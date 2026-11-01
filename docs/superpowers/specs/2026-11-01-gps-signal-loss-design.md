@@ -40,9 +40,9 @@ The maintainer's decisions for this work:
   - B-1 BAD SATELLITE GEOMETRY SEE EPE ON STA 2 PAGE: follows a RAIM-not-available notice; the geometry allows a
     position error larger than IFR use permits.
   - B-1 BAD SATELLITE GEOMETRY AND RAIM NOT AVAILABLE: only in approach active, RAIM unavailable and the geometry
-    degraded further; a NAV flag may follow in a couple of minutes.
+    degraded further; a NAV flag can follow within a few minutes if it keeps getting worse.
   - B-3 RAIM NOT AVAILABLE APR MODE INHIBITED PREDICT RAIM ON STA 5: integrity predicted unavailable at the FAF or MAP;
-    ACTV is refused until conditions improve.
+    the unit refuses ACTV until RAIM is available again.
   - B-3 PRESS GPS APR FOR NAV: after a NAV flag caused by RAIM in the approach mode; GPS APR restores navigation for the
     missed approach.
   - B-1 ALTITUDE FAIL already exists; it notes that the altitude helps the integrity calculation.
@@ -63,7 +63,7 @@ The maintainer's decisions for this work:
   rule stays.
 - Two photos of a newer unit (local reference library, `gps search/kmem-iap-1.jpg` and `kmem-star-2.jpg`, host software
   `01515-0047` per `status-3.jpg`) show STA 2 as `0.00NM` and a little later `0.01NM`: a leading zero, two decimals
-  and full-size `NM`. A second unit in the same panel, without a fix, shows five underscores before `NM`.
+  and full-size `NM`. A second unit in the same panel, without a fix, shows five dashes before `NM`. The font draws its dashes low, so the photo was first read as underscores.
 
 **The simulator.** Scans of the SDK `GPSSatComputer` with the unit's own ephemeris file, 8 channels, a whole week (the
 SDK reduces time to the time of week, so a week covers every date) on a 5° grid at sea level:
@@ -189,9 +189,9 @@ A new module (name left to the builder, for example `kln90b/GpsSolution.ts`), ow
 - **STA 2**, line 3, field five characters wide and right-aligned so that `NM` ends in the last column:
   - With a fix: `0.00NM` style, `d.dd` with full-size `NM`. The field never needs more, since the solution is invalid
     above 3.8 NM.
-  - Without a fix: `_____NM`.
-  - The builder checks the exact columns against the two photos (the maintainer has them) and that the font has the
-    underscore glyph.
+  - Without a fix: `-----NM`.
+  - The builder checks the exact columns against the two photos (the maintainer has them). The dashes are the glyph
+    the unit uses for every null value.
   - The page comment cites the photos and why they win over the 5-30 figure (section 1).
 
 ### 5.4 Messages
@@ -215,6 +215,12 @@ VFR-only included: the Installation Manual ties only ALTITUDE FAIL to the IFR co
   | RAIM NOT AVAILABLE APR MODE INHIBITED PREDICT RAIM ON STA 5 | The last ACTV check refused the switch for integrity (5.5), and the gate is still checking: ARM, the FAF active, within 2 NM. It leaves once ACTV succeeds, the unit leaves ARM, or the gate stops checking (my call) |
   | PRESS GPS APR FOR NAV | The integrity flag of 5.5 is set. It leaves when the flag clears, however that happens |
 
+- **`L:KLN90B_IntegrityWarn`** (maintainer request, 2026-11-01): ARINC 429 label 261 bit 24, GPS integrity, 1 = fail
+  (GAMA 11). It is true when the unit cannot assure the integrity of its position for the current flight phase: no valid
+  fix, or RAIM unavailable (too few measurements or geometry) at the alert limit of the current mode (2 NM ENR, 1 NM ARM,
+  0.3 NM APR). It is a real-time status bit, with no debounce, unlike the messages above. The integrity flag of 5.5 does
+  not set it. Bit 23, the final approach integrity bit, is not part of this.
+
 ### 5.5 Approach mode
 
 - **The ACTV gate** (`ModeController.checkSwitchAprArmToActive`, which has an `//Integrity check?` placeholder). After
@@ -224,10 +230,10 @@ VFR-only included: the Installation Manual ties only ALTITUDE FAIL to the IFR co
     These two predictions run once at the 2 NM point, not every tick.
 
   If either fails, the unit stays in ARM and posts the inhibit message. It retries on later ticks while still inside
-  2 NM (6-20: "until conditions improve"). The retry rate is the builder's call; a prediction costs about 0.04 ms.
+  2 NM, since 6-20 lets ACTV come once RAIM is available again. The retry rate is the builder's call; a prediction costs about 0.04 ms.
 - **The integrity flag.** A new field in `VolatileMemory.navPage`, reset at power-on like the rest.
-  - It is set in APR ACTV when RAIM has been unavailable for the 0.3 NM limit for 2 minutes (B-1's "a couple of
-    minutes"; my call, low confidence), and immediately when the solution itself is lost.
+  - It is set in APR ACTV when RAIM has been unavailable for the 0.3 NM limit for 2 minutes (B-1 says only that the
+    flag can follow within a few minutes; the 2 minutes are my call, low confidence), and immediately when the solution itself is lost.
   - While it is set, `NavCalculator` flags the navigation values as it does for an invalid position. The position, the
     ground speed and the nearest pages stay valid.
   - It is cleared when the mode leaves APR ACTV: GPS APR (which already goes to ARM, 6-20), Direct To, OBS.
@@ -244,7 +250,7 @@ At the cheapest stage that observes each behavior (CLAUDE.md):
   - the singular case;
   - the slopes;
   - the model's HDOP equals the SDK's for the same satellites without the altitude.
-- **Render: STA 2.** The `0.00NM` / `0.01NM` / `_____NM` lines.
+- **Render: STA 2.** The `0.00NM` / `0.01NM` / `-----NM` lines.
 - **Render: STA 1.**
   - NAV A with three satellites and an altitude: inhibit all but three.
   - INIT/ACQ, not NAV, with three and no altitude.
@@ -265,8 +271,10 @@ At the cheapest stage that observes each behavior (CLAUDE.md):
 
 - `docs/architecture.md`: the GPS section and the STA 1 state line (NAV A, DEGRD).
 - `test/README.md` if new harness helpers appear (for example a helper to inhibit all but N satellites).
-- The public contract (CLAUDE.md) is unchanged: no H event, LVar, panel.xml key or persisted format changes. The GPS
-  SimVars follow the NAV flag as today.
+- The public contract (CLAUDE.md): no H event, panel.xml key or persisted format changes, and the GPS SimVars follow the
+  NAV flag as today. The one change is the meaning of `L:KLN90B_IntegrityWarn` (5.4), at the maintainer's request: it
+  now follows the integrity definition above instead of only "no fix". The maintainer informs the developer of the
+  aircraft that uses it.
 
 ## 6. Left to the builder
 

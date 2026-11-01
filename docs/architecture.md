@@ -251,13 +251,14 @@ and `GENERAL ENG FUEL USED SINCE START:n`, and converts them to the configured u
   setting `barosetting`.
 
 `GPS` (`kln90b/Gps.ts`) **simulates acquisition, then reads the true sim position once valid.** There is no position
-error or noise and no RAIM ("We have pretty all messages except for failures and RAIM problems"). STA 5 predicts
-the satellite geometry at the destination and ETA with `gps.raimPrediction`, a long-lived SDK prediction context of the
-main computer; RAIM failures are still not modeled.
+error or noise. Whether there is a position comes from the unit's own solution (`GPS.solution`, below), not from the
+SDK's. STA 5 predicts the satellite geometry at the destination and ETA with `gps.raimPrediction`, a long-lived SDK
+prediction context of the main computer.
 
 - It wraps the SDK `GPSSatComputer` in `KLNGPSSatComputer` (`// @ts-ignore extends`). That class keeps every reach
   into **private SDK internals through `as any`**, so it may break on SDK upgrades:
-    - `activeSimulationContext.channels` (STA 1). Since SDK 2.3.3 the receiver's time, position and last known position
+    - `activeSimulationContext.channels` (STA 1 only; the receiver model reads the satellites' public in-use state
+      instead). Since SDK 2.3.3 the receiver's time, position and last known position
       live in `activeSimulationContext` too; the unit no longer reads them (#211, replaced by the start model).
     - `lastAlamanacTime` (`getLastAlmanacTime()`, for the start model and the saved `lastAlmanacDownload`).
     - `satelliteTimingOptions` (`setAcquisitionTime()` and `setAcquisitionTimeWithEphemeris()`: the object is shared
@@ -316,12 +317,47 @@ main computer; RAIM failures are still not modeled.
   ephemeris download 30 s (one data frame) and expiry 2 h, acquisition with a current ephemeris 9 ± 3 s (a hot start
   has its fix before the 17 s self-test ends), almanac download 12.5 min, almanac expiry six months (3-17), timeout
   4 min. With `fastGpsAcquisition` all of these drop to about 1 to 10 s.
-- `isValid()` is true one calculation tick after the receiver's first solution (`systemState` is `SolutionAcquired` or
-  `DiffSolutionAcquired`), and stays true while that holds. The tick in between is TRAN (`isTransition()`, 5-29, #215).
-  A forced acquisition (engine-running start, SET 10 FAST) is accepted at once, without TRAN
-  (`acceptForcedSolution`, called by `KLNGPSSatComputer.acquireAndUseSatellites`). `gpsAcquired()` runs on acceptance.
-  There is a TODO: 3-satellite plus altitude aiding is not modeled.
-- **STA 1 state line** (`Sta1Page.stateText`, #215): NAV D, NAV A (whenever there is an altitude) or NAV when valid;
+- **The receiver model** (`kln90b/GpsSolution.ts`, #453, design in
+  `docs/superpowers/specs/2026-11-01-gps-signal-loss-design.md` 5.1). `GPS.solution` is a `GpsGeometry` computed by
+  `computeGeometry` from the line of sight (`position.get()`) of the satellites the SDK has in use (`InUse`,
+  `InUseDiffApplied`, in PRN order, through the public `getSatellites()`) and from the altitude input, an extra measurement whenever
+  `airdata.pressureAltitude` is not null (`SensorsIn` passes that check to the constructor). It is valid with four
+  satellites, or three plus the altitude (5-29), and an error estimate within 3.8 NM (B-4). The SDK alone always needs
+  four, so with three satellites it reports PDOP -1 while the unit navigates, usually with the state `Acquiring` (it
+  reports `Searching` when no channel is acquiring and the receiver is beyond 100 NM of its last known position).
+    - **The cache**: `GPS.tick` recomputes after `onUpdate()`, but only when the in-use PRNs, any of their position
+      values (the SDK moves them every 5 s, in place) or the altitude presence changed. The previous inputs are kept in
+      reused arrays. `acceptForcedSolution` and `reset()` recompute too, since no tick has seen the receiver's new
+      satellites yet.
+    - **Take-home mode** never recomputes from satellites: its solution is a constant healthy one (eight satellites,
+      HDOP 1), and only its `altitudeAided` follows the altitude input (`updateSolution`), so STA 1 shows NAV A with an
+      altimeter as in flight.
+    - **The last known position**: while the unit has a fix and the SDK has none (three satellites plus the altitude),
+      `GPS.tick` passes `coords` to `gpsSatComputer.syncLastKnownPosition` every tick. Otherwise the SDK's last known
+      position stays where its own solution ended. Satellites that need a new channel (ones that rose, or came back
+      after a loss) are then offered by its line-of-sight filter only within 100 NM of that position; beyond it the SDK
+      searches blind in PRN order. `GpsSolution.test.ts` holds this: back from three satellites 150 NM on, it gets its
+      fix in about 11 s with the sync and took about 9 minutes without it (slow acquisition).
+- **RAIM availability** (`raimStatus`, #453): five measurements are needed (the altitude counts as one), and the
+  protection level (the largest slope of the geometry × 5 m × 5.3) must be within the alert limit of the flight phase
+  (`halForMode`: 2 NM en route, 1 NM in ARM, 0.3 NM in APR). The levels and K are our own choice (design 5.2). Satellite
+  failures (#366) and a fuzzy position (#402) are not modeled. The messages wait `RAIM_MESSAGE_DELAY` (10 s of GPS time,
+  our own call) before `RAIM NOT AVAILABLE` and the geometry messages show; the coverage message has no delay.
+- **STA 2** (`Sta2Page`, #453) shows the unit's own error estimate: 2 × HDOP × 5 m in NM with two decimals (`formatEpe`),
+  five dashes without a fix. The format follows a photographed real unit, not the figure of the Pilot's Guide (5-30). The
+  SDK's HDOP is not used, since it is -1 with three satellites plus the altitude.
+- **STA 5** (`Sta5Page.calculateRaim`, #453) predicts RAIM for the destination at its ETA and at offsets around it, against
+  the approach limit of 0.3 NM and with the altitude row when the unit has an altitude input. The same `predictRaim`
+  serves the ACTV gate (Core 5).
+- `isValid()` is true one calculation tick after the first valid solution, and stays true while the solution is valid.
+  The tick in between is TRAN (`isTransition()`, 5-29, #215). A forced acquisition (engine-running start, SET 10 FAST)
+  is accepted at once, without TRAN (`acceptForcedSolution`, called by `KLNGPSSatComputer.acquireAndUseSatellites`).
+  `gpsAcquired()` runs on acceptance and sets `hadFixSincePowerOn`, which `powerChanged` clears at power-on and
+  power-off.
+- **STA 1 state line** (`Sta1Page.stateText`, #215, #453): when valid, DEGRD while RAIM is unavailable for geometry
+  (`raimStatus` is `Raim.Geometry` against the alert limit of the flight phase, `halForMode`; our own call, low
+  confidence, and not with too few measurements), otherwise NAV D, NAV A (when `GPS.solution.altitudeAided`, the altitude
+  input being a measurement of the solution) or NAV;
   TRAN in the transition tick; ACQ during the start model's acquisition, even when nothing can be acquired; INIT during
   the almanac and sky searches and before the first channel assignment.
 - When valid, `coords` come from `PLANE LATITUDE/LONGITUDE` and `groundspeed` from `GROUND VELOCITY`.
@@ -365,7 +401,12 @@ on them.
           optimised for the autopilot.
         - `L:KLN90B_HSI_TF_FLAGS`: 0 = off, 1 = TO, 2 = FROM.
         - `L:KLN90B_RollCommand`: degrees, positive = left.
-        - `L:KLN90B_IntegrityWarn` (#87): true when the GPS is not valid.
+        - `L:KLN90B_IntegrityWarn` (#87, #453): ARINC 429 label 261 bit 24 (GPS integrity), true = fail: no valid fix
+          (`!isValid()`), or RAIM unavailable for the alert limit of the current mode (`raimStatus(gps.solution,
+          halForMode(navmode))`, 2 NM ENR, 1 NM ARM, 0.3 NM APR). Written by `NavCalculator.setOutput`, in real time without
+          the debounce of the MSG messages. The approach integrity flag (Core 5) does not set it: it flags the navigation
+          while the position stays valid, and once the fix and RAIM are back the bit is 0 although the navigation stays
+          flagged until GPS APR.
         - `L:KLN90B_XTK` (#158): the ARINC 429 label 116 cross track in NM, positive = fly left, 0 without an
           active waypoint. Not smoothed, unlike `GPS WP CROSS TRK`.
         - `L:KLN90B_MsgLight`, `L:KLN90B_WptLight`, `L:KLN90B_AnnunTest`.
@@ -697,10 +738,23 @@ sim.
   first APP leg is kept in `navPage.approachDisarmedLeg`, and the auto-arm skips that approach until the next press,
   or until the legs are another object (the approach was removed, replaced or loaded again). A power-up clears it.
 - ARM becomes APR when the FAF is active (or the IAF copy of a fix that is IAF and FAF, `ActiveWaypoint.getActiveFafLeg()`),
-  within 2 NM, the MAP is ahead and the track is within 110 deg of FAF to MAP. APR becomes 0.3 at the FAF ("Integrity
-  check?" is a TODO; there is no RAIM). In APR the scale ramps from its value at the activation to 0.3 over the distance
+  within 2 NM, the MAP is ahead, the track is within 110 deg of FAF to MAP and the integrity gate below passes. The scale
+  becomes 0.3 at the FAF. In APR the scale ramps from its value at the activation to 0.3 over the distance
   to the FAF left at the activation (capped at 1); both values are kept in `navPage.aprActivationScale` and
   `navPage.aprActivationDist`.
+- **The ACTV integrity gate** (`ModeController.checkApproachIntegrity`, #453, 6-3, 6-20): ACTV also needs RAIM available
+  now for the approach limit of 0.3 NM and predicted available at the FAF and at the MAP for their ETAs (`predictRaim`
+  on `gps.raimPrediction`, with the altitude row when the unit has an altitude input, as the live solution and STA 5
+  do). Below 1 kt there is no ETA and both predictions are for the present time. A refusal sets
+  `navPage.aprIntegrityInhibit` (the persistent `AprModeInhibitedMessage`) and keeps ARM; while the gate keeps checking,
+  it checks again every `APR_INTEGRITY_RETRY` (10 s, our own choice). The inhibit clears with ACTV, when the unit
+  leaves ARM, or when the gate stops checking (the FAF no longer active, or more than 2 NM from it).
+- **The integrity flag** (`navPage.integrityFlag`, #453, B-1, B-3, 6-20): set in APR when the fix is lost, or when RAIM
+  for 0.3 NM has been unavailable for `APR_RAIM_FLAG_DELAY` (2 minutes of GPS time, our own call). `NavCalculator`
+  treats it as it treats a lost fix: the navigation is flagged (`setFlag`, no XTK), but the position stays valid, so
+  `isValid()` does not change, and `L:KLN90B_IntegrityWarn` follows the fix and RAIM, not this flag. It stays until the
+  mode leaves APR, even when the fix or RAIM comes back; a GPS APR press leaves APR for ARM, which brings the navigation
+  back for the missed approach. The persistent `PressGpsAprMessage` (`PRESS GPS APR FOR NAV`) follows the flag.
 - `armApproachPressed()` is triggered from MainPage on `EVT_APPR_ARM`.
 - **OBS mode is implemented as a direct-to from a synthetic user facility (`ICAO.value("U","XX",...)`) 1000 NM away on
   the reciprocal of the OBS** (`setObsTrue`). The course is held true in `navPage.obsTrue` (#425); `setObs` takes a
@@ -1071,8 +1125,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - Messages are added with `messageHandler.addMessage(new OneTimeMessage(["LINE1","LINE2"]))`; each line holds at
       most about 22 to 23 characters.
 - `buildPersistentMessages(props)` creates: `AltitudeFailMessage`, `ArmGPSApproachMessage`, `DatabaseOutOfDateMessage`,
-  `IfRequiredSelectObsMessage`, `MagvarMessage`, `Obs200NMMessage`, `PressAltToSetBaroMessage`, `VnavAlertMessage`, and
-  both course messages, which decide on every call which indicator case applies, because `Output.ObsTarget` can change
+  `IfRequiredSelectObsMessage`, `MagvarMessage`, `Obs200NMMessage`, `PressAltToSetBaroMessage`, `VnavAlertMessage`, the
+  signal and RAIM messages of #453 (`SatelliteCoverageMessage`, `RaimNotAvailableMessage`, `BadGeometryMessage`,
+  `BadGeometryApproachMessage`, `AprModeInhibitedMessage`, `PressGpsAprMessage`; see Core 3 and Core 5), and both
+  course messages, which decide on every call which indicator case applies, because `Output.ObsTarget` can change
   at run time (#401): `AdjustCourseToMessage` (`ADJ NAV IND CRS TO xxx°`) while `obsTarget===0`, and
   `AdjustCourseMessage` (`ADJ NAV IND CRS`) for a driven indicator. Neither is evaluated before the self-test is
   approved (#330). With a readable course the TO message shows at once at a leg change and otherwise after more than
@@ -1120,8 +1176,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - RNAV SIDs and STARs are excluded
     - only `A-Z0-9 -` can be displayed
 - **Deliberate non-real additions:** `GPS COURSE TO STEER`, the roll-steering LVar for the autopilot, `bearingForAP` on
-  arcs, the fast GPS acquisition setting (default on) and keyboard mode. Missing on purpose or not implemented: RAIM,
-  failures, 3-satellite plus altitude solutions, CTA/TMA in the SUA filter (TODO), and the third line of the SUA
+  arcs, the fast GPS acquisition setting (default on) and keyboard mode. Missing on purpose or not implemented: satellite
+  failures (#366), a fuzzy position (#402), CTA/TMA in the SUA filter (TODO), and the third line of the SUA
   messages (the APT 4 reference for Class B/C and the controlling agency, #210: the sim's data has neither).
 - **Event bus topics** are typed by interfaces declared next to their owner. There is no central file:
     - `PowerEvent.powerEvent` (`PowerSupply.ts`)

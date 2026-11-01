@@ -4,7 +4,8 @@ import {FROM, TO, VolatileMemory} from "../VolatileMemory";
 import {FlightPathUtils, GeoCircle, GeoPoint, NavMath, UnitType, UserSetting} from "@microsoft/msfs-sdk";
 import {KLN90BUserSettings} from "../../settings/KLN90BUserSettings";
 import {Degrees, Knots, NauticalMiles, Seconds} from "../Units";
-import {ModeController} from "../../services/ModeController";
+import {halForMode, ModeController} from "../../services/ModeController";
+import {Raim, raimStatus} from "../../GpsSolution";
 import {KLNFixType, KLNFlightplanLeg} from "../flightplan/Flightplan";
 import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
@@ -173,7 +174,8 @@ export class NavCalculator implements CalcTickable {
             nav.activeWaypoint.clearTurnStack();
             this.setOutput();
             return;
-        } else if (!this.sensors.in.gps.isValid()) {
+        } else if (!this.sensors.in.gps.isValid() || nav.integrityFlag) {
+            //#453, 6-20: the integrity flag of APR flags the navigation as a lost fix does; the position stays valid
             this.setFlag();
             this.setOutput();
             return;
@@ -872,7 +874,11 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setDistance(nav.distToActive);
         this.sensors.out.setWPTETE(nav.eteToActive, this.eteToEta(nav.eteToActive));
         this.sensors.out.setDestETE(nav.eteToDest, this.eteToEta(nav.eteToDest));
-        this.sensors.out.setPos(this.sensors.in.gps.coords, this.sensors.in.gps.groundspeed, track, magvar, !this.sensors.in.gps.isValid());
+        const gps = this.sensors.in.gps;
+        //#453: GPS integrity fail (ARINC label 261 bit 24) is no fix, or no RAIM at the alert limit of the current phase.
+        //Real time, without the debounce of the messages. The APR integrity flag does not set it
+        const integrityFail = !gps.isValid() || raimStatus(gps.solution, halForMode(nav.navmode)) !== Raim.Available;
+        this.sensors.out.setPos(gps.coords, gps.groundspeed, track, magvar, integrityFail);
 
         this.sensors.out.setWPIndex(nav.activeWaypoint.getActiveFplIdx(), nav.activeWaypoint.fpl0.getLegs().length);
 

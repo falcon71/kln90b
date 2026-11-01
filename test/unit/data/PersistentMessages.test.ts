@@ -39,6 +39,15 @@ interface World {
     legChangeDtkDelta: number | null;
     /** The length of ActiveWaypoint.turnStack: a turn is being flown while it is not 0 */
     turnStackLength: number;
+    /** GPS.isValid(): the position is accepted and its solution is valid (#453) */
+    gpsValid: boolean;
+    /** GPS.solution.valid: false while the unit has no solution; true with gpsValid false is TRAN (#453) */
+    solutionValid: boolean;
+    /** GPS.hadFixSincePowerOn (#453) */
+    hadFix: boolean;
+    /** GPS.solution: only what the RAIM messages read (#453) */
+    measurements: number;
+    maxSlope: number;
 }
 
 /** A page object that passes the instanceof checks of PersistentMessages without being rendered */
@@ -67,6 +76,12 @@ function quietWorld(): World {
         gpsTime: Date.UTC(2026, 5, 1, 12),
         legChangeDtkDelta: null,
         turnStackLength: 0,
+        // Eight satellites, a perfect geometry: RAIM is available in every flight phase
+        gpsValid: true,
+        solutionValid: true,
+        hadFix: true,
+        measurements: 8,
+        maxSlope: 0,
     };
 }
 
@@ -131,6 +146,13 @@ function harness(w: World) {
                 gps: {
                     get timeZulu() {
                         return {getTimestamp: () => w.gpsTime};
+                    },
+                    isValid: () => w.gpsValid,
+                    get hadFixSincePowerOn() {
+                        return w.hadFix;
+                    },
+                    get solution() {
+                        return {valid: w.solutionValid, measurements: w.measurements, maxSlope: w.maxSlope};
                     },
                 },
             },
@@ -1229,5 +1251,92 @@ describe('ADJ NAV IND CRS TO nnn before the self-test is approved', () => {
         w.selfTestApproved = true;
 
         expect(everySecond(h, w, 40).flat()).toEqual([]);
+    });
+});
+
+
+// #453: which of the coverage, RAIM and geometry messages a state raises. The alert limit follows the flight phase
+// (halForMode: 2 NM en route, 1 NM armed, 0.3 NM in the approach), and HPL = max slope x 5 m x 5.3 (GpsSolution.ts)
+describe('the coverage, RAIM and geometry messages (#453)', () => {
+    const COVERAGE = 'SATELLITE COVERAGE INADEQUATE FOR NAV';
+    const RAIM = 'RAIM NOT AVAILABLE CROSS CHECK POSITION';
+    const GEOMETRY = 'BAD SATELLITE GEOMETRY SEE EPE ON STA 2 PAGE';
+    const APPROACH = 'BAD SATELLITE GEOMETRY AND RAIM NOT AVAILABLE';
+
+    const OURS = [COVERAGE, RAIM, GEOMETRY, APPROACH];
+    /** Only these four: the armed modes raise PRESS ALT TO SET BARO too */
+    const ours = (messages: string[]) => messages.filter(m => OURS.includes(m));
+
+    /** Our messages after the state has held for 12 s: the first tick starts the count, the 12th is more than 10 s later */
+    function after12s(change: (w: World) => void): string[] {
+        const w = quietWorld();
+        change(w);
+        return ours(tickSeconds(harness(w), w, 12));
+    }
+
+    it('raises none with a healthy solution in every flight phase', () => {
+        for (const mode of [NavMode.ENR_LEG, NavMode.ARM_LEG, NavMode.APR_LEG, NavMode.ENR_OBS, NavMode.ARM_OBS]) {
+            expect(after12s(w => w.navmode = mode)).toEqual([]);
+        }
+    });
+
+    it('raises the coverage message without a position, but only after a fix since the power-on (B-4)', () => {
+        const lost = (w: World) => {
+            w.gpsValid = false;
+            w.solutionValid = false;
+        };
+        expect(after12s(lost)).toEqual([COVERAGE]);
+        expect(after12s(w => {
+            lost(w);
+            w.hadFix = false;
+        })).toEqual([]);
+    });
+
+    // Gps.ts: a valid solution is accepted one tick later (TRAN, 5-29), and the NAV flag is up until then
+    it('keeps the coverage message through TRAN, while the solution is valid but not yet accepted (B-4)', () => {
+        expect(after12s(w => {
+            w.gpsValid = false;
+            w.solutionValid = true;
+        })).toEqual([COVERAGE]);
+    });
+
+    it('raises no RAIM message without a position: the coverage message is the one', () => {
+        expect(after12s(w => {
+            w.gpsValid = false;
+            w.solutionValid = false;
+            w.measurements = 3;
+        })).toEqual([COVERAGE]);
+    });
+
+    it('raises the RAIM message for four measurements, in every phase but the approach (B-3, B-1)', () => {
+        for (const mode of [NavMode.ENR_LEG, NavMode.ARM_LEG, NavMode.ENR_OBS, NavMode.ARM_OBS]) {
+            expect(after12s(w => {
+                w.navmode = mode;
+                w.measurements = 4;
+            })).toEqual([RAIM]);
+        }
+        expect(after12s(w => {
+            w.navmode = NavMode.APR_LEG;
+            w.measurements = 4;
+        })).toEqual([APPROACH]);
+    });
+
+    // HPL 100 x 5 m x 5.3 = 1.43 NM: within the 2 NM of en route, beyond the 1 NM of the armed approach
+    it('takes the alert limit from the flight phase (1.43 NM against 2, 1 and 0.3 NM)', () => {
+        const slope = (mode: NavMode) => after12s(w => {
+            w.navmode = mode;
+            w.maxSlope = 100;
+        });
+        expect(slope(NavMode.ENR_LEG)).toEqual([]);
+        expect(slope(NavMode.ARM_LEG)).toEqual([RAIM, GEOMETRY]);
+        expect(slope(NavMode.APR_LEG)).toEqual([APPROACH]);
+    });
+
+    it('raises the RAIM and geometry messages for a geometry beyond the limit, after more than 10 s', () => {
+        const w = quietWorld();
+        w.maxSlope = 200; // 2.9 NM
+        const h = harness(w);
+        expect(ours(tickSeconds(h, w, 11))).toEqual([]);
+        expect(ours(tickSeconds(h, w, 1))).toEqual([RAIM, GEOMETRY]);
     });
 });

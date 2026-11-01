@@ -14,6 +14,9 @@ import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TimeStamp, TIMEZONES} from "../../data/Time";
 import {HOURS_TO_SECONDS} from "../../services/KLNNavmath";
+import {predictRaim} from "../../GpsSolution";
+import {halForMode} from "../../services/ModeController";
+import {NavMode} from "../../data/VolatileMemory";
 
 
 type Sta5PageTypes = {
@@ -116,10 +119,11 @@ export class Sta5Page extends SixLineHalfPage {
         this.refDebounce.schedule(async () => { //we need to simulate the calculation time anyway
             await prediction.awaitInit();
             let result = "";
+            //#453, 6-20: RAIM for the approach limit, with the altitude input when the unit has one (design 5.2, 5.5)
+            const altitudeAided = this.props.sensors.in.airdata.pressureAltitude !== null;
             for (let timeOffset = -15; timeOffset <= 15; timeOffset += 5) {
                 //6-19, 6-20: the satellite geometry at the destination at the ETA and around it (#214)
-                prediction.setPosition(wpt.lat, wpt.lon, 0, actualTimeStamp + timeOffset * 60 * 1000).predict();
-                const isRaimAvailable = prediction.getDops()[0] >= 0; //A position solution exists
+                const isRaimAvailable = predictRaim(prediction, wpt.lat, wpt.lon, actualTimeStamp + timeOffset * 60 * 1000, altitudeAided, halForMode(NavMode.APR_LEG));
 
                 result += isRaimAvailable ? "è" : "é";
             }

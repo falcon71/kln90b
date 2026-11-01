@@ -1,4 +1,4 @@
-import {FROM, isObsMode, NavMode, NavPageState} from "../data/VolatileMemory";
+import {APR_RAIM_FLAG_DELAY, FROM, isObsMode, NavMode, NavPageState} from "../data/VolatileMemory";
 import {
     AirportFacility,
     EventBus,
@@ -18,6 +18,8 @@ import {StatusLineMessageEvents} from "../controls/StatusLine";
 import {CalcTickable, TICK_TIME_CALC} from "../TickController";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 import {roundBearing} from "../data/Coordinates";
+import {predictRaim, Raim, raimStatus} from "../GpsSolution";
+import {HOURS_TO_SECONDS} from "./KLNNavmath";
 
 const VEC3_CACHE = new Float64Array(3);
 
@@ -28,6 +30,33 @@ const VEC3_CACHE = new Float64Array(3);
  * not always the same number to the last bit) from counting as a turn of the indicator (#122, #425)
  */
 const OBS_SAME_COURSE_EPSILON = 1e-6;
+
+/**
+ * The horizontal alert limit of the flight phase in NM for the RAIM check (TSO-C129 values, see the design of #453, 5.2):
+ * 2 NM en route, 1 NM while the approach is armed, 0.3 NM with the approach active
+ */
+export function halForMode(mode: NavMode): number {
+    switch (mode) {
+        case NavMode.APR_LEG:
+            return 0.3;
+        case NavMode.ARM_LEG:
+        case NavMode.ARM_OBS:
+            return 1;
+        default:
+            return 2;
+    }
+}
+
+/** #453, B-1: the 2 minutes before the integrity flag in APR, a low-confidence call (defined in VolatileMemory) */
+export {APR_RAIM_FLAG_DELAY};
+
+/**
+ * #453, 6-20: while the integrity check of the ACTV gate refuses the switch, it is made again at most this often. 6-20 says
+ * only that ACTV stays inhibited for as long as the poor conditions last, with no rate for checking again; the 10 s are our
+ * own call, with low confidence. A prediction costs about 0.04 ms, so the rate is not about cost alone: the predictions
+ * need not run every second
+ */
+const APR_INTEGRITY_RETRY = 10_000;
 
 /**
  * 5-36
@@ -362,6 +391,8 @@ export class ModeController implements CalcTickable {
     }
 
     public tick(): void {
+        //#453: a key may have left APR or ARM since the last tick (GPS APR, Direct To, OBS)
+        this.clearIntegrityStateOfOtherModes();
         const apt = this.getApproachApt();
         switch (this.navState.navmode) {
             case NavMode.ENR_LEG:
@@ -404,7 +435,34 @@ export class ModeController implements CalcTickable {
 
                     this.adjustXtkScaleActive();
                 }
+                if (this.navState.navmode === NavMode.APR_LEG) {
+                    this.updateIntegrityFlag();
+                }
                 break;
+        }
+        //This tick may have left APR or ARM itself
+        this.clearIntegrityStateOfOtherModes();
+    }
+
+    /**
+     * #453, 6-20, B-1, B-3: in APR the navigation is flagged at once when the fix is lost, and when RAIM has been unavailable
+     * for the approach limit (0.3 NM) for APR_RAIM_FLAG_DELAY. The flag stays until the mode leaves APR, even when the fix
+     * or RAIM comes back: GPS APR brings the navigation back for the missed approach (6-20)
+     */
+    private updateIntegrityFlag(): void {
+        const gps = this.sensors.in.gps;
+        this.navState.integrityFlag ||= !gps.isValid()
+            || this.navState.aprRaimLoss.update(raimStatus(gps.solution, halForMode(NavMode.APR_LEG)) !== Raim.Available, gps.timeZulu.getTimestamp());
+    }
+
+    /** #453: the integrity flag belongs to APR and the inhibit of the ACTV gate to ARM */
+    private clearIntegrityStateOfOtherModes(): void {
+        if (this.navState.navmode !== NavMode.APR_LEG) {
+            this.navState.integrityFlag = false;
+            this.navState.aprRaimLoss.reset();
+        }
+        if (this.navState.navmode !== NavMode.ARM_LEG) {
+            this.navState.aprIntegrityInhibit = false;
         }
     }
 
@@ -490,17 +548,24 @@ export class ModeController implements CalcTickable {
             return; //No transition for OBS
         }
 
+        if (!this.sensors.in.gps.isValid()) {
+            //#453: without a fix the position and the track are frozen and ACTV is impossible,
+            //so the gate stops checking; SATELLITE COVERAGE INADEQUATE FOR NAV already says why (B-4)
+            this.navState.aprIntegrityInhibit = false;
+            return;
+        }
+
         const faf = this.navState.activeWaypoint.getActiveFafLeg();
         if (faf === null) {
+            this.navState.aprIntegrityInhibit = false; //#453: the gate stopped checking
             return; //6-3: only with the FAF active, or the IAF copy of a fix that is IAF and FAF (#129)
         }
 
         const fafDist = UnitType.GA_RADIAN.convertTo(this.sensors.in.gps.coords.distance(faf.wpt), UnitType.NMILE);
         if (fafDist > 2) {
+            this.navState.aprIntegrityInhibit = false; //#453: the gate stopped checking
             return; //Within 2 NM
         }
-
-        //Integrity check?
 
         const map = this.getApproachMapIfAhead();
         if (map === null) {
@@ -515,11 +580,44 @@ export class ModeController implements CalcTickable {
             return; //Heading towards FAF
         }
 
+        if (!this.checkApproachIntegrity(fafPoint, fafDist, map)) {
+            return;
+        }
+
         console.log("Moving to Apr mode");
         //If all this has passed, we switch to approach active
         this.navState.aprActivationDist = fafDist;
         this.navState.aprActivationScale = Math.min(this.navState.xtkScale, 1);
         this.navState.navmode = NavMode.APR_LEG;
+    }
+
+    /**
+     * #453, 6-3, 6-20: ACTV also needs RAIM available now for the approach limit (0.3 NM), and predicted available at the
+     * FAF and at the MAP for their ETAs. A refusal sets aprIntegrityInhibit (B-3: RAIM NOT AVAILABLE APR MODE INHIBITED)
+     * and keeps the unit in ARM; the check is made again every APR_INTEGRITY_RETRY while the gate keeps checking. Below
+     * 1 kt there is no ETA, and both predictions are for the present time
+     */
+    private checkApproachIntegrity(fafPoint: GeoPoint, fafDist: number, map: KLNFlightplanLeg): boolean {
+        const gps = this.sensors.in.gps;
+        const now = gps.timeZulu.getTimestamp();
+        //A clock that went back (a time entered on SET 2) does not hold the retry back
+        if (this.navState.aprIntegrityInhibit && now >= this.navState.aprIntegrityCheckTime && now - this.navState.aprIntegrityCheckTime < APR_INTEGRITY_RETRY) {
+            return false;
+        }
+        this.navState.aprIntegrityCheckTime = now;
+
+        const hal = halForMode(NavMode.APR_LEG);
+        const altitudeAided = this.sensors.in.airdata.pressureAltitude !== null;
+        const gs = gps.groundspeed;
+        const msPerNm = gs < 1 ? 0 : HOURS_TO_SECONDS * 1000 / gs;
+        const fafEta = now + fafDist * msPerNm;
+        const mapEta = fafEta + UnitType.GA_RADIAN.convertTo(fafPoint.distance(map.wpt), UnitType.NMILE) * msPerNm;
+
+        const available = raimStatus(gps.solution, hal) === Raim.Available
+            && predictRaim(gps.raimPrediction, fafPoint.lat, fafPoint.lon, fafEta, altitudeAided, hal)
+            && predictRaim(gps.raimPrediction, map.wpt.lat, map.wpt.lon, mapEta, altitudeAided, hal);
+        this.navState.aprIntegrityInhibit = !available;
+        return available;
     }
 
 

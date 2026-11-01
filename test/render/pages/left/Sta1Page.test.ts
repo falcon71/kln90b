@@ -1,8 +1,14 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSSatellite, GPSSystemState} from '@microsoft/msfs-sdk';
+import {GPSSatellite, GPSSatelliteState, GPSSystemState} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {DEFAULT_START} from '../../../harness/sim/clock';
+import {inhibitAllBut} from '../../../harness/gps';
+import {APR_ARM_SWITCH, NO_ALTIMETER, panelXml} from '../../../harness/panelXml';
+import {approachWorld} from '../../../harness/fixtures';
+import {savedFlightplan} from '../../../harness/storage';
+import {GpsGeometry} from '../../../../kln90b/GpsSolution';
+import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
 // The STA 1 snapshot of a unit with a fix is in GpsAcquisition.test.ts (describe 'STA 1 page with a fix'); the INIT
 // state of an almanac search is below. The decisions of #215: INIT covers the almanac and the sky searches (ORS 20 has
@@ -187,4 +193,154 @@ describe('STA 1 receiver states (5-29)', () => {
         expect(gps.isValid()).toBe(true);
         expect(Screen.read().rows('L')[0]).toMatch(/^STATE (  NAV|NAV A|NAV D)$/);
     }, 60_000);
+});
+
+// 5-29: the state follows the receiver's own solution (#453). NAV A is a position from three satellites plus the altitude;
+// DEGRD is our reading of "RAIM is not available for the geometry", which is a low-confidence call (design, 5.3)
+describe('STA 1 states from the receiver solution (5-29, #453)', () => {
+    /** A valid six-measurement geometry whose horizontal protection level exceeds the 2 NM en-route limit (200 x 5 m x 5.3 = 2.9 NM) */
+    const POOR_GEOMETRY: GpsGeometry = {
+        valid: true, satellites: 6, altitudeAided: false, measurements: 6, hdop: 1, epeNm: 0.01, maxSlope: 200,
+    };
+
+    async function staOneWithFix(options: Parameters<typeof bootUnit>[0] = {}): Promise<HeadlessUnit> {
+        const unit = await bootUnit(options);
+        await settle(unit);
+        await unit.panel.selectPage('L', 'STA 1');
+        return unit;
+    }
+
+    it('shows NAV A on three satellites with an altitude input', async () => {
+        const unit = await staOneWithFix();
+
+        inhibitAllBut(unit, 3);
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+        expect(unit.props.sensors.in.gps.solution.altitudeAided).toBe(true);
+        expect(Screen.read().rows('L')[0]).toBe('STATE NAV A');
+    }, 60_000);
+
+    it('shows ACQ after losing the fix on three satellites without altitude', async () => {
+        const unit = await staOneWithFix({panelXml: panelXml(NO_ALTIMETER)});
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true);
+
+        inhibitAllBut(unit, 3);
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false);
+        expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
+    }, 60_000);
+
+    it('shows DEGRD while RAIM is unavailable for geometry', async () => {
+        const unit = await staOneWithFix();
+        const gps = unit.props.sensors.in.gps;
+
+        vi.spyOn(gps, 'solution', 'get').mockReturnValue(POOR_GEOMETRY);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(gps.isValid()).toBe(true);
+        expect(Screen.read().rows('L')[0]).toBe('STATE DEGRD');
+    }, 60_000);
+
+    it('does not show DEGRD when RAIM lacks measurements', async () => {
+        const unit = await staOneWithFix();
+        const gps = unit.props.sensors.in.gps;
+
+        vi.spyOn(gps, 'solution', 'get').mockReturnValue({...POOR_GEOMETRY, measurements: 4, satellites: 4});
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(gps.isValid()).toBe(true);
+        expect(Screen.read().rows('L')[0]).toBe('STATE   NAV');
+    }, 60_000);
+
+    it('shows NAV when the geometry is fine, with RAIM available', async () => {
+        const unit = await staOneWithFix({panelXml: panelXml(NO_ALTIMETER)});
+        const gps = unit.props.sensors.in.gps;
+        vi.spyOn(gps, 'solution', 'get').mockReturnValue({...POOR_GEOMETRY, maxSlope: 20});
+
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[0]).toBe('STATE   NAV');
+    }, 60_000);
+
+    /**
+     * Reaches each flight phase through the unit's own mode logic, as a pilot would (a mode written into the memory is
+     * reverted by the next calculation tick): the approach world of the mode controller tests, loaded from APT 8
+     */
+    async function inMode(mode: NavMode): Promise<HeadlessUnit> {
+        const w = approachWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(mode === NavMode.APR_LEG ? 7.5 : 20),
+            panelXml: panelXml(APR_ARM_SWITCH),
+            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        if (mode === NavMode.ENR_OBS) {
+            await unit.panel.obsMode();
+        }
+        if (mode !== NavMode.ENR_LEG && mode !== NavMode.ENR_OBS) {
+            await unit.panel.loadProcedure('APT 8');
+            await vi.advanceTimersByTimeAsync(31_000);
+        }
+        if (mode === NavMode.ARM_OBS) {
+            await unit.panel.obsMode();
+        }
+        if (mode === NavMode.APR_LEG) {
+            //Inbound on the final course and inside 2 NM of the FAF (5 NM before the airport): the approach goes active
+            await moveAircraft(unit, w.north(5 + 1.95), {groundspeedKt: 120, trackTrue: 180});
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+        await unit.panel.selectPage('L', 'STA 1');
+        return unit;
+    }
+
+    // The alert limit of each flight phase (2 NM en route, 1 NM armed, 0.3 NM approach active): a protection level of
+    // 1.7 NM (maxSlope 120 x 5 m x 5.3) is degraded for the two stricter limits only. The OBS modes use the limit of
+    // their phase
+    it.each([
+        [NavMode.ENR_LEG, 'ENR_LEG', 'STATE   NAV'],
+        [NavMode.ENR_OBS, 'ENR_OBS', 'STATE   NAV'],
+        [NavMode.ARM_LEG, 'ARM_LEG', 'STATE DEGRD'],
+        [NavMode.ARM_OBS, 'ARM_OBS', 'STATE DEGRD'],
+        [NavMode.APR_LEG, 'APR_LEG', 'STATE DEGRD'],
+    ])('judges a protection level of 1.7 NM in mode %s (%s) as %s', async (mode, _name, expected) => {
+        const unit = await inMode(mode);
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.isValid()).toBe(true);
+        vi.spyOn(gps, 'solution', 'get').mockReturnValue({...POOR_GEOMETRY, maxSlope: 120});
+
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.props.memory.navPage.navmode).toBe(mode);
+        expect(Screen.read().rows('L')[0]).toBe(expected);
+    }, 60_000);
+
+    // NAV D means a satellite is acquired but not yet in use. The real sky has none once the unit is settled, so one
+    // channel's public state is spied as Acquired (the page reads sat.state.get()); the solution is spied as well
+    describe('with a satellite in the Acquired state', () => {
+        async function withAcquiredSatellite(geometry: GpsGeometry): Promise<HeadlessUnit> {
+            const unit = await staOneWithFix();
+            const gps = unit.props.sensors.in.gps;
+            const sat = gps.gpsSatComputer.getChannels().filter(s => s !== null)[0] as GPSSatellite;
+            vi.spyOn(sat.state, 'get').mockReturnValue(GPSSatelliteState.Acquired);
+            vi.spyOn(gps, 'solution', 'get').mockReturnValue(geometry);
+            await vi.advanceTimersByTimeAsync(500);
+            expect(gps.isValid()).toBe(true);
+            return unit;
+        }
+
+        it('shows NAV D with a fine geometry', async () => {
+            await withAcquiredSatellite({...POOR_GEOMETRY, maxSlope: 20});
+
+            expect(Screen.read().rows('L')[0]).toBe('STATE NAV D');
+        }, 60_000);
+
+        it('shows DEGRD, not NAV D, with a poor geometry', async () => {
+            await withAcquiredSatellite(POOR_GEOMETRY);
+
+            expect(Screen.read().rows('L')[0]).toBe('STATE DEGRD');
+        }, 60_000);
+    });
 });

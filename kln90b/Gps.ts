@@ -5,7 +5,9 @@ import {
     GPSPredictionContext,
     GPSSatComputerOptions,
     GPSSatellite,
+    GPSSatelliteState,
     GPSSystemState,
+    ReadonlyFloat64Array,
     SimVarValueType,
     SubscribableSet,
     UnitType,
@@ -18,10 +20,26 @@ import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {TICK_TIME_CALC} from "./TickController";
 import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
+import {computeGeometry, GpsGeometry, SIGMA_UERE_M} from "./GpsSolution";
 
 const SAVE_INTERVALL = 60000;
 const MIN_GROUND_SPEED_FOR_TRACK = 2; //3-35
 const GPS_EPOCH = 315964800000; //Jan 6 1980
+
+/**
+ * Take-home mode flies without satellites (Installation manual 1-6, 2-4: it acts as if the GPS had a fix), so its
+ * solution is a healthy one that never changes, apart from the altitude flag: eight satellites at HDOP 1. The flag follows
+ * the altitude input as in flight (updateSolution), so STA 1 shows NAV A with it
+ */
+const TAKE_HOME_SOLUTION: Readonly<GpsGeometry> = {
+    valid: true,
+    satellites: 8,
+    altitudeAided: false, //The base: updateSolution takes the real value from the altitude input
+    measurements: 8,
+    hdop: 1,
+    epeNm: UnitType.METER.convertTo(2 * SIGMA_UERE_M, UnitType.NMILE), //The formula of GpsSolution at HDOP 1
+    maxSlope: 0,
+};
 
 /** "prn:time,prn:time" (setting lastEphemeris) */
 function parseEphemeris(saved: string): [number, number][] {
@@ -135,9 +153,23 @@ export class GPS {
     private gpsStartTime: number = 0;
     private solutionAccepted = false; //5-29: the unit accepts the receiver's solution one calculation tick after it appears (TRAN)
     private inTransition = false;
+    private _hadFixSincePowerOn = false;
+    /** The unit's own position solution (#453, GpsSolution.ts), recomputed by updateSolution */
+    private _solution: GpsGeometry;
+    //The inputs of the last computation, kept in reused arrays: the SDK changes a satellite's position array in place
+    private readonly solutionPrns: number[] = [];
+    private readonly solutionPositions: number[] = []; //zenith, azimuth per satellite
+    private solutionAltitude = false;
+    private readonly solutionInputs: ReadonlyFloat64Array[] = [];
     private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
-    constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler) {
+    /**
+     * @param hasAltitude whether the altitude input is present, which the solution uses as a measurement (5-29)
+     */
+    constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler,
+                private readonly hasAltitude: () => boolean) {
+        this.takeHomeMode = options.takeHomeMode;
+        this._solution = this.takeHomeMode ? {...TAKE_HOME_SOLUTION} : computeGeometry([], false);
         const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
 
         const gpsOptions: GPSSatComputerOptions = {
@@ -190,7 +222,6 @@ export class GPS {
 
         this.lastCoords = this.coords;
         this.gpsSatComputer.syncLastKnownPosition(this.coords);
-        this.takeHomeMode = options.takeHomeMode;
 
 
         //We assume that the internal clock kept the time fairly accurate since it has last been running
@@ -218,11 +249,13 @@ export class GPS {
             }
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + TICK_TIME_CALC);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
+            this.updateSolution();
         } else {
             this.search.tick(actualUnixTime, {lat, lon}, this.gpsSatComputer.internalTime);
             this.gpsSatComputer.onUpdate();
+            this.updateSolution();
 
-            if (!this.hasSdkSolution()) {
+            if (!this._solution.valid) {
                 this.solutionAccepted = false;
                 this.inTransition = false;
             } else if (!this.solutionAccepted) {
@@ -241,6 +274,12 @@ export class GPS {
                     lat,
                     lon,
                 );
+                if (!this.hasSdkSolution()) {
+                    //Three satellites plus the altitude: the SDK has no solution of its own and would keep its last known
+                    //position where its solution ended. Beyond 100 NM of it, its line-of-sight filter offers no satellite
+                    //for a free channel and it searches blind in PRN order (#453, design 5.1, GpsSolution.test.ts)
+                    this.gpsSatComputer.syncLastKnownPosition(this.coords);
+                }
                 this.groundspeed = SimVar.GetSimVarValue('GROUND VELOCITY', SimVarValueType.Knots);
 
                 if (this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK) {
@@ -286,9 +325,68 @@ export class GPS {
         return state === GPSSystemState.SolutionAcquired || state === GPSSystemState.DiffSolutionAcquired;
     }
 
+    /**
+     * 5-29: a position needs four satellites, or three when the altitude input is used in the solution. The unit's own
+     * solution decides, not the SDK's, which always needs four (#453)
+     */
     public isValid(): boolean {
-        //todo this is not entirely correct. GPSSatComputer assumes navigation is only possible with 4 sats. 5-29 states that navigation may be possible with 3 sats when an altitude input is used in the solution
-        return this.solutionAccepted && this.hasSdkSolution();
+        return this.solutionAccepted && this._solution.valid;
+    }
+
+    /** The unit's own position solution from the satellites the SDK has in use and the altitude input (#453). Constant in take-home mode */
+    public get solution(): GpsGeometry {
+        return this._solution;
+    }
+
+    /** Whether the unit has accepted a fix since it was last turned on */
+    public get hadFixSincePowerOn(): boolean {
+        return this._hadFixSincePowerOn;
+    }
+
+    /**
+     * Recomputes the solution from the satellites the SDK has in use, in PRN order, and the altitude input. Only when
+     * one of them changed: the SDK moves the satellites every 5 s, the calculation ticks at 1 Hz. Public SDK API only:
+     * the in-use state of the satellites, not the private channel list
+     */
+    private updateSolution(): void {
+        if (this.takeHomeMode) {
+            const aided = this.hasAltitude();
+            if (aided !== this._solution.altitudeAided) {
+                this._solution = {...TAKE_HOME_SOLUTION, altitudeAided: aided};
+            }
+            return;
+        }
+        const altitude = this.hasAltitude();
+        let changed = altitude !== this.solutionAltitude;
+        let n = 0;
+        for (const sat of this.gpsSatComputer.getSatellites()) {
+            const state = sat.state.get();
+            if (state !== GPSSatelliteState.InUse && state !== GPSSatelliteState.InUseDiffApplied) {
+                continue;
+            }
+            const position = sat.position.get();
+            if (n >= this.solutionPrns.length
+                || this.solutionPrns[n] !== sat.prn
+                || this.solutionPositions[2 * n] !== position[0]
+                || this.solutionPositions[2 * n + 1] !== position[1]) {
+                changed = true;
+                this.solutionPrns[n] = sat.prn;
+                this.solutionPositions[2 * n] = position[0];
+                this.solutionPositions[2 * n + 1] = position[1];
+            }
+            this.solutionInputs[n] = position;
+            n++;
+        }
+        if (n !== this.solutionPrns.length) {
+            changed = true;
+            this.solutionPrns.length = n;
+            this.solutionPositions.length = 2 * n;
+        }
+        this.solutionInputs.length = n;
+        if (changed) {
+            this.solutionAltitude = altitude;
+            this._solution = computeGeometry(this.solutionInputs, altitude);
+        }
     }
 
     /** 5-29: enough satellites are tracked, but the unit has not accepted the position yet */
@@ -298,7 +396,8 @@ export class GPS {
 
     /** The forced acquisition of an engine-running start or SET 10 FAST is accepted at once, without TRAN */
     public acceptForcedSolution(): void {
-        if (this.hasSdkSolution() && !this.solutionAccepted) {
+        this.updateSolution(); //No tick has seen the satellites of the forced acquisition yet
+        if (this._solution.valid && !this.solutionAccepted) {
             this.solutionAccepted = true;
             this.inTransition = false;
             this.gpsAcquired();
@@ -309,6 +408,7 @@ export class GPS {
     reset(): void {
         this.savePosition();
         this.gpsSatComputer.reset();
+        this.updateSolution(); //The receiver has no satellites in use now
 
         //we still keep all old values
     }
@@ -345,6 +445,7 @@ export class GPS {
 
     private gpsAcquired() {
         this.search.end(); //The first fix ends the start model (#62)
+        this._hadFixSincePowerOn = true;
         const timeNow = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         console.log(`gpsAcquired in ${timeNow - this.gpsStartTime} seconds`);
         const actualUnixTime = this.absoluteTimeToUNIXTime(timeNow);
@@ -377,11 +478,13 @@ export class GPS {
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp(); //The receiver reads it on the first update, before tick refreshes it (#211)
             this.search.start(this.coords); //The receiver starts from the position stored at power-off (#62)
+            this._hadFixSincePowerOn = false;
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         } else {
             this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
             this.solutionAccepted = false;
             this.inTransition = false;
+            this._hadFixSincePowerOn = false;
             this.search.end();
         }
     }

@@ -441,6 +441,16 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS
   acquires while the welcome and self-test pages run. A warm start's time is drawn per power-on, so pass `seed` for
   the spread (`powerOnCold` in `GpsAcquisition.test.ts`).
+- **Losing satellites.** `inhibitAllBut(unit, n)` (`gps.ts`) keeps the first `n` satellites the SDK has in use (PRN
+  order) and inhibits every other one on `gpsSatComputer` and on `raimPrediction`; it returns the PRNs kept and throws
+  when fewer than `n` are in use. The inhibited satellites leave the solution at the SDK's next position update (every
+  5 s), so advance the clock at least that long before asserting. `liftInhibits(unit)` lifts them all again, and the prediction context follows
+  the computer's inhibits once more. Three satellites with the default altimeter input are a valid unit solution with no
+  SDK solution (`GpsSolution.test.ts`). `test/render/harness/gps.test.ts` holds both helpers.
+- **A predicted geometry.** `stubSatellites(skyDeg)` (`predictionStub.ts`) builds stub prediction satellites in use at
+  fixed [zenith, azimuth] degrees, for `vi.spyOn(gps.raimPrediction, 'getSatellites').mockReturnValue(...)`.
+  `RAIM_ENROUTE_NOT_APPROACH` is a geometry whose RAIM passes the 2 NM and 1 NM alert limits but not the 0.3 NM of the
+  approach, on a unit without an altitude input (`NO_ALTIMETER`); its slope was computed outside the project's code.
 - **`bootToSelfTest(opts)`** (`boot.ts`) boots cold and dark whatever `opts.engineRunning` says (the self-test follows
   the welcome page only on a unit that is not force-ready), powers on, advances 19 s (the 17 s Turn-On page and two
   seconds more) and returns the unit with the self-test page showing. It throws with `Screen.read().dump()` when the

@@ -1,18 +1,20 @@
 import {describe, expect, it, vi} from 'vitest';
 import {BootOptions, bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle, untilCalcTick} from '../harness/boot';
 import {Screen} from '../harness/render/screen';
-import {legWorld, standardRoute, variationNear} from '../harness/fixtures';
+import {approachWorld, legWorld, standardRoute, variationNear} from '../harness/fixtures';
 import {savedFlightplan} from '../harness/storage';
-import {HEADING_INPUT, NO_GPS_SIMVARS, NO_OBS, panelXml} from '../harness/panelXml';
+import {APR_ARM_SWITCH, HEADING_INPUT, NO_ALTIMETER, NO_GPS_SIMVARS, NO_OBS, panelXml} from '../harness/panelXml';
 import {activeIdent, turnStackLength} from '../harness/readers';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {NavMode} from '../../kln90b/data/VolatileMemory';
 import {courseDeg, finalCourseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
 import {blinkCycle} from '../harness/render/blink';
+import {inhibitAllBut, liftInhibits} from '../harness/gps';
+import {GpsGeometry, Raim, raimStatus} from '../../kln90b/GpsSolution';
 
-// Public contract: the LVar is documented in LVars.ts (ARINC label 261, bit 24: true when no GPS signal is acquired) and
-// listed in CLAUDE.md, "Public contract with aircraft". An unset LVar reads 0, so "written as 0" is asserted with
-// lastWrite().
+// Public contract: the LVar is documented in LVars.ts (ARINC label 261, bit 24, GPS integrity: 1 = fail, true when there is
+// no valid fix or RAIM is unavailable at the alert limit of the flight phase; #453). An unset LVar reads 0, so "written as
+// 0" is asserted with lastWrite().
 describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
     it('is 1 while the GPS has no fix and 0 once it has one', async () => {
         // The last position and the almanac are valid, so the slow acquisition stays well below the cap
@@ -46,6 +48,146 @@ describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
         expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
         expect(sim.get('L:KLN90B_IntegrityWarn', 'bool')).toBe(0);
     });
+
+    // #453, GAMA 11 label 261 bit 24: the unit cannot assure the integrity of its position. No debounce, unlike the MSG
+    // messages: it is a real-time status bit. Four satellites without an altitude input give a fix but only four
+    // measurements, and RAIM needs five
+    it('is 1 with a valid fix while RAIM is not available en route (#453)', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        const sim = unit.env.sim;
+        const gps = unit.props.sensors.in.gps;
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0); // Precondition: healthy
+
+        inhibitAllBut(unit, 4);
+        // The SDK drops the inhibited satellites at its next position update, every 5 s
+        for (let s = 0; s < 12 && gps.solution.satellites !== 4; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.solution.satellites).toBe(4);
+        await vi.advanceTimersByTimeAsync(1000); // One calculation tick
+
+        expect(gps.isValid()).toBe(true);
+        expect(gps.solution.measurements).toBe(4);
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
+
+        liftInhibits(unit);
+        // After a lift the SDK takes about 14 s to use satellites again
+        for (let s = 0; s < 120 && gps.solution.satellites < 5; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.solution.satellites).toBeGreaterThanOrEqual(5);
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(raimStatus(gps.solution, 2)).toBe(Raim.Available);
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
+    }, 60_000);
+
+    /**
+     * Reaches a flight phase through the unit's own mode logic (a mode written into the memory is reverted by the next
+     * calculation tick): the approach world of Sta1Page.test.ts, loaded from APT 8, 20 NM out for ENR and ARM, inside the
+     * FAF for APR
+     */
+    async function inMode(mode: NavMode, panel: Record<string, unknown> = {}): Promise<HeadlessUnit> {
+        const w = approachWorld();
+        const unit = await bootUnit({
+            facilities: w.facilities, position: w.north(mode === NavMode.APR_LEG ? 7.5 : 20),
+            panelXml: panelXml({...APR_ARM_SWITCH, ...panel}),
+            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+        });
+        await settle(unit);
+        if (mode === NavMode.ENR_OBS) {
+            await unit.panel.obsMode();
+        }
+        if (mode !== NavMode.ENR_LEG && mode !== NavMode.ENR_OBS) {
+            await unit.panel.loadProcedure('APT 8');
+            await vi.advanceTimersByTimeAsync(31_000);
+        }
+        if (mode === NavMode.ARM_OBS) {
+            await unit.panel.obsMode();
+        }
+        if (mode === NavMode.APR_LEG) {
+            //Inbound on the final course and inside 2 NM of the FAF (5 NM before the airport): the approach goes active
+            await moveAircraft(unit, w.north(5 + 1.95), {groundspeedKt: 120, trackTrue: 180});
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.navPage.navmode).toBe(mode); // Precondition
+        return unit;
+    }
+
+    // The alert limit of each flight phase is 2 NM (3704 m) en route, 1 NM (1852 m) armed and 0.3 NM (555.6 m) with the
+    // approach active; the OBS modes use the limit of their phase. The protection level is maxSlope x 5 m x 5.3:
+    // - maxSlope 120 gives about 3180 m, within the en route limit and over the other two;
+    // - maxSlope 50 gives about 1325 m, within the armed limit and over the approach limit only.
+    // Every NavMode has a row where a wrong limit changes the bit
+    it.each([
+        [NavMode.ENR_LEG, 'ENR_LEG', 120, 0],
+        [NavMode.ENR_OBS, 'ENR_OBS', 120, 0],
+        [NavMode.ARM_LEG, 'ARM_LEG', 120, 1],
+        [NavMode.ARM_OBS, 'ARM_OBS', 120, 1],
+        [NavMode.ARM_LEG, 'ARM_LEG', 50, 0],
+        [NavMode.APR_LEG, 'APR_LEG', 50, 1],
+    ])('follows the alert limit of the flight phase: mode %s (%s) with maxSlope %s gives %s (#453)', async (mode, _name, maxSlope, expected) => {
+        const unit = await inMode(mode);
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.isValid()).toBe(true);
+        expect(unit.env.sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0); // Precondition: the real sky is healthy
+        const geometry: GpsGeometry = {valid: true, satellites: 6, altitudeAided: false, measurements: 6, hdop: 1, epeNm: 0.01, maxSlope};
+        vi.spyOn(gps, 'solution', 'get').mockReturnValue(geometry);
+
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(unit.props.memory.navPage.navmode).toBe(mode);
+        expect(unit.env.sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(expected);
+    }, 60_000);
+
+    // 5-29: the unit accepts the receiver's solution one calculation tick after it appears (TRAN). The solution is valid
+    // then, but the unit has no accepted position yet: the integrity bit is set until it has one
+    it('is 1 during TRAN, with a valid solution the unit has not accepted yet (#453)', async () => {
+        const unit = await bootUnit({coldGps: true});
+        const gps = unit.props.sensors.in.gps;
+
+        for (let i = 0; i < 600 && !gps.isTransition(); i++) {
+            await vi.advanceTimersByTimeAsync(250);
+        }
+
+        expect(gps.isTransition()).toBe(true);
+        expect(gps.solution.valid).toBe(true);
+        expect(gps.isValid()).toBe(false);
+        expect(unit.env.sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
+    }, 60_000);
+
+    // #453, 6-20: the integrity flag flags the navigation until GPS APR, but it is not the integrity bit: once the fix and
+    // RAIM are back the unit assures its position again
+    it('is 0 again while the approach integrity flag is still set (#453)', async () => {
+        const unit = await inMode(NavMode.APR_LEG, NO_ALTIMETER);
+        const nav = unit.props.memory.navPage;
+        const gps = unit.props.sensors.in.gps;
+        const sim = unit.env.sim;
+
+        inhibitAllBut(unit, 0);
+        for (let s = 0; s < 30 && gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(gps.isValid()).toBe(false); // Preconditions: the fix is lost, the approach flagged, the warning set
+        expect(nav.integrityFlag).toBe(true);
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(1);
+
+        liftInhibits(unit);
+        for (let s = 0; s < 120 && !(gps.isValid() && raimStatus(gps.solution, 0.3) === Raim.Available); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(gps.isValid()).toBe(true);
+        expect(raimStatus(gps.solution, 0.3)).toBe(Raim.Available);
+        expect(nav.navmode).toBe(NavMode.APR_LEG);
+        expect(nav.integrityFlag).toBe(true);
+        expect(nav.xtkToActive).toBeNull(); // The navigation stays flagged
+        expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
+    }, 120_000);
 });
 
 // Public contract: CLAUDE.md, "Public contract with aircraft" (GPS SimVars), and the Hot Swapping wiki page. The unit

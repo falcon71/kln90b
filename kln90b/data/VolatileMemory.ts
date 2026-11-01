@@ -25,6 +25,7 @@ import type {FplPage} from "../pages/left/FplPage";
 import type {Message} from "./MessageHandler";
 import {PowerEvent, PowerEventData} from "../PowerSupply";
 import {Sensors} from "../Sensors";
+import {SustainedCondition} from "./SustainedCondition";
 
 /**
  * The state of a waypoint page type (APT, VOR, NDB, INT, SUP). The waypoint it shows is kept over a power cycle (KLN 89
@@ -97,6 +98,14 @@ export function isObsMode(mode: NavMode): boolean {
     return mode === NavMode.ENR_OBS || mode === NavMode.ARM_OBS;
 }
 
+/**
+ * #453, B-1: how long RAIM must be unavailable for the approach limit in APR before the navigation is flagged
+ * (NavPageState.aprRaimLoss, ModeController). B-1 says only that the flag may follow some minutes later, without a figure; 2
+ * minutes is the design's call, with low confidence (docs/superpowers/specs/2026-11-01-gps-signal-loss-design.md, 5.5). It is defined
+ * here and not in ModeController, which re-exports it, because an import of ModeController here would be a cycle
+ */
+export const APR_RAIM_FLAG_DELAY = 120_000;
+
 export class NavPageState {
 
     public isSelfTestActive: boolean = false;
@@ -148,6 +157,20 @@ export class NavPageState {
     //6-3, 6-11: the distance to the FAF and the scale when the unit went ACTV; the ramp to 0.3 runs from there (#163)
     public aprActivationDist: NauticalMiles = 2;
     public aprActivationScale: number = 1;
+    /**
+     * #453, 6-20, B-3: the last ACTV check refused the switch for integrity, and the gate is still checking (ARM, the FAF
+     * active, within 2 NM). It drives RAIM NOT AVAILABLE APR MODE INHIBITED
+     */
+    public aprIntegrityInhibit: boolean = false;
+    /** #453: the GPS time of the last integrity check of the ACTV gate, for its retry (ModeController) */
+    public aprIntegrityCheckTime: number = 0;
+    /**
+     * #453, 6-20, B-1, B-3: the navigation is flagged in APR for a loss of integrity or of the fix, until the mode leaves
+     * APR (GPS APR, Direct To, OBS). It drives PRESS GPS APR FOR NAV
+     */
+    public integrityFlag: boolean = false;
+    /** #453: how long RAIM has been unavailable for the approach limit in APR, for the integrity flag */
+    public aprRaimLoss: SustainedCondition = new SustainedCondition(APR_RAIM_FLAG_DELAY);
 
     public waypointAlert = false;
     /**
@@ -406,6 +429,11 @@ export class VolatileMemory {
         this.navPage.approachDisarmedLeg = null; //The legs of a short power-off stay in FPL 0, the disarm does not (#139)
         this.navPage.aprActivationDist = 2;
         this.navPage.aprActivationScale = 1;
+        //#453: the integrity state of the approach belongs to the mode, which starts again in ENR-LEG
+        this.navPage.aprIntegrityInhibit = false;
+        this.navPage.aprIntegrityCheckTime = 0;
+        this.navPage.integrityFlag = false;
+        this.navPage.aprRaimLoss = new SustainedCondition(APR_RAIM_FLAG_DELAY);
         //The entered variation outside the database coverage is kept over a short power-off. The KLN 89 Pilot's Guide says
         //so (4-46, 4-47); the 90B guide is silent (5-44)
         if (evt.timeSincePowerChange > RESET_TIME) {

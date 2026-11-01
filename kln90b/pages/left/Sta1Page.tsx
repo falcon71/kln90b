@@ -13,6 +13,8 @@ import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {padInt} from "../../data/NumberFormat";
 import {SearchMode} from "../../GpsSearch";
+import {Raim, raimStatus} from "../../GpsSolution";
+import {halForMode} from "../../services/ModeController";
 
 
 type Sta1PageTypes = {
@@ -113,10 +115,20 @@ export class Sta1Page extends SixLineHalfPage {
     private stateText(rows: SatRow[]): string {
         const gps = this.props.sensors.in.gps;
         if (gps.isValid()) {
+            const solution = gps.solution;
+            //5-29: DEGRD is shown when the satellite geometry is too poor for RAIM. The condition is the spec's
+            //low-confidence call (design of #453, 5.3): RAIM available in principle (enough measurements) but the
+            //protection level of the geometry exceeds the alert limit of the flight phase. With too few measurements
+            //there is no RAIM to degrade, and the state stays NAV
+            if (raimStatus(solution, halForMode(this.props.memory.navPage.navmode)) === Raim.Geometry) {
+                return "DEGRD";
+            }
             if (rows.some(r => r.state === GPSSatelliteState.Acquired)) {
                 return "NAV D";
             }
-            return this.props.sensors.in.airdata.pressureAltitude === null ? "  NAV" : "NAV A";
+            //5-29: NAV A is a solution that uses the altitude input as a measurement (three satellites plus altitude, or
+            //four and more with it)
+            return solution.altitudeAided ? "NAV A" : "  NAV";
         }
         if (gps.isTransition()) {
             return " TRAN";

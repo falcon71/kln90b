@@ -15,6 +15,9 @@ import {Vnav, VnavState} from "../services/Vnav";
 import {Nav4LeftPage, Nav4RightPage} from "../pages/left/Nav4Page";
 import {isBaroTransmitted, KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {SustainedCondition} from "./SustainedCondition";
+import {Raim, raimStatus} from "../GpsSolution";
+import {halForMode} from "../services/ModeController";
+import {GPS} from "../Gps";
 
 /**
  * How long the course must be off before a course message that waits shows: the KA 90 Installation Manual pp. 3-43 and
@@ -23,8 +26,17 @@ import {SustainedCondition} from "./SustainedCondition";
  */
 export const COURSE_MESSAGE_DELAY = 12_000;
 
+/**
+ * How long the RAIM and satellite geometry conditions must hold before their messages show: more than 10 s. The Pilot's
+ * Guide gives no time for it (the messages are on B-1 and B-3): the 10 s are our own choice, so that a short dropout of a
+ * satellite posts nothing. The count is in GPS time, which stands still while the sim is paused and starts again at a jump
+ * of the clock
+ */
+export const RAIM_MESSAGE_DELAY = 10_000;
+
 /*
-We have pretty all messages except for failures and RAIM problems
+Not built yet:
+- RAIM POSITION ERROR (a faulty satellite) and the failure messages of the unit's own hardware and interfaces (#366)
  */
 
 export function buildPersistentMessages(props: PageProps): Message[] {
@@ -41,6 +53,12 @@ export function buildPersistentMessages(props: PageProps): Message[] {
         //SimVarSync), so each decides on every call which indicator case applies (#401)
         new AdjustCourseToMessage(props.sensors, props.modeController, props.memory.navPage, props.planeSettings),
         new AdjustCourseMessage(props.sensors, props.memory.navPage, props.planeSettings),
+        new SatelliteCoverageMessage(props.sensors.in.gps),
+        new RaimNotAvailableMessage(props.sensors.in.gps, props.memory.navPage),
+        new BadGeometryMessage(props.sensors.in.gps, props.memory.navPage),
+        new BadGeometryApproachMessage(props.sensors.in.gps, props.memory.navPage),
+        new AprModeInhibitedMessage(props.memory.navPage),
+        new PressGpsAprMessage(props.memory.navPage),
     ];
 }
 
@@ -407,5 +425,147 @@ class VnavAlertMessage implements Message {
 
 
         return !this.nav4Shown;
+    }
+}
+
+
+/**
+ * B-4: the fix is lost in flight. It needs no delay, and it is not posted during the start-up search: the unit has to
+ * have had a fix since it was powered on. It goes with the fix, which is the unit accepting the position (isValid), not the
+ * solution being valid again: during TRAN the NAV flag is still up. #453
+ */
+class SatelliteCoverageMessage implements Message {
+
+    public readonly message: string[] = ["SATELLITE COVERAGE", "INADEQUATE FOR NAV"];
+    public seen: boolean = false;
+
+    constructor(private readonly gps: GPS) {
+    }
+
+    public isConditionValid(): boolean {
+        return this.gps.hadFixSincePowerOn && !this.gps.isValid();
+    }
+}
+
+/** The causes the RAIM messages test for, module constants so that a message check allocates nothing */
+const RAIM_NOT_AVAILABLE = (r: Raim): boolean => r !== Raim.Available;
+const RAIM_GEOMETRY = (r: Raim): boolean => r === Raim.Geometry;
+
+/**
+ * Whether the position is valid and RAIM, for the alert limit of the mode (halForMode), fails for one of the causes. A unit
+ * without a position has the coverage message instead
+ */
+function raimLost(gps: GPS, mode: NavMode, causes: (r: Raim) => boolean): boolean {
+    return gps.isValid() && causes(raimStatus(gps.solution, halForMode(mode)));
+}
+
+/**
+ * B-3: RAIM is not available, for too few measurements (four satellites without an altitude input) or for a geometry that
+ * fails the alert limit. It shows once that has held for more than RAIM_MESSAGE_DELAY of GPS time. A geometry that fails
+ * the limit has the geometry message with it (BadGeometryMessage), and the approach modes have their own message
+ * (BadGeometryApproachMessage). #453
+ */
+class RaimNotAvailableMessage implements Message {
+
+    public readonly message: string[] = ["RAIM NOT AVAILABLE", "CROSS CHECK POSITION"];
+    public seen: boolean = false;
+    private readonly held = new SustainedCondition(RAIM_MESSAGE_DELAY);
+
+    constructor(private readonly gps: GPS, private readonly navState: NavPageState) {
+    }
+
+    public isConditionValid(): boolean {
+        const mode = this.navState.navmode;
+        //The GPS replaces its time object on some ticks, so it is read through the GPS each time. MessageHandler.tick
+        //asks twice per tick, and the time is the same for both
+        const holds = mode !== NavMode.APR_LEG && raimLost(this.gps, mode, RAIM_NOT_AVAILABLE);
+        return this.held.update(holds, this.gps.timeZulu.getTimestamp());
+    }
+
+    public onPowerOff(): void {
+        this.held.reset();
+    }
+}
+
+/**
+ * B-1: the satellites are there, but their geometry does not give the alert limit of the mode, so RAIM cannot be used. It
+ * comes with RaimNotAvailableMessage, which says what to do; this one says why and where to look (STA 2). #453
+ */
+class BadGeometryMessage implements Message {
+
+    public readonly message: string[] = ["BAD SATELLITE GEOMETRY", "SEE EPE ON STA 2 PAGE"];
+    public seen: boolean = false;
+    private readonly held = new SustainedCondition(RAIM_MESSAGE_DELAY);
+
+    constructor(private readonly gps: GPS, private readonly navState: NavPageState) {
+    }
+
+    public isConditionValid(): boolean {
+        const mode = this.navState.navmode;
+        const holds = mode !== NavMode.APR_LEG && raimLost(this.gps, mode, RAIM_GEOMETRY);
+        return this.held.update(holds, this.gps.timeZulu.getTimestamp());
+    }
+
+    public onPowerOff(): void {
+        this.held.reset();
+    }
+}
+
+/**
+ * B-1: in an approach mode (the 0.3 NM alert limit) the one message says both: the geometry and the missing RAIM, for too
+ * few measurements as well as for a geometry that fails the limit. #453
+ */
+class BadGeometryApproachMessage implements Message {
+
+    public readonly message: string[] = ["BAD SATELLITE GEOMETRY", "AND RAIM NOT AVAILABLE"];
+    public seen: boolean = false;
+    private readonly held = new SustainedCondition(RAIM_MESSAGE_DELAY);
+
+    constructor(private readonly gps: GPS, private readonly navState: NavPageState) {
+    }
+
+    public isConditionValid(): boolean {
+        const mode = this.navState.navmode;
+        const holds = mode === NavMode.APR_LEG && raimLost(this.gps, mode, RAIM_NOT_AVAILABLE);
+        return this.held.update(holds, this.gps.timeZulu.getTimestamp());
+    }
+
+    public onPowerOff(): void {
+        this.held.reset();
+    }
+}
+
+/**
+ * B-3, 6-20: the last ACTV check refused the switch, because RAIM is not available now or not predicted at the FAF or the
+ * MAP (ModeController.checkApproachIntegrity). It leaves once ACTV succeeds, the unit leaves ARM, or the gate stops
+ * checking (the FAF no longer active, or more than 2 NM from it): our own call for the end, design 5.4. #453
+ */
+class AprModeInhibitedMessage implements Message {
+
+    public readonly message: string[] = ["RAIM NOT AVAILABLE", "APR MODE INHIBITED", "PREDICT RAIM ON STA 5"];
+    public seen: boolean = false;
+
+    constructor(private readonly navState: NavPageState) {
+    }
+
+    public isConditionValid(): boolean {
+        return this.navState.aprIntegrityInhibit;
+    }
+}
+
+/**
+ * B-3, 6-20: the navigation is flagged in APR for integrity (NavPageState.integrityFlag), and GPS APR brings it back for the
+ * missed approach. It leaves with the flag, however that clears. #453
+ */
+class PressGpsAprMessage implements Message {
+
+    public readonly message: string[] = ["PRESS GPS APR FOR NAV"];
+    public seen: boolean = false;
+
+    constructor(private readonly navState: NavPageState) {
+    }
+
+    public isConditionValid(): boolean {
+        return this.navState.integrityFlag;
     }
 }

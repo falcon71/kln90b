@@ -219,13 +219,13 @@ render, flight).
 
 - [ ] **Step 1: Write the failing tests.**
   - Unit-level cases inside the render file:
-    - `formatEpe(null)` is `'_____'`;
+    - `formatEpe(null)` is `'-----'`;
     - `formatEpe(0.0049)` is `' 0.00'`;
     - `formatEpe(0.0051)` is `' 0.01'`;
     - `formatEpe(0.025)` is `' 0.03'`;
     - `formatEpe(3.8)` is `' 3.80'`.
   - Replace both characterization snapshots:
-    - Without a fix, row 2 of the left half is `'    _____NM'`.
+    - Without a fix, row 2 of the left half is `'    -----NM'`.
     - With a fix, row 2 matches `/^ {5}\d\.\d\dNM$/`, and with this harness seed it is the literal the test pins (run
       once, then pin it with a comment saying it is the seed's value).
     - Rows 0 and 1 stay `'ESTIMATED  '` and `'POSN ERROR '`.

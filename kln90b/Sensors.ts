@@ -265,9 +265,10 @@ export class SensorsIn implements CalcTickable {
 
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, messageHandler: MessageHandler) {
-        this.gps = new GPS(bus, userSettings, options, messageHandler);
-        this.fuelComputer = new FuelComputer(options);
         this.airdata = new Airdata(userSettings, options);
+        //5-29: the altitude input is a measurement of the GPS solution. Airdata reports none until its first tick
+        this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.pressureAltitude !== null);
+        this.fuelComputer = new FuelComputer(options);
     }
 
     tick() {
@@ -522,7 +523,8 @@ export class SensorsOut {
     public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number, integretyWarning: boolean) {
         //The LVar is an output of the unit, independent of the GPS SimVars
         //Real unit: ARINC 429 transmitter, label 261 GPS discrete word bit 24 GPS integrity, 1 = fail (GAMA 11 page 18).
-        //No analog or RS-232 output carries it
+        //The caller passes true when the position has no fix, or RAIM is unavailable at the alert limit of the current
+        //flight phase (#453). No analog or RS-232 output carries it
         SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
 
         if (!this.options.output.writeGPSSimVars) {

@@ -7,6 +7,9 @@ import {AIRDATA, APR_ARM_SWITCH, NO_ALTIMETER, panelXml, VFR_ONLY} from '../../h
 import {activeIdent, messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
+import {DEFAULT_START} from '../../harness/sim/clock';
+import {inhibitAllBut, liftInhibits} from '../../harness/gps';
+import {GpsGeometry} from '../../../kln90b/GpsSolution';
 
 describe('ALTITUDE FAIL', () => {
     // B-1: the message shows when the altitude input fails. Input.AltimeterInterfaced false is a unit without the input
@@ -303,4 +306,376 @@ describe('ADJ NAV IND CRS, a driven indicator slewed through a sequencing (#401)
         expect(slewedTo(legAfter)).toBe(true);
         expect(sampled.filter(m => m.includes('ADJ NAV IND CRS'))).toEqual([]);
     });
+});
+
+// #453: the messages for a lost fix and for missing integrity. B-4: SAT COVERAGE needs no delay; B-3 and B-1: the RAIM and
+// geometry messages wait more than 10 s (RAIM_MESSAGE_DELAY, counted in GPS time)
+describe('signal loss and RAIM messages (#453)', () => {
+    const COVERAGE = 'SATELLITE COVERAGE INADEQUATE FOR NAV';
+    const RAIM = 'RAIM NOT AVAILABLE CROSS CHECK POSITION';
+    const GEOMETRY = 'BAD SATELLITE GEOMETRY SEE EPE ON STA 2 PAGE';
+    const APPROACH_RAIM = 'BAD SATELLITE GEOMETRY AND RAIM NOT AVAILABLE';
+    const ALL = [COVERAGE, RAIM, GEOMETRY, APPROACH_RAIM];
+    /** The stored data of a unit last used here yesterday (GpsAcquisition.test.ts): a warm start of about a minute */
+    const WARM_START = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 60 * 60 * 1000};
+    const listed = (unit: HeadlessUnit) => messages(unit).filter(m => ALL.includes(m));
+
+    /**
+     * Waits until the model has n measurements. The SDK drops an inhibited satellite at its next position update, every
+     * 5 s, so a step of the test waits for the model and not for a fixed time
+     */
+    async function untilMeasurements(unit: HeadlessUnit, n: number, capSeconds = 12): Promise<void> {
+        const gps = unit.props.sensors.in.gps;
+        for (let s = 0; s < capSeconds && gps.solution.measurements !== n; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.solution.measurements).toBe(n);
+    }
+
+    /** A solution of the model with the given count and slope, the SDK's satellites unchanged */
+    function spySolution(unit: HeadlessUnit, measurements: number, maxSlope: number) {
+        const gps = unit.props.sensors.in.gps;
+        const geometry: GpsGeometry = {valid: true, satellites: measurements, altitudeAided: false, measurements, hdop: 1, epeNm: 0.01, maxSlope};
+        return vi.spyOn(gps, 'solution', 'get').mockReturnValue(geometry);
+    }
+
+    it('posts SATELLITE COVERAGE INADEQUATE FOR NAV at once when the fix is lost in flight, and removes it with the fix (B-4)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        expect(listed(unit)).toEqual([]); // Precondition: a unit with a fix lists none of them
+
+        inhibitAllBut(unit, 0);
+        for (let s = 0; s < 12 && gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.isValid()).toBe(false); // Precondition: the SDK has dropped the satellites
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(listed(unit)).toEqual([COVERAGE]);
+
+        liftInhibits(unit);
+        for (let s = 0; s < 120 && !gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.isValid()).toBe(true); // Precondition: the fix is back
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(listed(unit)).toEqual([]);
+    }, 60_000);
+
+    // 5-29: when the satellites come back the unit shows TRAN for a tick before it accepts the position, and the NAV flag
+    // stays up. The message goes with the accepted fix, not with a valid solution
+    it('keeps SATELLITE COVERAGE through TRAN, until the unit accepts the position (B-4)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        inhibitAllBut(unit, 0);
+        for (let s = 0; s < 12 && gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).toContain(COVERAGE); // Precondition: lost and posted
+
+        liftInhibits(unit);
+        let inTransition = false;
+        for (let t = 0; t < 120_000 && !gps.isValid(); t += 250) {
+            await vi.advanceTimersByTimeAsync(250);
+            if (gps.isTransition()) {
+                inTransition = true;
+                expect(gps.solution.valid).toBe(true);
+                expect(gps.isValid()).toBe(false);
+                expect(messages(unit)).toContain(COVERAGE);
+            }
+        }
+        expect(inTransition).toBe(true); // Precondition: the unit was seen in TRAN
+        expect(gps.isValid()).toBe(true);
+    }, 60_000);
+
+    it('lists it within 2 s of the loss, without a delay (B-4)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+
+        inhibitAllBut(unit, 0);
+        let lostAt = -1;
+        let listedAt = -1;
+        for (let t = 0; t < 12_000 && listedAt < 0; t += 250) {
+            await vi.advanceTimersByTimeAsync(250);
+            if (lostAt < 0 && !gps.isValid()) {
+                lostAt = t;
+            }
+            if (messages(unit).includes(COVERAGE)) {
+                listedAt = t;
+            }
+        }
+        expect(lostAt).toBeGreaterThanOrEqual(0); // Precondition: the loss happened
+        expect(listedAt).toBeGreaterThanOrEqual(0);
+        expect(listedAt - lostAt).toBeLessThanOrEqual(2000);
+    }, 60_000);
+
+    // The start-up search is not a loss: the unit has not had a fix since it was powered on. A cold-and-dark boot, since a
+    // coldGps boot is a reset of a running unit and not a power-on
+    it('does not post it during the start-up search', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: WARM_START});
+        const gps = unit.props.sensors.in.gps;
+        await unit.panel.powerOn();
+
+        let searched = 0;
+        const sampled: string[] = [];
+        for (let s = 0; s < 300 && !gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            searched++;
+            sampled.push(...listed(unit));
+        }
+        expect(gps.isValid()).toBe(true); // Precondition: the search ended with a fix
+        expect(searched).toBeGreaterThan(10); // Precondition: it was a search of some length, not a fix at once
+        await vi.advanceTimersByTimeAsync(5000);
+        sampled.push(...listed(unit));
+
+        expect(sampled).toEqual([]);
+    }, 120_000);
+
+    // The message belongs to the power-on: after a power cycle the unit has had no fix yet
+    it('does not post it again in the search of the next power-on', async () => {
+        const unit = await bootUnit({storage: WARM_START});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        inhibitAllBut(unit, 0);
+        await vi.advanceTimersByTimeAsync(8000);
+        expect(messages(unit)).toContain(COVERAGE); // Precondition: it was posted
+
+        await unit.panel.powerOff();
+        liftInhibits(unit);
+        await unit.panel.powerOn();
+        const sampled: string[] = [];
+        let searched = 0;
+        for (let s = 0; s < 300 && !gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            searched++;
+            sampled.push(...listed(unit));
+        }
+
+        expect(searched).toBeGreaterThan(0); // Precondition: the unit searched
+        expect(sampled).toEqual([]);
+    }, 120_000);
+
+    it('posts RAIM NOT AVAILABLE CROSS CHECK POSITION after 10 s with four satellites and no altitude (B-3)', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+
+        inhibitAllBut(unit, 4);
+        await untilMeasurements(unit, 4);
+        expect(gps.isValid()).toBe(true); // Precondition: four satellites are a position, only RAIM is missing
+        await vi.advanceTimersByTimeAsync(9000);
+        expect(listed(unit)).toEqual([]);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        // The cause is the count: no bad geometry message
+        expect(listed(unit)).toEqual([RAIM]);
+
+        liftInhibits(unit);
+        await vi.advanceTimersByTimeAsync(15_000);
+        expect(gps.solution.measurements).toBeGreaterThan(4); // Precondition: the satellites are back (the SDK takes 14 s)
+        expect(listed(unit)).toEqual([]);
+    }, 60_000);
+
+    // The SDK takes about 14 s to bring a satellite back, so a drop of 3 s is the model's solution held at four
+    // measurements for 3 s
+    it('a drop of 3 s posts nothing', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        const spy = spySolution(unit, 4, 1);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(gps.solution.measurements).toBe(4); // Precondition: the drop is on
+        const sampled: string[] = [];
+        sampled.push(...listed(unit));
+        spy.mockRestore();
+        for (let s = 0; s < 20; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            sampled.push(...listed(unit));
+        }
+
+        expect(gps.solution.measurements).toBeGreaterThan(4); // Precondition: the drop has ended
+        expect(sampled).toEqual([]);
+    }, 60_000);
+
+    it('the altitude counts: four satellites plus altitude posts no RAIM message', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+
+        inhibitAllBut(unit, 4);
+        await untilMeasurements(unit, 5);
+        expect(gps.solution.altitudeAided).toBe(true); // Precondition: it is the altitude that makes five
+        await vi.advanceTimersByTimeAsync(30_000);
+
+        expect(listed(unit)).toEqual([]);
+    }, 60_000);
+
+    it('posts the geometry message with the RAIM message when the cause is geometry (B-1)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        // HPL 200 x 5 m x 5.3 = 2.9 NM against the alert limit of 2 NM (ENR)
+        spySolution(unit, 6, 200);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG); // Precondition: the limit is that of ENR
+        await vi.advanceTimersByTimeAsync(7000);
+        expect(listed(unit)).toEqual([]);
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(listed(unit)).toEqual([RAIM, GEOMETRY]);
+    }, 60_000);
+
+    it('a geometry within the alert limit posts nothing', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        // HPL 50 x 5 m x 5.3 = 0.7 NM against 2 NM
+        spySolution(unit, 6, 50);
+        await vi.advanceTimersByTimeAsync(20_000);
+
+        expect(listed(unit)).toEqual([]);
+    }, 60_000);
+
+    it('VFR-only units get the RAIM message too', async () => {
+        const unit = await bootUnit({panelXml: panelXml({...VFR_ONLY, ...NO_ALTIMETER})});
+        await settle(unit);
+
+        inhibitAllBut(unit, 4);
+        await untilMeasurements(unit, 4);
+        await vi.advanceTimersByTimeAsync(12_000);
+
+        expect(listed(unit)).toEqual([RAIM]);
+    }, 60_000);
+
+    // B-1: the approach alert limit is 0.3 NM, and the message there is the other one. The unit is flown to the final
+    // approach course (approachWorld.test.ts), where it is in APR
+    describe('in approach mode', () => {
+        async function inApproach(): Promise<HeadlessUnit> {
+            const w = approachWorld();
+            const unit = await bootUnit({
+                facilities: w.facilities, position: w.north(7.5),
+                panelXml: panelXml({...APR_ARM_SWITCH, ...NO_ALTIMETER}),
+                storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+            });
+            await settle(unit);
+            await unit.panel.loadProcedure('APT 8');
+            await vi.advanceTimersByTimeAsync(31_000);
+            await moveAircraft(unit, w.north(6.5), {groundspeedKt: 120, trackTrue: 180});
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(unit.props.memory.navPage.navmode).toBe(NavMode.APR_LEG); // Precondition
+            return unit;
+        }
+
+        it('posts BAD SATELLITE GEOMETRY AND RAIM NOT AVAILABLE for a geometry within the limit of ENR but not that of the approach (B-1)', async () => {
+            const unit = await inApproach();
+            // HPL 40 x 5 m x 5.3 = 0.57 NM: within 2 NM, beyond 0.3 NM
+            spySolution(unit, 6, 40);
+            await vi.advanceTimersByTimeAsync(2000);
+            expect(listed(unit)).toEqual([]);
+            await vi.advanceTimersByTimeAsync(7000);
+            expect(listed(unit)).toEqual([]);
+            await vi.advanceTimersByTimeAsync(3000);
+
+            expect(unit.props.memory.navPage.navmode).toBe(NavMode.APR_LEG);
+            expect(listed(unit)).toEqual([APPROACH_RAIM]);
+        }, 60_000);
+
+        it('posts it too for too few measurements, and not the plain RAIM message (B-1)', async () => {
+            const unit = await inApproach();
+            inhibitAllBut(unit, 4);
+            await untilMeasurements(unit, 4);
+            await vi.advanceTimersByTimeAsync(12_000);
+
+            expect(unit.props.memory.navPage.navmode).toBe(NavMode.APR_LEG);
+            expect(listed(unit)).toEqual([APPROACH_RAIM]);
+        }, 60_000);
+
+        it('does not post it for a geometry within the limit of the approach', async () => {
+            const unit = await inApproach();
+            // HPL 10 x 5 m x 5.3 = 0.14 NM: within 0.3 NM
+            spySolution(unit, 6, 10);
+            await vi.advanceTimersByTimeAsync(20_000);
+
+            expect(unit.props.memory.navPage.navmode).toBe(NavMode.APR_LEG);
+            expect(listed(unit)).toEqual([]);
+        }, 60_000);
+    });
+
+    // A jump of the clock (a sim time moved on) must neither satisfy the count at once nor leave it half done
+    it('a clock jump does not post at once (Review Focus 2)', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        inhibitAllBut(unit, 4);
+        await untilMeasurements(unit, 4);
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(listed(unit)).toEqual([]); // Precondition: 5 s of the 10 s have counted
+
+        const before = gps.timeZulu.getTimestamp();
+        unit.env.sim.absoluteTimeOffsetMs = 10 * 60_000;
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(gps.timeZulu.getTimestamp() - before).toBeGreaterThan(9 * 60_000); // Precondition: the unit's clock followed
+        expect(gps.isValid()).toBe(true); // Precondition: still a valid position of four satellites
+        expect(gps.solution.measurements).toBe(4);
+        expect(listed(unit)).toEqual([]);
+
+        await vi.advanceTimersByTimeAsync(6000);
+        expect(listed(unit)).toEqual([]); // Counted again from the jump: 7 s are not enough
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(listed(unit)).toEqual([RAIM]);
+    }, 60_000);
+
+    // Take-home mode is not officially supported (the maintainer, 2026-11-01): one cheap check that its constant healthy
+    // solution lists none of the messages
+    it('a take-home unit lists none of them', async () => {
+        const unit = await bootUnit({panelXml: panelXml({TakeHomeMode: true})});
+        await vi.advanceTimersByTimeAsync(60_000);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true); // Precondition: a valid fix
+        expect(listed(unit)).toEqual([]);
+    }, 60_000);
+
+    // A message of the power-on in which it was posted: its count does not carry over a power cycle
+    it('a power cycle forgets the count of the RAIM message', async () => {
+        const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        inhibitAllBut(unit, 4);
+        await untilMeasurements(unit, 4);
+        await vi.advanceTimersByTimeAsync(8000);
+        expect(listed(unit)).toEqual([]); // Precondition: 8 s of the 10 s have counted
+
+        await unit.panel.powerOff();
+        await unit.panel.powerOn();
+        for (let s = 0; s < 120 && !gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.isValid()).toBe(true); // Precondition: the fix is there again, with the satellites still inhibited
+        expect(gps.solution.measurements).toBe(4);
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(listed(unit)).toEqual([]); // 5 s since the new fix, though more than 10 s since the drop
+        await vi.advanceTimersByTimeAsync(7000);
+        expect(listed(unit)).toEqual([RAIM]);
+    }, 60_000);
+
+    // The real unit is invalid for a while after a power-on, which ends the count by itself. A fix that is valid at once
+    // (here by mock) would carry the count over the power cycle, if onPowerOff did not forget it. The approach message is
+    // not covered: a test of it stayed green without its onPowerOff, because the power-on resets the navmode to ENR_LEG (VolatileMemory.ts), which ends its count
+    it('a power cycle forgets the count even when the fix is valid at once', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        spySolution(unit, 6, 200); // Geometry beyond the limit: the RAIM message and the geometry message
+        await vi.advanceTimersByTimeAsync(12_000);
+        expect(listed(unit)).toEqual([RAIM, GEOMETRY]); // Precondition: posted
+
+        await unit.panel.powerOff();
+        vi.spyOn(gps, 'isValid').mockReturnValue(true);
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(listed(unit)).toEqual([]);
+        await vi.advanceTimersByTimeAsync(9000);
+        expect(listed(unit)).toEqual([RAIM, GEOMETRY]);
+    }, 60_000);
 });
