@@ -12,6 +12,7 @@ import {pointFrom} from '../../../harness/flight/geo';
 import {MainPage} from '../../../../kln90b/pages/MainPage';
 import {blinkCycle} from '../../../harness/render/blink';
 import {collectStatusMessages} from '../../../harness/statusLine';
+import {EVT_ENT, EVT_POWER_OFF} from '../../../../kln90b/HEvents';
 
 const kaaa = airport('KAAA', 47.0, 8.0);
 const abc = vor('ABC', 47.2, 8.0);
@@ -501,5 +502,67 @@ describe('DIRECT TO page with an unknown identifier', () => {
         expect(unit.panel.focused('L')).toEqual({row: 2, col: 3, text: '     '});
         const masks = await blinkCycle(() => Screen.read().maskRows('L')[2].slice(3, 8));
         expect(masks).toEqual(['IIIII', 'IIIII', 'IIIII', 'IIIII']);
+    });
+});
+
+// #452: WaypointEditor.enter awaits the ident search, and a power-off meanwhile replaces the main page. The step after
+// the search still treats the current page as the main page: the approval of a unique ident pushes the waypoint page
+// on the right, a duplicate ident pushes the DUPLICATE WAYPOINT page on the left, and both throw. Each pin has a control
+// that runs the same entry without the power-off, so a broken setup fails there and not invisibly inside the pin
+describe('DIRECT TO page turned off right after ENT on a typed ident (#452)', () => {
+    const POSITION = {lat: 47.0, lon: 8.0};
+    const unq = intersection('UNQ', 47.2, 8.1);
+    const abdNear = intersection('ABD', 47.3, 8.1);
+    const abdFar = intersection('ABD', 48.0, 7.0, {region: 'LF'});
+
+    /** D-> and the ident typed with the knobs; the ENT is the test's */
+    async function typed(ident: string, facilities: ReturnType<typeof intersection>[]): Promise<HeadlessUnit> {
+        const unit = await bootUnit({facilities, position: POSITION});
+        await settle(unit);
+        await unit.panel.dct();
+        await unit.panel.enterIdent('L', ident);
+        expect(Screen.read().rows('L')[2]).toBe(`   ${ident}     `); // Precondition: the typed ident
+        return unit;
+    }
+
+    it('shows the waypoint page of a unique ident after ENT (control of the #452 pin)', async () => {
+        const unit = await typed('UNQ', [unq]);
+
+        unit.send(EVT_ENT);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().status().right).toBe('INT');
+        expect(Screen.read().rows('R')[0].trim()).toBe('UNQ');
+        expect(unit.errors).toEqual([]);
+    });
+
+    it.fails('shows no error when the unit is turned off right after ENT on a unique ident (#452)', async () => {
+        const unit = await typed('UNQ', [unq]);
+
+        unit.send(EVT_ENT);
+        unit.send(EVT_POWER_OFF);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('shows the DUPLICATE WAYPOINT page of a duplicate ident after ENT (control of the #452 pin)', async () => {
+        const unit = await typed('ABD', [abdNear, abdFar]);
+
+        unit.send(EVT_ENT);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(Screen.read().rows('L')[0]).toBe(' ABD      2');
+        expect(unit.errors).toEqual([]);
+    });
+
+    it.fails('shows no error when the unit is turned off right after ENT on a duplicate ident (#452)', async () => {
+        const unit = await typed('ABD', [abdNear, abdFar]);
+
+        unit.send(EVT_ENT);
+        unit.send(EVT_POWER_OFF);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(unit.errors).toEqual([]);
     });
 });
