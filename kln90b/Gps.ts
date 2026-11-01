@@ -445,6 +445,7 @@ export class GPS {
 
     private gpsAcquired() {
         this.search.end(); //The first fix ends the start model (#62)
+        const firstFix = !this._hadFixSincePowerOn;
         this._hadFixSincePowerOn = true;
         const timeNow = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
         console.log(`gpsAcquired in ${timeNow - this.gpsStartTime} seconds`);
@@ -455,7 +456,9 @@ export class GPS {
             SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree),
         );
 
-        if (UnitType.GA_RADIAN.convertTo(this.coords.distance(pos), UnitType.NMILE) > 2) {
+        //B-3: only the first NAV after power-on is compared with the position at power-off. A fix regained in flight
+        //would compare with the position where the fix was lost (#454)
+        if (firstFix && UnitType.GA_RADIAN.convertTo(this.coords.distance(pos), UnitType.NMILE) > 2) {
             this.messageHandler.addMessage(new OneTimeMessage(["POSITION DIFFERS FROM", "LAST POSITION BY >2NM"]));
         }
 

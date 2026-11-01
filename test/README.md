@@ -437,7 +437,9 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
 - **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition and erases the cached
   ephemeris, without a power-on, so the start model (`GpsSearch.ts`) does not run: it acquires in about 70 s (slow;
   `IDLE_ACQUISITION` plus 30 s of ephemeris) whatever the almanac, the stored position or the clock, and cannot measure
-  a hot, warm or cold start. For hot, warm, ACQ-give-up and almanac-search starts boot with `engineRunning: false` and
+  a hot, warm or cold start. Nor is its fix the first since the power-on: it is never compared with the stored
+  position for `POSITION DIFFERS FROM LAST POSITION BY >2NM` (B-3, #454). For hot, warm, ACQ-give-up and
+  almanac-search starts, and for that message, boot with `engineRunning: false` and
   the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS
   acquires while the welcome and self-test pages run. A warm start's time is drawn per power-on, so pass `seed` for
   the spread (`powerOnCold` in `GpsAcquisition.test.ts`).

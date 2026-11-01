@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
-import {bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
+import {DEFAULT_START} from '../../../harness/sim/clock';
 import {messages} from '../../../harness/readers';
 import {Screen} from '../../../harness/render/screen';
 import {airport} from '../../../harness/navdata/builders';
@@ -170,20 +171,28 @@ async function enterLatitude46N(unit: HeadlessUnit): Promise<void> {
     await unit.panel.ent();
 }
 
-// The harness cannot measure what the real unit uses the confirmed position for, the satellite search: a cold GPS
-// acquires in about 70 s whatever the position (test/README.md section 4). What it can see is the position the first fix
-// is compared with, which posts POSITION DIFFERS FROM LAST POSITION BY >2NM when they are more than 2 NM apart.
+// What the real unit uses the confirmed position for, the satellite search, has its tests in GpsAcquisition.test.ts
+// (#357). What these see is the position the first fix is compared with, which posts POSITION DIFFERS FROM LAST
+// POSITION BY >2NM when they are more than 2 NM apart. B-3 compares only the first fix after a power-on (#454), so the
+// unit is powered on cold and dark: a coldGps boot is a reset of a running unit, whose fix was already its first.
 describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
     const MESSAGE = 'POSITION DIFFERS FROM LAST POSITION BY >2NM';
 
-    /** A cold unit whose stored last position is the aircraft's, so that the boot itself posts no position message */
+    /**
+     * A unit powered on cold and dark whose stored last position is the aircraft's, so that the boot itself posts no
+     * position message. The almanac is a day old: a warm search of the slow acquisition, which leaves the time for SET 1
+     */
     async function coldOnSet1(): Promise<HeadlessUnit> {
-        const unit = await bootUnit({
-            facilities: [kaaa(), airport('KAAB', POSITION.lat, POSITION.lon)], position: POSITION, coldGps: true,
-            storage: {fastGpsAcquisition: false, lastLatitude: POSITION.lat, lastLongitude: POSITION.lon},
+        const unit = await bootToSelfTest({
+            facilities: [kaaa(), airport('KAAB', POSITION.lat, POSITION.lon)], position: POSITION,
+            storage: {
+                fastGpsAcquisition: false, lastLatitude: POSITION.lat, lastLongitude: POSITION.lon,
+                lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 60 * 60 * 1000,
+            },
         });
-        expect(unit.props.sensors.in.gps.isValid()).toBe(false);
+        await unit.panel.approveSelfTest();
         await unit.panel.selectPage('L', 'SET 1');
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false);
         return unit;
     }
 

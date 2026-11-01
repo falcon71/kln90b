@@ -5,6 +5,7 @@ import {DEFAULT_START} from '../harness/sim/clock';
 import {Screen} from '../harness/render/screen';
 import {storedSetting} from '../harness/storage';
 import {messages} from '../harness/readers';
+import {inhibitAllBut, liftInhibits} from '../harness/gps';
 import {TimeStamp} from '../../kln90b/data/Time';
 import {GPS_ERA_DURATION, SearchMode} from '../../kln90b/GpsSearch';
 
@@ -579,6 +580,26 @@ describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
 
         expect(messages(unit)).not.toContain(TEXT);
     });
+
+    // B-3 ties the message to the first NAV after power-on. A loss of the fix in flight is no power cycle: the fix
+    // regained 6 NM further on is no first fix and is not compared with the position where the fix was lost (#454)
+    it('does not post when the fix is regained in flight 6 NM from where it was lost (B-3, #454)', async () => {
+        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        expect(messages(unit)).not.toContain(TEXT); // Precondition: the first fix posted nothing
+
+        inhibitAllBut(unit, 0);
+        for (let s = 0; s < 30 && gps.isValid(); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.isValid()).toBe(false); // Precondition: the fix is lost
+        unit.env.sim.set('PLANE LATITUDE', 'degrees', 47 + 6 / 60);
+        liftInhibits(unit);
+        expect(await secondsToFix(unit, 300)).toBeLessThan(300);
+
+        expect(messages(unit)).not.toContain(TEXT);
+    }, SLOW);
 });
 
 describe('messages at power-on (B-3, B-4)', () => {
