@@ -26,12 +26,35 @@ waypoint is always flown with turn anticipation.
   `flyOver: true`, which `NavCalculator` already honors (`toLeg.flyOver`), so navigation does not change. The leg shows
   the `:` separator and counts against the 30 en-route waypoints. `Use?` and `Use? Inverted?` copy it with the flag
   (they copy the leg objects); removing procedures does not touch it.
-- **Not persisted:** `UserFlightplanPersistor` keeps its format (a public contract), so the flag falls back to en
-  route at power-on.
+- **Persisted (maintainer, amended the same day):** the flag survives power cycles and sim sessions. See "Storage"
+  below.
 - **Changing the choice:** only by deleting the waypoint and entering it again.
 - **No question, fly-by:** legs from the EFB route sync (maintainer), plans restored at power-on, the airport added by
   APT 7/8, CTR waypoints, D->. Waypoints added inside a SID/STAR of FPL 0 (6-23) are procedure legs already and are
   not asked.
+
+## Storage
+
+Persisted flight plans are a public contract (users keep their data across versions), and the MSFS user settings
+should stay small. The maintainer chose to append the flags to the existing V2 string, without a format bump:
+
+- **Layout of `fplN`:** the en-route (`USER`) legs as today, one V2 ICAO string of 19 characters each, then, only when
+  at least one leg is a fly-over, a trailer: the leg count as two decimal digits, then the flags as a bitset in
+  standard base64 (`A-Z a-z 0-9 + /`). Each base64 character holds 6 legs, least significant bit first: bit `i % 6` of
+  character `i / 6` is the flag of leg `i`. That is `ceil(n / 6)` characters, at most 5 for 30 legs.
+- **Telling the formats apart:** a plain V2 string's length is a multiple of 19, and a trailer of 3 to 7 characters
+  never is. So `userDataFormat` stays 2, `UserFlightplanLoaderV2` reads both, and a plan without fly-over legs is saved
+  exactly as before.
+- **Reading:** the trailer is `length % 19` characters long. If its count does not equal `floor(length / 19)`, or a
+  character is not base64, the flags are ignored and the legs load as en route. The flags must stay with their legs
+  when `loadIcaos` drops a waypoint that is no longer in the database, and when it cuts the plan at 30 legs.
+- **Older releases** (a downgrade) read the legs as before and lose the flags. The trailer comes out as one more short
+  chunk, which most likely shows one spurious `WAYPOINT … DELETED` message for that plan. User waypoints are not
+  affected.
+
+Rejected alternatives: a V3 format with `userDataFormat` 3 and the count in front (an older release would read
+format 3 as V1, fail, and save empty data over all plans and user waypoints); a separate `fplNflags` key (an older
+release that edits a plan leaves stale flags behind, which then mark the wrong waypoint after the upgrade).
 
 ## Non-goals
 
@@ -39,7 +62,6 @@ waypoint is always flown with turn anticipation.
   and 53% of the STAR ones in AIRAC 2607) is never asked, because finding its airports would mean loading every
   airport up to 237 NM around it (tick cost, see #77's comment). This includes VORs: the guide's own example in fig.
   4-7a is a VOR and would not be asked here.
-- Persisting the choice, or a new persisted flight-plan format.
 - Mirroring the flag to the SDK flight planner or the EFB route answer.
 
 ## Approaches considered
@@ -56,7 +78,7 @@ waypoint is always flown with turn anticipation.
 The KLN 89 trainer (2026-11-01) could not show the page: its demo database has one STAR (TRUDO1 at KMKE), no SIDs,
 and none of 21 entries raised the 89's equivalent page. The AVsoftech 90B trainer does not model it (SWR and KAPA
 procedure fixes entered, no page). The maintainer ruled that, with both trainers silent, the separator and the
-copy/power-cycle behavior follow from the model chosen above. The implementation adds a dated block for this check to
+copy behavior follow from the model chosen above; keeping the flag over a power cycle is the maintainer's choice. The implementation adds a dated block for this check to
 `docs/kln89-trainer-record.md`.
 
 ## Left to the builder (my calls, marked as such)
@@ -69,4 +91,5 @@ copy/power-cycle behavior follow from the model chosen above. The implementation
   meanwhile must not insert the leg twice.
 - **Tests:** at the cheapest stage that observes them: the question appears only for a terminal fix flown over in a
   SID/STAR of its airport; the SID/STAR answer sets `flyOver` and the en-route answer does not; `Use?` keeps the flag;
-  no question for EFB legs.
+  no question for EFB legs; a save and restore keeps the flags; a plain V2 string still loads; a trailer with a wrong
+  count is ignored; a dropped waypoint does not shift the flags of the legs after it.
