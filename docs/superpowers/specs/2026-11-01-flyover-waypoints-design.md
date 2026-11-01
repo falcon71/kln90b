@@ -11,14 +11,16 @@ waypoint is always flown with turn anticipation.
 
 ## What gets built
 
-- **When the question comes:** the pilot enters an intersection whose ICAO names an airport (a terminal waypoint,
-  `icaoStruct.airport` not blank, as `IntPage.tsx` detects it) into any flight plan, FPL 0 or a numbered one, and some
+- **When the question comes:** the pilot enters an intersection or an NDB whose ICAO names an airport (a terminal
+  waypoint or terminal NDB, `icaoStruct.airport` not blank, as `IntPage.tsx` detects it; NDBs added by the maintainer,
+  amended the same day) into any flight plan, FPL 0 or a numbered one, and some
   SID or STAR of that airport has a leg to this fix with `flyOver` set. A fix that appears in that airport's procedures
   only as an ordinary fix gets no question (maintainer). The check loads the airport through `KLNFacilityLoader`, once
   per such entry.
 - **Where it comes:** after the ENT that approves the waypoint page, before the leg is inserted
   (`FlightplanList.insertLeg`). Every pilot entry that ends there asks: append, insert in front of a waypoint, the
-  alternate entry from a waypoint page (3-15), the REF to FPL path (#291).
+  alternate entry from a waypoint page (3-15). (The REF to FPL path, #291, also ends there but never carries a
+  candidate; see Non-goals.)
 - **The page (fig. 4-7a):** the left page shows the ident on line 1, `TYPE WPT` on line 2, `1 EN ROUTE?` on line 4 and
   `2 SID/STAR?` on line 5. The waypoint page stays on the right. The cursor starts on `1 EN ROUTE?`, the left outer
   knob moves it between the two, and ENT inserts the leg with the choice.
@@ -62,6 +64,12 @@ release that edits a plan leaves stale flags behind, which then mark the wrong w
   and 53% of the STAR ones in AIRAC 2607) is never asked, because finding its airports would mean loading every
   airport up to 237 NM around it (tick cost, see #77's comment). This includes VORs: the guide's own example in fig.
   4-7a is a VOR and would not be asked here.
+- **Sim check (2026-11-01, the SIDs/STARs of EDDF, EDDM, EGLL, EHAM, LFPG, LIRF, LEMD, LOWI, LOWS, LSZH, KDEN,
+  KORD):** VOR fixes never carry an airport in their ICAO, although some are flown over (KLO at LSZH, SSY at LEMD).
+  Terminal NDBs do (RUM is `LOWI`, MNE is `EDDM`, also when loaded by ident), so they are asked like terminal
+  intersections; none of these airports flies over an NDB. KDEN and KORD have no fly-over legs at all in the sim's
+  data.
+- The REF to FPL path (#291) never reaches the question: a REF waypoint is always a user waypoint.
 - Mirroring the flag to the SDK flight planner or the EFB route answer.
 
 ## Approaches considered
