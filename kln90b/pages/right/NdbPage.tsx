@@ -3,7 +3,7 @@ import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {NdbSelector} from "../../controls/selects/NdbSelector";
-import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {unpackFacility, WaypointPage} from "./WaypointPage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {NdbFreqEditor} from "../../controls/editors/NdbFreqEditor";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
@@ -13,7 +13,7 @@ import {NearestSelector} from "../../controls/selects/NearestSelector";
 import {CoordOrNearestView} from "../../controls/CoordOrNearestView";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {convertTextToKLNCharset} from "../../data/Text";
-import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, isUserWaypoint, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 
 interface UserNdb {
     freq: number | null,

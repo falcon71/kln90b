@@ -11,7 +11,7 @@ import {
 } from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
-import {isUserWaypoint} from "../pages/right/WaypointPage";
+import {isUserWaypoint} from "../data/navdata/IcaoBuilder";
 import {Hardware} from "../Hardware";
 
 /**

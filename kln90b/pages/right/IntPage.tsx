@@ -18,7 +18,7 @@ import {LatitudeEditor} from "../../controls/editors/LatitudeEditor";
 import {LongitudeEditor} from "../../controls/editors/LongitudeEditor";
 import {IntersectionSelector} from "../../controls/selects/IntersectionSelector";
 import {WaypointEditor} from "../../controls/editors/WaypointEditor";
-import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {unpackFacility, WaypointPage} from "./WaypointPage";
 import {CreateWaypointMessage} from "../../controls/selects/CreateWaypointMessage";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {StatusLineMessageEvents} from "../../controls/StatusLine";
@@ -27,7 +27,7 @@ import {DistanceEditor} from "../../controls/editors/DistanceEditor";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {ActiveArrow} from "../../controls/displays/ActiveArrow";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
-import {buildIcao, buildIcaoStruct, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcao, buildIcaoStruct, isUserWaypoint, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
 import {KLNMagvar} from "../../data/navdata/KLNMagvar";
 
 

@@ -9,7 +9,8 @@ import {
 } from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
-import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint} from "../../data/navdata/IcaoBuilder";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {RunwayLengthEditor} from "../../controls/editors/ElevationEditor";
 import {RunwaySurfaceEditor} from "../../controls/editors/RunwaySurfaceEditor";

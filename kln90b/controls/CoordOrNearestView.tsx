@@ -5,7 +5,8 @@ import {LongitudeEditor} from "./editors/LongitudeEditor";
 import {BearingDisplay} from "./displays/BearingDisplay";
 import {DistanceDisplay} from "./displays/DistanceDisplay";
 import {NearestWpt} from "../data/navdata/NearestList";
-import {isNearestWpt, isUserWaypoint, unpackFacility} from "../pages/right/WaypointPage";
+import {isNearestWpt, unpackFacility} from "../pages/right/WaypointPage";
+import {isUserWaypoint} from "../data/navdata/IcaoBuilder";
 import {Latitude} from "../data/Units";
 import {KLNMagvar} from "../data/navdata/KLNMagvar";
 

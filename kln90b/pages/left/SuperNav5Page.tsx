@@ -18,7 +18,7 @@ import {
 import {NO_CHILDREN, PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {Canvas, CanvasSize, CoordinateCanvasDrawContext} from "../../controls/Canvas";
-import {isUserWaypoint} from "../right/WaypointPage";
+import {isUserWaypoint} from "../../data/navdata/IcaoBuilder";
 import {effectiveMapOrientation, Nav5Orientation, SuperNav5VOR} from "../../settings/KLN90BUserSettings";
 import {SuperNav5Left} from "../../controls/SuperNav5Left";
 import {SevenLinePage} from "../OneSegmentPage";

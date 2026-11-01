@@ -6,7 +6,7 @@ import {MAX_SCROLL_SPEED, Scanlist} from "../../data/navdata/Scanlist";
 import {AirportNearestList, isNearestWpt, NdbNearestList, NearestWpt, unpackFacility, VorNearestList} from "../../data/navdata/NearestList";
 export {isNearestWpt, unpackFacility} from "../../data/navdata/NearestList";
 import {NearestSelector} from "../../controls/selects/NearestSelector";
-import {buildIcaoStructIdentOnly, TEMPORARY_WAYPOINT, USER_WAYPOINT} from "../../data/navdata/IcaoBuilder";
+import {buildIcaoStructIdentOnly} from "../../data/navdata/IcaoBuilder";
 
 type ScrollDirection = -1 | 1;
 
@@ -284,10 +284,6 @@ export interface ActiveWaypointPageProps<T extends Facility> extends PageProps {
 
 export function isActiveWaypointPageProps<T extends Facility>(props: PageProps): props is ActiveWaypointPageProps<T> {
     return "idx" in props;
-}
-
-export function isUserWaypoint(fac: Facility): boolean {
-    return fac.icaoStruct.region === USER_WAYPOINT || fac.icaoStruct.region === TEMPORARY_WAYPOINT;
 }
 
 export function isWapointPage(page: any): page is WaypointPage<Facility> {

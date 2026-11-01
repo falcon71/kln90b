@@ -1,8 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/boot';
-import {intersection, ndb} from '../../../harness/navdata/builders';
+import {ndb} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
-import {isUserWaypoint} from '../../../../kln90b/pages/right/WaypointPage';
 
 /*
  * WaypointPage is the base of the APT, VOR, NDB, INT and SUP pages. These tests drive it through the NDB page, which
@@ -178,20 +177,5 @@ describe('waypoint page memory over a page change (characterization)', () => {
 
         const rows = Screen.read().rows('R');
         expect([rows[0], rows[2], rows[3]]).toEqual([' QQ        ', 'CREATE NEW ', 'WPT AT:    ']);
-    });
-});
-
-// The ICAO region XX marks a user waypoint and XY a temporary one (CLAUDE.md, Navdata; IcaoBuilder). The pages make the
-// fields of a user waypoint editable on that test.
-describe('isUserWaypoint (characterization)', () => {
-    it.each([
-        ['XX', true],
-        ['XY', true],
-        ['K1', false],
-    ])('takes the region %s as a user waypoint: %s', (region, expected) => {
-        const fac = intersection('QQ', 47, 10.5, {region});
-        expect(fac.icaoStruct.region).toBe(region); // precondition: the builder's region
-
-        expect(isUserWaypoint(fac)).toBe(expected);
     });
 });

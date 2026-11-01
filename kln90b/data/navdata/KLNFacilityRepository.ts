@@ -10,7 +10,7 @@ import {
     ICAO,
     IcaoValue,
 } from "@microsoft/msfs-sdk";
-import {isUserWaypoint} from "../../pages/right/WaypointPage";
+import {isUserWaypoint} from "./IcaoBuilder";
 import {MAX_USER_WAYPOINTS} from "../../settings/KLN90BUserWaypoints";
 
 /** Facility types for which {@link KLNFacilityRepository} supports spatial searches. */

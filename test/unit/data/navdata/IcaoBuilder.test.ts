@@ -4,11 +4,12 @@ import {
     buildIcao,
     buildIcaoStruct,
     buildIcaoStructIdentOnly,
+    isUserWaypoint,
     TEMPORARY_WAYPOINT,
     USER_WAYPOINT,
 } from '../../../../kln90b/data/navdata/IcaoBuilder';
 import {IcaoFixedLength} from '../../../../kln90b/data/navdata/IcaoFixedLength';
-import {vor} from '../../../harness/navdata/builders';
+import {intersection, vor} from '../../../harness/navdata/builders';
 
 // Contract. Source: CLAUDE.md "Navdata" (ICAO region XX = user, XY = temporary) and the persisted V1/V2 waypoint
 // strings (docs/architecture.md Core 7), which carry the region; a stored user waypoint keeps it across versions.
@@ -16,6 +17,20 @@ describe('user and temporary regions', () => {
     it('uses XX for user waypoints and XY for temporary ones', () => {
         expect(USER_WAYPOINT).toBe('XX');
         expect(TEMPORARY_WAYPOINT).toBe('XY');
+    });
+});
+
+// The pages make the fields of a user waypoint editable on this test, and the repository updates only those.
+describe('isUserWaypoint (characterization)', () => {
+    it.each([
+        ['XX', true],
+        ['XY', true],
+        ['K1', false],
+    ])('takes the region %s as a user waypoint: %s', (region, expected) => {
+        const fac = intersection('QQ', 47, 10.5, {region});
+        expect(fac.icaoStruct.region).toBe(region); // precondition: the builder's region
+
+        expect(isUserWaypoint(fac)).toBe(expected);
     });
 });
 

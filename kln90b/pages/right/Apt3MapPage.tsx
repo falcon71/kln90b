@@ -2,7 +2,8 @@ import {AirportFacility, GeoPoint, RunwayUtils, VNode} from '@microsoft/msfs-sdk
 import {PageProps, UIElementChildren} from "../Page";
 import {NO_CURSOR_CONTROLLER} from "../CursorController";
 import {Canvas} from "../../controls/Canvas";
-import {isUserWaypoint, unpackFacility, WaypointPage} from "./WaypointPage";
+import {unpackFacility, WaypointPage} from "./WaypointPage";
+import {isUserWaypoint} from "../../data/navdata/IcaoBuilder";
 import {WaypointPageState} from "../../data/VolatileMemory";
 import {Scanlist} from "../../data/navdata/Scanlist";
 import {AirportNearestList} from "../../data/navdata/NearestList";

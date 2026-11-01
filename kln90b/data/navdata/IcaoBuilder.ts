@@ -1,7 +1,11 @@
-import {ICAO, IcaoValue} from "@microsoft/msfs-sdk";
+import {Facility, ICAO, IcaoValue} from "@microsoft/msfs-sdk";
 
 export const TEMPORARY_WAYPOINT = 'XY';
 export const USER_WAYPOINT = 'XX';
+
+export function isUserWaypoint(fac: Facility): boolean {
+    return fac.icaoStruct.region === USER_WAYPOINT || fac.icaoStruct.region === TEMPORARY_WAYPOINT;
+}
 
 /**
  * @deprecated use buildIcaoStruct
