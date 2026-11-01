@@ -77,4 +77,20 @@ describe('user flight plan persistor (V2)', () => {
 
         expect(identsOf(plans[0].getLegs())).toEqual(['FIXA', 'MYWPT']);
     });
+
+    // The trailer is our own format (docs/superpowers/specs/2026-11-01-flyover-waypoints-design.md, Storage)
+    it('appends the trailer only when a USER leg is a fly-over (characterization)', () => {
+        persistor().persistFlightplan(new Flightplan(5, [
+            {wpt: fixa, type: KLNLegType.USER},
+            {wpt: abc, type: KLNLegType.APP, flyOver: true},
+            {wpt: xy, type: KLNLegType.USER, flyOver: true},
+        ], bus));
+        expect(settings.getSetting('fpl5').get()).toBe(W_FIXA + N_XY + '02C');
+    });
+    it('round trips a fly-over flag (characterization)', async () => {
+        const p = persistor();
+        p.persistFlightplan(new Flightplan(6, [{wpt: fixa, type: KLNLegType.USER, flyOver: true}, {wpt: xy, type: KLNLegType.USER}], bus));
+        const plans = await p.restoreAllFlightplan();
+        expect(plans[6].getLegs().map(l => l.flyOver === true)).toEqual([true, false]);
+    });
 });

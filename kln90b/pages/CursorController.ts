@@ -292,12 +292,7 @@ export class CursorController implements CursorHandler {
         const result = await field.enter();
 
         if (result == EnterResult.Handled_Keep_Focus) {
-            const focused = this.getCurrentFocusedField();
-            if (this.cursorActive && focused && !focused.isFocused) {
-                //Happens when enter was pressed to delete an item (e.g. OTH 3 page)
-                //This item no longer exists, but we still want to focus the item on the current index
-                this.focusAt(this.cursorField);
-            }
+            this.refocus();
         } else if (result === EnterResult.Handled_Move_Focus || this.enterAlwaysMoves) {
             //Enter moves to the next field, see https://www.youtube.com/shorts/9We5fcd2-VE
             //A field with nothing to accept leaves the cursor where it is, checked in the KLN 89 trainer (#354)
@@ -305,6 +300,19 @@ export class CursorController implements CursorHandler {
             this.outerRight();
         }
         return result;
+    }
+
+    /**
+     * Focuses the field at the cursor's index when the field there is not focused, after the field that kept the focus
+     * was replaced
+     */
+    public refocus(): void {
+        const focused = this.getCurrentFocusedField();
+        if (this.cursorActive && focused && !focused.isFocused) {
+            //Happens when enter was pressed to delete an item (e.g. OTH 3 page)
+            //This item no longer exists, but we still want to focus the item on the current index
+            this.focusAt(this.cursorField);
+        }
     }
 
     public clear(): boolean {

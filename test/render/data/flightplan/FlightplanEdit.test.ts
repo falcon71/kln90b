@@ -1,4 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
+import {IntersectionFacility} from '@microsoft/msfs-sdk';
 import {bootUnit, HeadlessUnit, settle} from '../../../harness/boot';
 import {airport, intersection} from '../../../harness/navdata/builders';
 import {standardRoute} from '../../../harness/fixtures';
@@ -383,18 +384,22 @@ describe('adding a waypoint to a full FPL 0', () => {
 // into a plan of 30 fillers, whose first one made room for KPRC). A leg inserted in front of a SID waypoint is a SID leg
 // (createLeg copies the type), which counts only toward the total of 45 (#221)
 describe('adding a waypoint in front of a SID waypoint of a full FPL 0', () => {
-    async function bootWithSid() {
+    /** `flyOverFix`, a terminal fix of KPRC, is also in the world, flown over by a second SID of KPRC, DEP9 (#77) */
+    async function bootWithSid(flyOverFix?: IntersectionFacility) {
         const kprcBase = airport('KPRC', 47.0, 8.0);
         const east = (nm: number) => pointFrom(kprcBase, 90, nm);
         const sidaa = intersection('SIDAA', east(8).lat, east(8).lon);
         const sidab = intersection('SIDAB', east(20).lat, east(20).lon);
         const kprc = withProcedures(kprcBase, {
             approaches: [],
-            departures: [sid('DEP1', {runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}], common: [Leg.TF(sidab)]})],
+            departures: [
+                sid('DEP1', {runways: [{runway: '09', legs: [Leg.CA(90), Leg.DF(sidaa)]}], common: [Leg.TF(sidab)]}),
+                ...(flyOverFix === undefined ? [] : [sid('DEP9', {common: [Leg.TF(flyOverFix, 0, true)]})]),
+            ],
         });
         const fillers = Array.from({length: 30}, (_, i) => intersection(`FL${String(i).padStart(2, '0')}`, 46.5, 7.0 + 0.02 * i));
         const unit = await bootUnit({
-            facilities: [kprc, sidaa, sidab, ...fillers], position: {lat: 46.5, lon: 7.12},
+            facilities: [kprc, sidaa, sidab, ...fillers, ...(flyOverFix === undefined ? [] : [flyOverFix])], position: {lat: 46.5, lon: 7.12},
             storage: savedFlightplan(0, fillers),
         });
         await settle(unit);
@@ -441,6 +446,33 @@ describe('adding a waypoint in front of a SID waypoint of a full FPL 0', () => {
 
         expect(unit.panel.focused('L').text).toBe('CONTINUE?');
         expect(unit.props.memory.fplPage.flightplans[0].getLegs()).toHaveLength(32);
+    });
+
+    // The rule of the design doc of #77: a waypoint added inside a SID is a SID leg already, so it is not asked EN ROUTE
+    // or SID/STAR, also when it is a terminal fix flown over by a procedure of its airport
+    it('adds a terminal fly-over fix in front of SIDAB as a SID leg without asking its type (characterization, #77)', async () => {
+        const tfo1 = intersection('TFO1', 47.05, 8.2, {airport: 'KPRC'});
+        const unit = await bootWithSid(tfo1);
+        await unit.panel.selectPage('L', 'FPL 0');
+        await unit.panel.cursor('L');
+        await unit.panel.cursorToTop('L');
+        for (let i = 0; unit.panel.focused('L').text.trim() !== 'SIDAB' && i < 6; i++) {
+            await unit.panel.outer('L', 1);
+        }
+        expect(unit.panel.focused('L').text.trim()).toBe('SIDAB'); // Precondition
+        await unit.panel.inner('L', 1);
+        await unit.panel.enterIdent('L', 'TFO1');
+        await unit.panel.ent(); // the waypoint page
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1500);
+
+        const legs = unit.props.memory.fplPage.flightplans[0].getLegs();
+        expect(legs.slice(0, 4).map(l => [l.wpt.icaoStruct.ident, l.type, l.flyOver === true])).toEqual([
+            ['KPRC', KLNLegType.USER, false], ['SIDAA', KLNLegType.SID, false], ['TFO1', KLNLegType.SID, false],
+            ['SIDAB', KLNLegType.SID, false],
+        ]);
+        expect(Screen.read().rows('L')).not.toContain('  TYPE WPT ');
+        expect(unit.errors).toEqual([]);
     });
 });
 

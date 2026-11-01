@@ -130,6 +130,14 @@ export class WaypointEditor extends Editor<Facility | null> {
     }
 
     /**
+     * The waypoint that waits for its approval with ENT, or null: no approval is pending, or the pending one is the CLR
+     * of the ident
+     */
+    public pendingValue(): Facility | null {
+        return this.isAwaitingConfirmation ? this.valueToConfirm : null;
+    }
+
+    /**
      * #262: true while the SUP page that creates the typed ident is on the right stack, shown or covered by a page it
      * pushed (the approval of a REF waypoint). FlightplanListItem.clear reads it before and after CLR: true before and
      * false after means CLR canceled the creation

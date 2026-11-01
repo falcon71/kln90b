@@ -24,8 +24,8 @@ class TestLoader extends Flightplanloader {
         super(bus, client as unknown as FacilityClient, messageHandler);
     }
 
-    public load(icaos: IcaoValue[], fplIdx?: number): Promise<Flightplan> {
-        return this.loadIcaos(icaos, fplIdx);
+    public load(icaos: IcaoValue[], fplIdx?: number, flyOver?: boolean[]): Promise<Flightplan> {
+        return this.loadIcaos(icaos, fplIdx, flyOver);
     }
 }
 
@@ -33,9 +33,9 @@ const known = (i: number) => ICAO.value('V', 'K1', '', `K${String(i).padStart(2,
 const gone = (i: number) => ICAO.value('V', 'K1', '', `GONE${i}`);
 const messagesOf = (mh: MessageHandler) => mh.getMessages().map(m => m.message.join('|'));
 
-async function load(icaos: IcaoValue[]) {
+async function load(icaos: IcaoValue[], flyOver?: boolean[]) {
     const mh = new MessageHandler();
-    const fpl = await new TestLoader(mh).load(icaos);
+    const fpl = await new TestLoader(mh).load(icaos, undefined, flyOver);
     return {fpl, messages: messagesOf(mh)};
 }
 
@@ -109,5 +109,20 @@ describe('Flightplanloader.loadIcaos', () => {
         const {messages} = await load(icaos);
 
         expect(messages).toEqual(['WAYPOINT K30 DELETED', 'WAYPOINT K31 DELETED', 'WAYPOINT GONE0 DELETED']);
+    });
+
+    // characterization of the loader API (#77): the flags belong to the icaos, so a dropped waypoint takes its flag along
+    it('keeps the fly-over flag with its leg when a waypoint is dropped (characterization)', async () => {
+        const {fpl} = await load([known(0), gone(1), known(2)], [false, false, true]);
+
+        expect(identsOf(fpl.getLegs())).toEqual(['K00', 'K02']);
+        expect(fpl.getLegs().map(l => l.flyOver)).toEqual([undefined, true]);
+    });
+
+    it('gives a leg without a fly-over flag no flyOver key (characterization)', async () => {
+        const {fpl} = await load([known(0), known(1)], [false, true]);
+
+        expect('flyOver' in fpl.getLegs()[0]).toBe(false);
+        expect(fpl.getLegs()[1].flyOver).toBe(true);
     });
 });

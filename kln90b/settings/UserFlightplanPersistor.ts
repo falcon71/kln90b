@@ -6,6 +6,7 @@ import {Flightplanloader} from "../services/Flightplanloader";
 import {KLN90BUserSettings} from "./KLN90BUserSettings";
 import {UserFlightplanLoaderV2} from "./UserFlightplanLoaderV2";
 import {UserFlightplanLoaderV1} from "./UserFlightplanLoaderV1";
+import {encodeFlyOverTrailer} from "./FlyOverTrailer";
 
 
 export interface UserFlightplanLoader {
@@ -43,12 +44,8 @@ export class UserFlightplanPersistor extends Flightplanloader {
     public persistFlightplan(fpl: Flightplan) {
         const setting = this.manager.getSetting(`fpl${fpl.idx}`);
 
-        let serialized = "";
-        for (const leg of fpl.getLegs()) {
-            if (leg.type === KLNLegType.USER) {
-                serialized += this.serializeLeg(leg);
-            }
-        }
+        const userLegs = fpl.getLegs().filter(leg => leg.type === KLNLegType.USER);
+        const serialized = userLegs.map(leg => this.serializeLeg(leg)).join("") + encodeFlyOverTrailer(userLegs.map(leg => leg.flyOver === true));
         console.log("persisting flightplan", fpl, serialized);
         setting.set(serialized);
     }

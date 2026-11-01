@@ -925,7 +925,17 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       them. The loader takes the feet when the slot is longer than the surface and the meters otherwise; older versions
       read by fixed offsets and ignore the feet. An unknown elevation (-1 m) has no feet.
     - `fpl{i}` stores FPL i for 0 to 25, **including FPL 0**. Only USER legs are stored.
-    - Code: `UserWaypointLoaderV2`, `UserFlightplanLoaderV2`.
+    - Since #77 a plan with a fly-over leg (a waypoint the pilot answered `SID/STAR?` for, 4-2..4-3 and figure 4-7a,
+      stored as a fly-over) has a trailer after the
+      legs: the leg count as two decimal digits, then the flags as a bitset in base64 (`A-Z a-z 0-9 + /`), one character
+      for each six legs, least significant bit first. A plan without a fly-over leg is stored exactly as before. The
+      legs are whole 19-character cells, so the trailer is `length % 19` characters, which tells it from a plain V2
+      string, and `userDataFormat` stays 2. The loader ignores a trailer whose count is not the number of stored legs
+      or that has a character outside base64, and the legs then load as fly-by. The flags travel with their legs
+      through `loadIcaos` (a missing waypoint, the cut at 30 legs). An older release reads the trailer as one more
+      (short) ICAO chunk, which names no facility: it shows one `WAYPOINT  DELETED` message with a blank ident for that
+      plan, restores the legs and loses the flags.
+    - Code: `UserWaypointLoaderV2`, `UserFlightplanLoaderV2`, `FlyOverTrailer.ts` (the trailer's codec).
 - Migration in `KLN90BCore.asyncInit`: if the format is not 2, re-persist all waypoints and plans with the V2 writers, then
   set `userDataFormat=2`. Writers (`UserWaypointPersistor.serialize*`, `UserFlightplanPersistor.persistFlightplan`) only
   produce V2. `UserWaypointPersistor.restoreWaypoints()` suspends the repository sync while the loader adds the stored
@@ -1261,7 +1271,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - Startup: `WelcomePage`, `SelfTestLeftPage`/`SelfTestRightPage`, `TakehomePage`, `VFROnlyPage`, `ObsWarningPage`,
   `AiracPage`.
 - Temporary pushed pages: `DirectToPage` (name `"DIR  "`), `AltPage`, `DuplicateWaypointPage` (name `"     "`),
-  `WaypointConfirmPage`.
+  `WaypointConfirmPage`, `WaypointTypePage` (name `"     "`, the EN ROUTE?/SID/STAR? question of #77).
 - `name` is exactly 5 chars and is shown in the status line: `"APT 2"`, `"D/T 1"`, `` `FPL${n.padStart(2)}` `` →
   `"FPL 0"`/`"FPL10"`. When `numPages > 1`, MainPage shows `name[0..3] + "+" + name[4]`, e.g. `"APT+3"`. This is the
   real unit's "+" multi-page indicator.
@@ -1326,7 +1336,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   open entry (`SixLineHalfPage.hasOpenEntry()`: by default a focused field that `isEntered`, that is an open edit or a
   DEL question) takes CLR first. A `WaypointConfirmPage` shown for an editor on the right side counts as an open entry
   too, because the right page has no cursor of its own while it waits for the approval (#359); the confirmation of a
-  left-side editor does not, since the left cursor sits on that editor. So an open edit on the right is not overtaken
+  left-side editor does not while that editor's page is the left page, since the left cursor sits on that editor.
+  While the `WaypointTypePage` of #77 covers the flight plan page, the confirmation of the FPL row reports an open
+  entry too, and the type page always does (`hasOpenEntry()` is true), so both sides hold one and the question takes
+  CLR first. So an open edit on the right is not overtaken
   by the left page answering CLR (FPL with its cursor off asks DELETE FPL?). That priority applies only to the half pages, never to an overlay. It goes
   to the right page only when the right side holds an open entry and the left does not; otherwise the order is left,
   then right (`left.clear() || right.clear()`). When both sides hold an open entry the left goes first. `FiveSegmentPage`
@@ -1598,6 +1611,18 @@ export class Set3Page extends SixLineHalfPage {
    `enterCallback(facility)`. ENT on the right side reaches `WaypointConfirmPage.enter()`, which delegates to
    `callingEditor` and, when that editor is the right page's focused field (the REF field of SUP or INT), moves the
    right cursor on to the next field (#284).
+   An FPL USER row can defer the approval (#77, 4-2..4-3, figure 4-7a). Before it calls `waypointEditor.enter()`,
+   `FlightplanListItem.enter` reads the waiting waypoint (`WaypointEditor.pendingValue()`) and asks
+   `isSidStarFlyOver` (`services/FlyOverWaypoints.ts`), which loads the fix's airport. While that load runs, another ENT
+   on the row is handled and does nothing (the in-flight guard), so the waypoint is not inserted twice. After the load
+   the row checks again that the unit is still on (`PageManager.getMainPage()`), that its flight plan page is still the
+   left page (ALT or D-> may have covered it) and that the same waypoint still waits (CLR or the inner knob may have
+   ended the approval); if not, the ENT ends there. For a fly-over fix it pushes `WaypointTypePage` on the left with
+   the flight plan page as its parent and returns `Handled_Keep_Focus`; the waypoint page stays on the right. The
+   answer calls `waypointEditor.enter()` itself, with EN ROUTE as a plain insert and SID/STAR as a USER leg with
+   `flyOver: true` (`setFacility`). `CursorController.enter` has returned long before, so the row moves the cursor
+   itself: `refocus()` after an insert refused with FPL FULL (#240), `outerRight()` after an approval that moves on. CLR
+   on the question pops it and passes CLR to the flight plan page, as CLR on the approval does (4-2 step 7).
 7. Turning the inner knob or typing while waiting → `cancelAwaitingConfirmation()` (3-28). Outer knob is blocked while
    waiting. CLR → `confirmValue(null)`, which clears. When the editor is on the right side (REF of INT/SUP, the VNAV
    waypoint of NAV 4) the right page is the confirm page, which has no cursor: `WaypointConfirmPage.hasOpenEntry()`

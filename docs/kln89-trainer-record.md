@@ -859,3 +859,10 @@ SET 4 on, restarted by the maintainer before the check; raw data and report in
 - Left behind in the trainer: SET 4 off, GS 120, flying 8S to 8R; FPL 0 8Z 8Y 8X 8V 8U 8T 8S 8R, checked row by row. The
   temporary user waypoints 8N of each check were deleted again; no existing user waypoint or numbered flight plan was
   changed.
+
+**2026-11-01** (the waypoint type question of 4-2..4-3, #77)
+- The 89's demo database has one STAR (TRUDO1 at KMKE) and no SIDs. None of the 21 entries tried raised the 89's
+  equivalent of the waypoint type question: the STAR's fixes appended to and inserted into flight plans, and VORs. The
+  check cannot show the page, so the page and its answers follow the Pilot's Guide and the design of #77.
+- The third-party AVsoftech KLN 90B trainer, which is unreliable, does not model the question either: SWR and the
+  fixes of the KAPA procedures PIKES2 and DANDD1 entered into flight plans brought up no page.

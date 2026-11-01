@@ -4,6 +4,7 @@ import {Flightplan} from "../data/flightplan/Flightplan";
 import {MessageHandler} from "../data/MessageHandler";
 import {Flightplanloader} from "../services/Flightplanloader";
 import {UserFlightplanLoader} from "./UserFlightplanPersistor";
+import {decodeFlyOverTrailer} from "./FlyOverTrailer";
 
 
 export class UserFlightplanLoaderV2 extends Flightplanloader implements UserFlightplanLoader {
@@ -30,8 +31,12 @@ export class UserFlightplanLoaderV2 extends Flightplanloader implements UserFlig
                 return new Flightplan(idx, [], this.bus);
             }
 
-            const serializedLegs = serialized.match(/.{1,19}/g)!.map(ICAO.stringV2ToValue);
-            return await this.loadIcaos(serializedLegs, idx);
+            // The legs are cells of 19 characters. What does not fill a cell is the fly-over trailer (#77)
+            const trailerLength = serialized.length % 19;
+            const legsLength = serialized.length - trailerLength;
+            const serializedLegs = serialized.substring(0, legsLength).match(/.{19}/g)?.map(ICAO.stringV2ToValue) ?? [];
+            const flyOver = decodeFlyOverTrailer(serialized.substring(legsLength), serializedLegs.length);
+            return await this.loadIcaos(serializedLegs, idx, flyOver);
         } catch (e) {
             console.log(`Error restoring fpl ${idx}`, e);
             throw e;

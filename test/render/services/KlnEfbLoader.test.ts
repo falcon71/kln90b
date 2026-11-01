@@ -107,6 +107,23 @@ describe('EFB route import (KlnEfbLoader)', () => {
         expect(messages(unit).slice(before).filter(m => m.includes('DELETED'))).toEqual([]);
     });
 
+    // The rule of the design doc of #77 (the maintainer's ruling): legs from the EFB route sync are not asked EN ROUTE or
+    // SID/STAR, so a terminal fix that a STAR of its airport flies over loads as an ordinary en route fix
+    it('loads a terminal fly-over fix of the route without the fly-over and without asking its type (characterization, #77)', async () => {
+        const df1 = intersection('DF1', 47.1, 8.1, {airport: 'KAAA'});
+        const kaaaWithStar = withProcedures(kaaa, {arrivals: [star('ARR1', {common: [Leg.TF(df1, 0, true)]})]});
+        const unit = await bootUnit({facilities: [kaaaWithStar, df1, kbbb], efb: true});
+        await settle(unit);
+
+        unit.efb!.sync(efbRoute({enroute: [df1, kbbb]}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['DF1', 'KBBB']);
+        expect(unit.props.memory.fplPage.flightplans[0].getLegs().map(l => l.flyOver === true)).toEqual([false, false]);
+        expect(Screen.read().rows('L')).not.toContain('  TYPE WPT ');
+        expect(unit.errors).toEqual([]);
+    });
+
     // The EFB may name a lat/lon point. The unit keeps the first four characters of the name and makes them unique
     // with the first free letter, as for CUST
     it('names a lat/lon leg after the first four characters of its name (characterization)', async () => {

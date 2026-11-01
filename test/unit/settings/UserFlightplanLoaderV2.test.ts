@@ -8,6 +8,7 @@ import {MessageHandler} from '../../../kln90b/data/MessageHandler';
 import {MemoryFacilityClient} from '../../harness/navdata/MemoryFacilityClient';
 import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
 import {identsOf} from '../../harness/readers';
+import {Flightplan} from '../../../kln90b/data/flightplan/Flightplan';
 
 // Contract source: CLAUDE.md "Public contract with aircraft" (persisted user data: the V2 flight-plan strings) and
 // docs/architecture.md Core 7: `fpl{i}` stores FPL i for 0 to 25, including FPL 0, as concatenated 19 character ICAOs
@@ -36,6 +37,8 @@ const V_ABC = 'VK1        ABC     ';
 const N_XY = 'NK2        XY      ';
 const W_FIXA = 'WK1        FIXA    ';
 const U_MYWPT = 'UXX        MYWPT   ';
+
+const flags = (plan: Flightplan) => plan.getLegs().map(l => l.flyOver === true);
 
 function restore(messageHandler = new MessageHandler()) {
     return new UserFlightplanLoaderV2(bus, loader, messageHandler).restoreAllFlightplan();
@@ -81,5 +84,32 @@ describe('user flight plan V2 loader', () => {
         expect(plans[4].getLegs().length).toBe(30);
         expect(identsOf(plans[4].getLegs())).not.toContain('ABC');
         expect(messageHandler.getMessages().map(m => m.message)).toEqual([['WAYPOINT ABC DELETED']]);
+    });
+
+    // The trailer is our own format (docs/superpowers/specs/2026-11-01-flyover-waypoints-design.md, Storage)
+    it('restores the fly-over flags of the trailer (characterization)', async () => {
+        settings.getSetting('fpl3').set(W_FIXA + V_ABC + '02C');
+        const plans = await restore();
+        expect(identsOf(plans[3].getLegs())).toEqual(['FIXA', 'ABC']);
+        expect(flags(plans[3])).toEqual([false, true]);
+    });
+    it('keeps the flags with their legs when a stored waypoint is gone (characterization)', async () => {
+        settings.getSetting('fpl2').set(A_KAAA + 'VK1        GONE    ' + V_ABC + '03E');
+        const plans = await restore();
+        expect(identsOf(plans[2].getLegs())).toEqual(['KAAA', 'ABC']);
+        expect(flags(plans[2])).toEqual([false, true]);
+    });
+    it('keeps the flag of leg 30 when a longer stored plan is cut (characterization)', async () => {
+        settings.getSetting('fpl4').set(A_KAAA.repeat(30) + V_ABC + '31AAAAgA');
+        const plans = await restore();
+        expect(plans[4].getLegs().length).toBe(30);
+        expect(plans[4].getLegs()[29].flyOver).toBe(true);
+        expect(flags(plans[4]).filter(f => f).length).toBe(1);
+    });
+    it('loads the legs en route when the trailer does not fit (characterization)', async () => {
+        settings.getSetting('fpl5').set(W_FIXA + V_ABC + '03C');
+        const plans = await restore();
+        expect(identsOf(plans[5].getLegs())).toEqual(['FIXA', 'ABC']);
+        expect(flags(plans[5])).toEqual([false, false]);
     });
 });

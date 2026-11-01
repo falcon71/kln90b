@@ -13,6 +13,8 @@ import {FplWptEnterMode} from "./FlightplanList";
 import {KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
 import {SidStar} from "../data/navdata/SidStar";
 import {reportErrors} from "./ErrorPage";
+import {isSidStarFlyOver} from "../services/FlyOverWaypoints";
+import {WaypointTypePage} from "../pages/left/WaypointTypePage";
 
 export interface FlightplanListItemProps extends PageProps {
     fplIdx: number,
@@ -51,6 +53,8 @@ export class FlightplanListItem implements Field, ListItem {
     private waypointEditor: WaypointEditor;
     private insertRefused = false; //#240 the insert of the last confirmation was refused with FPL FULL
     private refEntry = false; //#291 the reference waypoint of the REF page, from its confirmation until the entry is left
+    private typeCheckRunning = false; //#77 the airport of the waypoint waiting for its approval is being loaded
+    private sidStarAnswer = false; //#77 4-3: the approval that runs now inserts the waypoint as a SID/STAR fly-over
     private readonly type: KLNLegType;
     private readonly wptIdent: string;
 
@@ -218,6 +222,10 @@ export class FlightplanListItem implements Field, ListItem {
                 this.props.onCreate(this.props.wptIdx, FplWptEnterMode.ENTER);
                 return EnterResult.Handled_Keep_Focus;
             }
+            const pending = this.type === KLNLegType.USER ? this.waypointEditor.pendingValue() : null;
+            if (pending !== null && await this.asksWaypointType(pending)) {
+                return EnterResult.Handled_Keep_Focus; //#77
+            }
             const wasBlank = this.wpt === null;
             this.insertRefused = false;
             const handled = await this.waypointEditor.enter();
@@ -236,6 +244,74 @@ export class FlightplanListItem implements Field, ListItem {
             }
             return handled;
         }
+    }
+
+    /**
+     * #77 4-2..4-3: the approval of a SID/STAR waypoint that is flown over asks first whether it is used en route or as
+     * the SID/STAR waypoint (WaypointTypePage). Only an en route entry asks; a waypoint added inside a SID/STAR is a
+     * procedure leg already. Loading the airport takes a moment, and an ENT meanwhile does nothing, so that the waypoint
+     * is not inserted twice (our choice, design doc of #77)
+     * @return true when this approval is handled here: the question is shown, or the airport is still loading
+     */
+    private async asksWaypointType(fix: Facility): Promise<boolean> {
+        if (this.typeCheckRunning) {
+            return true;
+        }
+        this.typeCheckRunning = true;
+        let isFlyOver: boolean;
+        try {
+            isFlyOver = await isSidStarFlyOver(fix, this.props.facilityLoader);
+        } finally {
+            this.typeCheckRunning = false;
+        }
+        if (!this.isShown()) {
+            return true; //The unit was turned off or the page left while the airport was loading
+        }
+        if (this.waypointEditor.pendingValue() !== fix) {
+            return true; //CLR or the knob ended the approval while the airport was loading
+        }
+        if (isFlyOver) {
+            reportErrors(this.askWaypointType(fix), this.props.bus);
+        }
+        return isFlyOver;
+    }
+
+    /**
+     * #77 4-3: the answer completes the approval: EN ROUTE inserts the waypoint as any other, SID/STAR as a fly-over. CLR
+     * ends the entry as CLR on the approval does (4-2 step 7)
+     */
+    private async askWaypointType(fix: Facility): Promise<void> {
+        //The page takes every key of the left side while it is shown, so the approval is still pending when it answers
+        const sidStar = await WaypointTypePage.ask({...this.props, fix: fix, parent: this.props.parent});
+        if (sidStar === null) {
+            this.props.parent.clear(); //The CLR of the flight plan page, as CLR on the approval itself reaches this row
+            return;
+        }
+        this.sidStarAnswer = sidStar;
+        this.insertRefused = false;
+        let handled: EnterResult;
+        try {
+            handled = await this.waypointEditor.enter();
+        } finally {
+            this.sidStarAnswer = false;
+        }
+        this.isEntered = this.waypointEditor.isEntered;
+        //CursorController.enter returned before the answer, so its cursor handling is done here
+        if (this.insertRefused) {
+            //4-4, C-1: the list was rebuilt as stored; the cursor stays on the waypoint the insert was in front of (#240)
+            this.props.cursorController.refocus();
+        } else if (handled === EnterResult.Handled_Move_Focus) {
+            //The cursor moves on as after any approval
+            this.props.cursorController.outerRight();
+        }
+    }
+
+    /**
+     * #77: this row's flight plan page is still the left page of the unit's main page. A power-off replaces the main page
+     */
+    private isShown(): boolean {
+        const mainPage = this.props.pageManager.getMainPage();
+        return mainPage !== null && mainPage.getLeftPage() === this.props.parent;
     }
 
     public confirmCurrentValue(): Promise<void> {
@@ -384,7 +460,9 @@ export class FlightplanListItem implements Field, ListItem {
 
     private setFacility(facility: Facility | null) {
         this.wpt = facility;
-        this.insertRefused = !this.props.onInsertDone(this.props.wptIdx, facility, this.props.leg);
+        //#77 4-3: a SID/STAR answer keeps the waypoint en route and turns off the turn anticipation at it (NavCalculator)
+        const leg = this.sidStarAnswer && facility !== null ? {wpt: facility, type: KLNLegType.USER, flyOver: true} : this.props.leg;
+        this.insertRefused = !this.props.onInsertDone(this.props.wptIdx, facility, leg);
     }
 
     public keyboard(key: string): boolean {

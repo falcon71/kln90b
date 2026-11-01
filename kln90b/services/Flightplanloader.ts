@@ -11,16 +11,18 @@ export abstract class Flightplanloader {
      * wapoints that can no longer be found. Messages will be generated for each deleted waypoint
      * @param icaos
      * @param fplIdx
+     * @param flyOver flyOver[i] belongs to icaos[i]. It travels with its leg through the drop of a missing waypoint and
+     * the cut at 30 legs
      * @protected
      */
-    protected async loadIcaos(icaos: IcaoValue[], fplIdx: number = 0): Promise<Flightplan> {
+    protected async loadIcaos(icaos: IcaoValue[], fplIdx: number = 0, flyOver: boolean[] = []): Promise<Flightplan> {
         const messages: Message[] = [];
 
         for (let i = 30; i < icaos.length; i++) { //I'm terribly sorry, but the KLN90B flightplans can only have a maximum of 30 legs
             messages.push(new OneTimeMessage([`WAYPOINT ${icaos[i].ident} DELETED`]));
         }
 
-        const promises = icaos.slice(0, 30).map(this.convertToKLNLeg.bind(this));
+        const promises = icaos.slice(0, 30).map((icao, i) => this.convertToKLNLeg(icao, flyOver[i] === true));
         const legs = await Promise.all(promises);
 
         messages.push(...(legs.filter(l => l instanceof OneTimeMessage) as OneTimeMessage[]));
@@ -45,10 +47,10 @@ export abstract class Flightplanloader {
         messages.forEach(this.messageHandler.addMessage.bind(this.messageHandler));
     }
 
-    private async convertToKLNLeg(icao: IcaoValue): Promise<KLNFlightplanLeg | OneTimeMessage> {
+    private async convertToKLNLeg(icao: IcaoValue, flyOver: boolean): Promise<KLNFlightplanLeg | OneTimeMessage> {
         try {
             const facility = await this.facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(icao), icao);
-            return {wpt: facility, type: KLNLegType.USER};
+            return flyOver ? {wpt: facility, type: KLNLegType.USER, flyOver: true} : {wpt: facility, type: KLNLegType.USER};
         } catch (e) {
             console.error(`Error converting ${icao}`, e);
             return new OneTimeMessage([`WAYPOINT ${icao.ident} DELETED`]);

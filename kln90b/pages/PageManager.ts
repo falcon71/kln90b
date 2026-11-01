@@ -119,6 +119,14 @@ export class PageManager implements DisplayTickable {
         return this.container!.getCurrentPage();
     }
 
+    /**
+     * The main page, or null while another page is shown, as when the unit is off or during the power-on pages
+     */
+    public getMainPage(): MainPage | null {
+        const page = this.getCurrentPage();
+        return page instanceof MainPage ? page : null;
+    }
+
     public resetKeyboard() {
         this.container!.resetKeyboard();
     }

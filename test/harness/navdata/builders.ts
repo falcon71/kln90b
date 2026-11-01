@@ -131,9 +131,10 @@ export function ndb(ident: string, lat: number, lon: number, opts: { frequencyKH
     } as unknown as NdbFacility;
 }
 
-export function intersection(ident: string, lat: number, lon: number, opts: { region?: string } = {}): IntersectionFacility {
+/** `opts.airport` makes a terminal fix: the airport ident goes into the ICAO's airport field, as the sim's procedure fixes have it */
+export function intersection(ident: string, lat: number, lon: number, opts: { region?: string; airport?: string } = {}): IntersectionFacility {
     const region = opts.region ?? DEFAULT_REGION;
-    const icaoStruct = ICAO.value('W', region, '', ident);
+    const icaoStruct = ICAO.value('W', region, opts.airport ?? '', ident);
     // noinspection JSDeprecatedSymbols
     return {
         icao: ICAO.valueToStringV1(icaoStruct), icaoStruct, name: '', lat, lon, region, city: '', routes: [],
