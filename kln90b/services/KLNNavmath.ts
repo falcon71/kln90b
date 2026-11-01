@@ -1,11 +1,14 @@
 import {GeoPoint, LatLonInterface} from "@microsoft/msfs-sdk";
 import {Degrees, Knots} from "../data/Units";
-import {HOURS_TO_SECONDS, MAX_BANK_ANGLE} from "../data/navdata/NavCalculator";
 
 const GEOPOINTCACHE = new GeoPoint(0, 0);
 
 //We assume that the aircraft can change it's bank angle by 5°/s
 const BANK_ANGLE_CHANGE_RATE = 5;
+
+export const HOURS_TO_SECONDS = 3600;
+
+export const MAX_BANK_ANGLE = 25;
 
 /**
  * https://edwilliams.org/avform147.htm#Intermediate

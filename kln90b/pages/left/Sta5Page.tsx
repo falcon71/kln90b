@@ -13,7 +13,7 @@ import {TimeEditor} from "../../controls/editors/TimeEditor";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {TimeStamp, TIMEZONES} from "../../data/Time";
-import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS} from "../../services/KLNNavmath";
 
 
 type Sta5PageTypes = {

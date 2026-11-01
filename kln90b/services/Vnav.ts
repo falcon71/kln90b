@@ -4,7 +4,7 @@ import {CalcTickable} from "../TickController";
 import {Flightplan} from "../data/flightplan/Flightplan";
 import {Degrees, Feet, NauticalMiles, Seconds} from "../data/Units";
 import {Facility, GeoPoint, ICAO, UnitType} from "@microsoft/msfs-sdk";
-import {HOURS_TO_SECONDS} from "../data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS} from "./KLNNavmath";
 import {padInt} from "../data/NumberFormat";
 
 export const enum VnavState {

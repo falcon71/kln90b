@@ -685,7 +685,8 @@ sim.
   the turn circle (`turnStack[0]`) from the start of the lead-in, or the next leg (`pathForDtk`) once the aircraft was
   farther from the circle than its radius (`TurnStackEntry.steerOnPathForDtk`, kept until the entry pops). Null where
   XTK is null (#373, #100).
-- `MAX_BANK_ANGLE = 25`. `HOURS_TO_SECONDS` is exported from here and widely imported.
+- The bank limit `MAX_BANK_ANGLE = 25` and `HOURS_TO_SECONDS` live in `services/KLNNavmath.ts`, which this file
+  imports; that module must not import `NavCalculator` back.
 
 **`ModeController`** (`services/ModeController.ts`, manual 5-36):
 

@@ -12,7 +12,7 @@ import {calculateGroundspeedAlongCourse} from "../../data/Wind";
 import {SelectField} from "../../controls/selects/SelectField";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
 import {IcaoFixedLength} from "../../data/navdata/IcaoFixedLength";
-import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS} from "../../services/KLNNavmath";
 
 
 type Tri5PageTypes = {

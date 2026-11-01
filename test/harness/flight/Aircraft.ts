@@ -17,7 +17,7 @@ export interface AircraftInit {
 export interface AircraftOptions {
     /** Default 5°/s, the roll rate KLNNavmath assumes for turn anticipation */
     rollRateDegPerS?: number;
-    /** Default 25° (MAX_BANK_ANGLE in NavCalculator.ts) */
+    /** Default 25° (MAX_BANK_ANGLE in KLNNavmath.ts) */
     maxBankDeg?: number;
 }
 

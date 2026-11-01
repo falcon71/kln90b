@@ -7,7 +7,7 @@ import {NullPage} from "./pages/NullPage";
 import {PageProps} from "./pages/Page";
 import {PropsReadyEvent} from "./KLN90BCore";
 import {LVAR_POWER} from "./LVars";
-import {HOURS_TO_SECONDS} from "./data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS} from "./services/KLNNavmath";
 
 /**
  * How long the unit's battery module carries a loss of the aircraft power, in milliseconds. The maintenance manual

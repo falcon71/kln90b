@@ -9,7 +9,7 @@ import {KLNFixType, KLNFlightplanLeg} from "../flightplan/Flightplan";
 import {KLNMagvar} from "./KLNMagvar";
 import {calcDistToDestination} from "../../services/FlightplanUtils";
 import {KLN90PlaneSettings} from "../../settings/KLN90BPlaneSettings";
-import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange} from "../../services/KLNNavmath";
+import {bankeAngleForStandardTurn, distanceToAchieveBankAngleChange, HOURS_TO_SECONDS} from "../../services/KLNNavmath";
 import {FromLeg, TurnBisector, TurnPlan, TurnStackEntry} from "../flightplan/ActiveWaypoint";
 import {courseAtWaypoint} from "./ObsGeometry";
 import {bearingBetween} from "./Bearing";
@@ -23,12 +23,8 @@ const WPT_ALERT_WITHOUT_TURN_ANTI = 36;
 //guide gives 36 s for a Direct To (3-29) without this distinction
 const WPT_ALERT_NO_TURN_WITH_TURN_ANTI = 15;
 
-export const HOURS_TO_SECONDS = 3600;
-
 const VEC3_CACHE = new Float64Array(3);
 const TO_GEOPOINT_CACHE = new GeoPoint(0, 0);
-
-export const MAX_BANK_ANGLE = 25;
 
 /**
  * The cross track to a leg beyond which the aircraft counts as off the leg (checked in the KLN 89 trainer, 2026-10-20:

@@ -11,7 +11,7 @@ import {BearingDisplay} from "../../controls/displays/BearingDisplay";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {TripFuelDisplay} from "../../controls/displays/FuelDisplay";
 import {calculateGroundspeedAlongCourse} from "../../data/Wind";
-import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS} from "../../services/KLNNavmath";
 import {bearingBetween} from "../../data/navdata/Bearing";
 
 

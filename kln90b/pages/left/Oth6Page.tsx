@@ -7,7 +7,7 @@ import {padFixed, padInt} from "../../data/NumberFormat";
 import {OthFuelFieldset, TripFuelFieldset} from "../../controls/selects/FuelFieldset";
 import {DurationDisplay} from "../../controls/displays/DurationDisplay";
 import {DistanceDisplay} from "../../controls/displays/DistanceDisplay";
-import {HOURS_TO_SECONDS} from "../../data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS} from "../../services/KLNNavmath";
 
 
 type Oth6PageTypes = {

@@ -4,7 +4,7 @@
 // the addendum that it is licensed only for usage in Microsoft Flight Simulator.
 import {FlightPathUtils, GeoCircle, LatLonInterface, MathUtils, NavMath, UnitType} from "@microsoft/msfs-sdk";
 import {Degrees, Knots, Seconds} from "../data/Units";
-import {HOURS_TO_SECONDS, MAX_BANK_ANGLE} from "../data/navdata/NavCalculator";
+import {HOURS_TO_SECONDS, MAX_BANK_ANGLE} from "./KLNNavmath";
 import {dtkAtClosest} from "../data/navdata/SequencingGeometry";
 
 /**
