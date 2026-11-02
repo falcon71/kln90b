@@ -236,13 +236,21 @@ tests set the bounds; the builder adjusts q within them.
   the truth.
 - **Fix lost:** as today, the last values are held. The error processes stop.
 - **Power-off and power-on:** all error and filter state is discarded. Nothing is persisted.
-- **Sim paused** (`dt` ≤ 0): no update, outputs held.
+- **Sim paused:** no update, outputs held. Flight 1 in the sim (2026-11-02) showed that the sim time runs on in the
+  active pause and in the pause, and that `VELOCITY WORLD` keeps its last value while the aircraft stands still. A
+  pause is therefore a truth that moved less than a tenth of what the filter's velocity predicts, when that is at least
+  1 m. The reference time follows during the hold, so the first update after a pause is a normal step. An update at
+  the same sim time is held as well (the second update of the acquisition tick).
 - **Time acceleration:** the update uses the real `dt`; the Gauss-Markov step and the filter are exact for any `dt`.
 - **Large gaps** (`dt` above 30 s, my call): only the filter restarts from the measurement. The error processes step
   over the real `dt` and are not redrawn. A sim time that goes backwards (a new flight) restarts everything.
-- **Slew, teleport, a new flight:** the truth moved much farther than its velocity explains. When the truth moved more
-  than 1 NM beyond `v·dt` in one tick (my call), the filter restarts from the measurement. This uses only the truth
-  inputs; no extra SimVar.
+- **Slew, teleport, a new flight:** the move of the truth does not fit the velocity. When it misses what the filter's
+  velocity or the sim's predicts by more than 50 m plus 20 m/s² · dt² / 2 (about 2 g, so that a turn under time
+  acceleration fits), at most 1 NM, the filter restarts from the measurement. Both velocities are checked because
+  flight 1 showed that `VELOCITY WORLD` is the slew speed during a slew but reads 0 at its first and last tick: the
+  first wrong reading is a pause, the filter's velocity misses the first slew step, and the sim's misses the last one.
+  Before this, flight 1 left 340 m and 450 m of error after the slew, decaying over 10 to 15 s. This uses only the
+  truth inputs; no extra SimVar.
 
 ### 6.8 Roll steering
 
@@ -391,7 +399,8 @@ Commits: this design and the plan as `references #402`, the implementation with 
 - The altitude row's error as indicated − true altitude, with no random part, and its rate error as white noise.
 - A new satellite starts with a fresh draw; a satellite that leaves forgets its error.
 - The filter's process noise q = (3 m/s²)².
-- Restart thresholds: `dt` above 30 s, and a truth jump of more than 1 NM beyond `v·dt`.
+- Restart thresholds: `dt` above 30 s, and a move that misses either velocity by more than 50 m + 20 m/s² · dt² / 2,
+  at most 1 NM. Pause: a move of less than a tenth of the filter's prediction.
 - The performance gate: the in-sim worst case × 10 under 1 ms.
 - The test-flight route (6.9a), the 1000 ft altitude error standing in for a wrong altimeter setting, the multiplier
   of 20 for the stress flight, and the pass criterion of flight 2: no oscillation beyond the baseline's.
