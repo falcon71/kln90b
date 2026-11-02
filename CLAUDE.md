@@ -41,7 +41,7 @@ npx vitest run --project flight   # one stage
 
 Tests live in `test/` and run with Vitest in three stages: unit (Node), render (happy-dom, reads the 23×7 screen) and
 flight (boots the whole unit headless and flies it on simulated time). See **[test/README.md](test/README.md)**; the
-records about the suite (coverage, next steps, KLN 89 trainer checks) are in `docs/`. With the sim running, the
+records about the suite (coverage, next steps, KLN 89 trainer checks, sim test flights) are in `docs/`. With the sim running, the
 `sim-debugger` skill (`.claude/skills/sim-debugger/`) reads SimVars, the unit's screen and the sim's navdata through the
 Coherent GT debugger; ask the developer before using it, since they have to start the sim. There is no linter. `tsc` and the
 build are separate checks; the GitHub Actions workflow `.github/workflows/ci.yml` runs both and `npm test` on every push
@@ -136,7 +136,8 @@ change what they mean; add new ones instead:
   (006-08773-0000, a free download linked in the README). Comments may also cite the install or maintenance manual, a
   YouTube timestamp, or the KLN 89 trainer. Keep these references and add one when you implement or change behaviour.
   Dated KLN 89 trainer checks are recorded in [docs/kln89-trainer-record.md](docs/kln89-trainer-record.md); a new check
-  adds a block there.
+  adds a block there. Test flights in the sim, how to prepare one, and the aircraft and autopilot behavior they measured
+  are recorded in [docs/sim-flight-record.md](docs/sim-flight-record.md) the same way.
 - `target: es2017` is chosen for Coherent GT; don't rely on newer runtime features.
 - Display text is uppercase, with only `A-Z 0-9 space -` from the database (`data/Text.ts`). Lowercase letters are small
   glyphs in the font (`nm`, `ft`, `ent`, `enr-leg`), so use them only where the real unit shows small text.

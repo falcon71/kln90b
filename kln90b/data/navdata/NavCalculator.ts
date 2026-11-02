@@ -233,7 +233,11 @@ export class NavCalculator implements CalcTickable {
                 //The roll-in on top of the lead is a deliberate departure from the trainer, which adds none: the unit
                 //calculates at 1 Hz and can start a turn up to a second late, and the sim's autopilot and aircraft need
                 //time to roll in. Users reported overshoots before it was added, and the default autopilot follows the GPS
-                //SimVars, so the displayed and the commanded turn start cannot be split
+                //SimVars, so the displayed and the commanded turn start cannot be split. In the sim flights of 2026-11-02
+                //(docs/sim-flight-record.md) the Turbine Duke's default autopilot banked 27° against the planned 20° and
+                //rolled out 220 to 310 m inside the next leg at 130 kt with the roll-in, 15 to 67 m without it; a model of
+                //an autopilot that flies the planned bank ends about 40 m outside with it and about 300 m outside without
+                //it. aircraftTurns.test.ts holds the Duke's turns
                 const turnPoint = lead + distanceToAchieveBankAngleChange(desiredBankAngle, this.sensors.in.gps.groundspeed);
                 //The turn starts at an along-track distance, measured along the inbound leg: on course it is the straight
                 //distance, off course it is not (checked in the KLN 89 trainer, 2026-10-20)
