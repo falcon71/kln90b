@@ -248,12 +248,14 @@ const BASELINE: Record<string, Metrics> = {
  * tighter one tangent to both legs at that lead (radius 1.07 NM), the trainer's (checked in the KLN 89 trainer,
  * 2026-10-20, docs/kln89-trainer-record.md). The harness aircraft cannot fly it at 25° of bank (its radius at 240 kt is
  * 1.79 NM), so it overshoots the next leg by design, geometrically by about (6.7 - 4.3) NM × sin(150°) = 1.2 NM. These
- * bounds, measured on 2026-10-21 (1.268 NM for both) and rounded up to 0.001 NM, replace the baseline's overshoot
+ * bounds, measured on 2026-10-21 (1.268 NM for both), measured again on 2026-11-02 (1.2707 NM for both) after the harness
+ * began to move the aircraft up to each read and to fly each bank command after it is given (#457), and rounded up to
+ * 0.001 NM, replace the baseline's overshoot
  * (0.031 NM) and maximum XTK once established (0.085 NM) for it; the qualitative checks are unchanged. The capped 150°
  * turns at 120 kt (S8e, S10, S11) stay within the baseline's bounds
  */
 const CAPPED_TURN_BOUNDS: Record<string, Pick<Metrics, 'overshootNm' | 'maxXtkEstablishedNm'>> = {
-    S8f: {overshootNm: 1.269, maxXtkEstablishedNm: 1.269},
+    S8f: {overshootNm: 1.271, maxXtkEstablishedNm: 1.271},
 };
 
 /**

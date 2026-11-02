@@ -850,8 +850,10 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
 - **There is no wind.** Ground speed and track equal airspeed and heading, so crosswind effects are not modeled.
 - **`jump` skips integrated values**, and monitors and the recorder sample once per simulated second.
 - **The 16 Hz loops** run every 62 ms in tests: the fake timers round the 62.5 ms interval down to whole milliseconds.
-  The aircraft integrates the time that really passed, but the instrument's own 16 Hz signal loop (the XTK output
-  filter) also runs at that rate, which matters for any future test of filter timing.
+  In a flight that is the rate of the pilot's bank command; the aircraft itself is moved up to the time of every SimVar
+  read (`FakeSim.beforeRead`), so a read sees the position of its own sim time, as in the sim (#457). The instrument's
+  own 16 Hz signal loop (the XTK output filter) also runs every 62 ms, which matters for any future test of filter
+  timing.
 - **The XTK output follows the D-bar filter** (#158): `GPS WP CROSS TRK` is the deviation through an RC low-pass with
   τ = 0.24 s (`kln90b/services/SignalOutputFilter.ts`), so after a step it needs about 1 s (4 τ) to get within 2 % and
   3 s to settle to 4 decimals. Read it once it has settled (the self-test test in `NavCalculator.test.ts` reads it 30 s

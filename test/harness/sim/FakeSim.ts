@@ -58,6 +58,11 @@ export class FakeSim {
      * added while the clock advances is a sim pause, a positive one a jump of the sim time. reset() sets it back to 0
      */
     public absoluteTimeOffsetMs = 0;
+    /**
+     * Runs before every read, whatever the path. The flight harness moves the aircraft up to the time of the read with
+     * it, so that a read sees the position of its own sim time, as in the sim (#457). reset() drops it
+     */
+    public beforeRead: (() => void) | null = null;
     private readonly values = new Map<string, Stored>();
     private readonly registrations: Registration[] = [];
     private readonly registrationIds = new Map<string, number>();
@@ -74,6 +79,7 @@ export class FakeSim {
         this.simStartMs = 0;
         this.applyObsKeyEvents = false;
         this.absoluteTimeOffsetMs = 0;
+        this.beforeRead = null;
     }
 
     /** Sets a value as the sim or the aircraft model would. */
@@ -83,6 +89,7 @@ export class FakeSim {
 
     /** Reads a value in the given unit, converting from the unit it was written in. */
     public get(name: string, unit: string): any {
+        this.beforeRead?.();
         const key = simVarKey(name);
         const derived = this.derived(key, unit);
         if (derived !== undefined) {
