@@ -20,7 +20,7 @@ import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {TICK_TIME_CALC} from "./TickController";
 import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
-import {computeGeometry, GpsGeometry, MAX_ROWS, SIGMA_UERE_M} from "./GpsSolution";
+import {computeGeometry, GpsGeometry, hasFiniteAngles, MAX_ROWS, SIGMA_UERE_M} from "./GpsSolution";
 import {GpsMeasurement, MeasurementInputs} from "./GpsMeasurement";
 
 const SAVE_INTERVALL = 60000;
@@ -372,6 +372,9 @@ export class GPS {
                 continue;
             }
             const position = sat.position.get();
+            if (!hasFiniteAngles(position)) {
+                continue; //Left out here, not in computeGeometry, so that the PRNs and the coefficients stay row by row (#456)
+            }
             if (n >= this.solutionPrns.length
                 || this.solutionPrns[n] !== sat.prn
                 || this.solutionPositions[2 * n] !== position[0]

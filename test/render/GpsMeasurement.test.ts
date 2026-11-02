@@ -253,6 +253,27 @@ describe('the GPS measurement strategy (#402, design 6.1)', () => {
         expect(Math.abs(last.indicatedAltitudeFt! - 3000)).toBeLessThan(100); //29.92 inHg: indicated is pressure altitude
     });
 
+    // #456: for a satellite exactly due north or south of the plane, the SDK's acos can round past ±1 and give a NaN
+    // azimuth. The solution leaves that satellite out, and the measurement gets the satellites that remain
+    it('a satellite whose azimuth is NaN is left out of the solution and the measurement (#456)', async () => {
+        const measurement = new RecordingMeasurement();
+        const unit = await bootUnit({altitudeFt: 3000, platform: {createGpsMeasurement: () => measurement}});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        const inUse = gps.gpsSatComputer.getSatellites().filter(sat =>
+            sat.state.get() === GPSSatelliteState.InUse || sat.state.get() === GPSSatelliteState.InUseDiffApplied);
+        expect(inUse.length).toBeGreaterThanOrEqual(5); //Precondition: four good satellites remain
+
+        const position = new Float64Array([inUse[0].position.get()[0], NaN]);
+        vi.spyOn(inUse[0].position, 'get').mockReturnValue(position);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(gps.solution.valid).toBe(true);
+        expect(gps.solution.satellites).toBe(inUse.length - 1);
+        expect(Number.isFinite(gps.solution.hdop)).toBe(true);
+        expect(measurement.last!.prns).toEqual(inUse.slice(1).map(sat => sat.prn));
+    });
+
     // 6.7: B-3 compares the position the receiver measured, and the unit navigates on it
     it('the unit takes and compares the measured position, not the truth', async () => {
         const acquisition = positionAtForcedAcquisition();
