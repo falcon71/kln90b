@@ -6,7 +6,9 @@ root. The records kept beside it are in `docs/`:
 
 - [test-coverage-record.md](../docs/test-coverage-record.md): what the tests covered when the baseline was complete;
 - [test-next-steps.md](../docs/test-next-steps.md): what is left to do;
-- [kln89-trainer-record.md](../docs/kln89-trainer-record.md): the dated checks on the KLN 89 trainer.
+- [kln89-trainer-record.md](../docs/kln89-trainer-record.md): the dated checks on the KLN 89 trainer;
+- [sim-flight-record.md](../docs/sim-flight-record.md): the dated test flights in the sim, how they are prepared, and the
+  measurements behind the aircraft profiles of `test/harness/flight/pilots.ts`.
 
 Tests live in `test/` and run with [Vitest](https://vitest.dev). The harness (`test/harness/`) boots the real
 instrument headless: the same `KLN90BCore` the sim runs, with fakes for everything the sim provides.

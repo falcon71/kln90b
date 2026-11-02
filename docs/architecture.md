@@ -688,7 +688,9 @@ sim.
     - The turn point is the lead plus the roll-in (`distanceToAchieveBankAngleChange`, the bank at 5 deg/s), measured
       along the track: the along-track distance to the waypoint (`alongTrackDistance`), which on course is the straight
       distance. The trainer adds no roll-in, so this is a deliberate departure: a 1 Hz calculation, autopilot lag, and
-      SimVars that the display shares. Users reported overshoots before the roll-in was added.
+      SimVars that the display shares. Users reported overshoots before the roll-in was added. The sim flights of
+      2026-11-02 ([sim-flight-record.md](sim-flight-record.md)) measured it with the Turbine Duke, whose default
+      autopilot undershoots because it banks steeper than the planned turn, and kept it.
     - Two regimes, chosen in every calculation by the cross track to the active leg's own path (not a turn circle)
       against `OFF_LEG_XTK` (4.0 NM, #157, checked in the KLN 89 trainer, 2026-10-20; not latched, so the regime can
       change from one calculation to the next). On the leg (|XTK| ≤ 4.0 NM) the turn plan, the turn start and the
