@@ -384,4 +384,14 @@ describe('predictRaim', () => {
         expect(predict(context, 2, false)).toBe(false);
         expect(predict(context, 2, true)).toBe(true);
     });
+
+    // #456: for a satellite exactly due north or south of the plane, the SDK's acos can round past ±1 and give a NaN
+    // azimuth. That satellite is left out, and the others still predict RAIM
+    it('leaves out a satellite whose azimuth is NaN (#456)', () => {
+        const broken = stubSatellites([[30, 0]])[0];
+        (broken.position.get() as Float64Array)[1] = NaN;
+        const context = stubContext([...stubSatellites(RAIM_ENROUTE_NOT_APPROACH), broken]);
+
+        expect(predict(context, 2)).toBe(true);
+    });
 });

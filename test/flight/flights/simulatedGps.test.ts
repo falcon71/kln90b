@@ -17,11 +17,6 @@ import {angleDiff, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, LatLon,
  * seed. A bound marked "baseline" was set from the same flight with the exact strategy (measured 2026-11-01, the value
  * in the comment) plus a margin.
  *
- * The harness reads the position coarser than the unit would in the sim: the physics loop writes the position every 62 ms
- * (the fake timers truncate 62.5 ms), while the tick reads an exact E:ABSOLUTE TIME, so at a calculation tick the
- * sim position is up to one physics step old, about 3.4 m at 120 kt. That is a floor of the per-tick position steps
- * below (#457).
- *
  * The flight stage holds the filter only coarsely: a position gain off by a factor of 2 either way passes here. The unit
  * tests of GpsPositionFilter hold its numbers, so the glide bound below is no proof of the smoothing.
  */
@@ -354,11 +349,10 @@ describe('simulated GPS receiver (#402)', () => {
         // sixteen seeds measured 2026-11-01, 30 m with this one, which therefore has a step worth gliding
         expect(errorStepM(samples[loss - 1], samples[loss], s => s.measured!)).toBeGreaterThanOrEqual(10);
         // Design 6.10: beyond the move of the truth between two ticks (v·dt), the position moves at most 5 m per tick,
-        // from 5 s before the loss on. The harness alone gives every step about 3.4 m of that: the physics writes the
-        // position every 62 ms while the tick reads an exact E:ABSOLUTE TIME, so the truth of a tick is up to one
-        // physics step stale (#457)
+        // from 5 s before the loss on. Held tighter here: the largest step is 1.18 m with this seed (measured 2026-11-02,
+        // 3.48 m while the harness still gave each tick a position up to 62 ms stale, #457), so a weaker glide fails too
         for (let i = loss - 5; i < samples.length; i++) {
-            expect(errorStepM(samples[i - 1], samples[i], s => s.gps), `t = ${samples[i].t.toFixed(1)} s`).toBeLessThanOrEqual(5);
+            expect(errorStepM(samples[i - 1], samples[i], s => s.gps), `t = ${samples[i].t.toFixed(1)} s`).toBeLessThanOrEqual(2);
         }
     });
 

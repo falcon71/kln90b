@@ -283,3 +283,29 @@ describe('FakeSim.writeCount', () => {
     });
 });
 
+
+// #457: the flight harness moves the aircraft up to the time of each read through this hook
+describe('FakeSim.beforeRead', () => {
+    afterEach(() => sim.reset());
+
+    it('runs before a read through the SDK, and the read sees what it set', () => {
+        sim.reset();
+        sim.set('PLANE LATITUDE', 'degrees', 1);
+        sim.beforeRead = () => sim.set('PLANE LATITUDE', 'degrees', 2);
+
+        expect(SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree)).toBe(2);
+    });
+
+    // One FakeSim serves every unit a test file boots: a hook left over would move the aircraft of a finished flight
+    it('is dropped by reset()', () => {
+        const hook = vi.fn();
+        sim.beforeRead = hook;
+        sim.get('PLANE LATITUDE', 'degrees');
+        expect(hook).toHaveBeenCalledTimes(1);
+
+        sim.reset();
+        sim.get('PLANE LATITUDE', 'degrees');
+
+        expect(hook).toHaveBeenCalledTimes(1);
+    });
+});

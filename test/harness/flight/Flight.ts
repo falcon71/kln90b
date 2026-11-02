@@ -17,8 +17,9 @@ export const minutes = (m: number): JumpTarget => ({kind: 'minutes', minutes: m}
 /** A jump must leave room for turn anticipation and the waypoint alert before the active waypoint. */
 const MIN_REMAINING_NM = 3;
 /**
- * 16 Hz. The fake timers truncate the delay of a timer to whole milliseconds (62 ms), so each step integrates the time
- * that actually passed on the clock rather than the nominal step; otherwise the aircraft would fly 0.8 % fast.
+ * 16 Hz, the rate of the pilot's bank command. The aircraft itself is moved up to the time of every SimVar read
+ * (Flight.catchUp, #457), so the position always belongs to the sim time it is read at. The fake timers truncate the
+ * delay of a timer to whole milliseconds (62 ms); each step integrates the time that actually passed on the clock.
  */
 const PHYSICS_STEP_MS = 1000 / 16;
 
@@ -71,6 +72,10 @@ export class Flight {
     private readonly startMs: number;
     /** Clock time up to which the aircraft has been integrated */
     private lastPhysicsMs = 0;
+    /** The bank the pilot commanded at the last 16 Hz step, flown until the next one */
+    private commandedBankDeg = 0;
+    /** Set while catchUp runs: the pilot and the aircraft read SimVars, which must not start another catch-up */
+    private catchingUp = false;
 
     private constructor(public readonly unit: HeadlessUnit, public readonly world: World, public readonly aircraft: Aircraft, pilot: Pilot) {
         this.pilot = pilot;
@@ -193,6 +198,7 @@ export class Flight {
      * @throws Error if the jump would cross or come within 3 NM of the active waypoint
      */
     public async jump(target: JumpTarget): Promise<void> {
+        this.catchUp();
         const active = this.nav.activeIdent;
         if (active === null) throw new Error('jump: no active waypoint');
         const toActive = distanceNm(this.aircraft, this.world.pos(active));
@@ -225,6 +231,7 @@ export class Flight {
      * no time passes and no tick runs, so the next tick reads the new position.
      */
     public teleport(pos: LatLon): void {
+        this.catchUp(); //The time before the teleport is flown from where the aircraft was
         this.aircraft.lat = pos.lat;
         this.aircraft.lon = pos.lon;
         this.aircraft.writeTo(this.sim, this.world.magvar(pos.lat, pos.lon));
@@ -232,17 +239,35 @@ export class Flight {
 
     private installLoops(): void {
         this.lastPhysicsMs = Date.now();
+        this.sim.beforeRead = () => this.catchUp();
         setInterval(() => {
-            const now = Date.now();
-            const bank = this.pilot.commandedBank({sim: this.sim, aircraft: this.aircraft});
-            this.aircraft.step((now - this.lastPhysicsMs) / 1000, bank);
-            this.lastPhysicsMs = now;
-            this.aircraft.writeTo(this.sim, this.world.magvar(this.aircraft.lat, this.aircraft.lon));
+            this.catchUp();
+            this.commandedBankDeg = this.pilot.commandedBank({sim: this.sim, aircraft: this.aircraft});
         }, PHYSICS_STEP_MS);
         setInterval(() => this.everySecond(), 1000);
     }
 
+    /**
+     * Moves the aircraft from the last physics time up to now with the commanded bank and writes it to the sim. The sim
+     * writes the position and the clock together, so a read of the position sees that of its own sim time (#457)
+     */
+    private catchUp(): void {
+        const now = Date.now();
+        if (this.catchingUp || now === this.lastPhysicsMs) {
+            return;
+        }
+        this.catchingUp = true;
+        try {
+            this.aircraft.step((now - this.lastPhysicsMs) / 1000, this.commandedBankDeg);
+            this.lastPhysicsMs = now;
+            this.aircraft.writeTo(this.sim, this.world.magvar(this.aircraft.lat, this.aircraft.lon));
+        } finally {
+            this.catchingUp = false;
+        }
+    }
+
     private everySecond(): void {
+        this.catchUp();
         for (const m of this.monitors) {
             const result = m.check(this);
             if (result !== true) this.failures.push({t: this.t, name: m.name, detail: result});

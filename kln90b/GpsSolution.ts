@@ -73,7 +73,17 @@ const augmented = new Float64Array(4 * 8);
 const los = new Float64Array(3);
 
 /**
- * @param satellites [zenith, azimuth] in rad of each satellite in use, as GPSSatellite.position.get() returns it
+ * Whether the SDK gave a satellite a usable [zenith, azimuth]. For a satellite exactly due north or south of the plane,
+ * GPSSatellite.applyProjection takes the acos of a dot product that can round past ±1, and the azimuth is NaN. Such a
+ * satellite is left out of the solution for that update (#456)
+ */
+export function hasFiniteAngles(position: ReadonlyFloat64Array): boolean {
+    return Number.isFinite(position[0]) && Number.isFinite(position[1]);
+}
+
+/**
+ * @param satellites [zenith, azimuth] in rad of each satellite in use, as GPSSatellite.position.get() returns it. Only
+ * finite angles (hasFiniteAngles): a NaN row makes the whole solution invalid
  * @param altitudeAided whether the altitude input is present
  * @param coefficients Written when the solution is valid and left alone otherwise: the north and the east position
  * error in meters per meter of whitened error of row i, at [2 i] and [2 i + 1]. The rows are in the order of the input,
@@ -244,8 +254,9 @@ export function predictRaim(prediction: GPSPredictionContext, lat: number, lon: 
     const satellites = prediction.getSatellites();
     for (let i = 0; i < satellites.length; i++) {
         const state = satellites[i].state.get();
-        if (state === GPSSatelliteState.InUse || state === GPSSatelliteState.InUseDiffApplied) {
-            predictedLos.push(satellites[i].position.get());
+        const position = satellites[i].position.get();
+        if ((state === GPSSatelliteState.InUse || state === GPSSatelliteState.InUseDiffApplied) && hasFiniteAngles(position)) {
+            predictedLos.push(position);
         }
     }
     const available = raimStatus(computeGeometry(predictedLos, altitudeAided), halNm) === Raim.Available;
