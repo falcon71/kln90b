@@ -250,8 +250,9 @@ and `GENERAL ENG FUEL USED SINCE START:n`, and converts them to the configured u
 - `getIndicatedAlt()` = `pressureAlt2IndicatedAlt(pressureAltitude, barometer)`. The baro value persists in the user
   setting `barosetting`.
 
-`GPS` (`kln90b/Gps.ts`) **simulates acquisition, then reads the true sim position once valid.** There is no position
-error or noise. Whether there is a position comes from the unit's own solution (`GPS.solution`, below), not from the
+`GPS` (`kln90b/Gps.ts`) **simulates acquisition, then navigates on a measured position once valid**: the true sim
+position plus the errors of a simulated receiver (the measurement, below), or the exact sim position where the platform
+asks for that. Whether there is a position comes from the unit's own solution (`GPS.solution`, below), not from the
 SDK's. STA 5 predicts the satellite geometry at the destination and ETA with `gps.raimPrediction`, a long-lived SDK
 prediction context of the main computer.
 
@@ -341,7 +342,8 @@ prediction context of the main computer.
 - **RAIM availability** (`raimStatus`, #453): five measurements are needed (the altitude counts as one), and the
   protection level (the largest slope of the geometry × 5 m × 5.3) must be within the alert limit of the flight phase
   (`halForMode`: 2 NM en route, 1 NM in ARM, 0.3 NM in APR). The levels and K are our own choice (design 5.2). Satellite
-  failures (#366) and a fuzzy position (#402) are not modeled. The messages wait `RAIM_MESSAGE_DELAY` (10 s of GPS time,
+  failures (#366) are not modeled; a later one can be a range bias in `GpsErrorModel`, which must flip the sign of
+  the satellite's coefficient (header of `GpsSolution.ts`). The messages wait `RAIM_MESSAGE_DELAY` (10 s of GPS time,
   our own call) before `RAIM NOT AVAILABLE` and the geometry messages show; the coverage message has no delay.
 - **STA 2** (`Sta2Page`, #453) shows the unit's own error estimate: 2 × HDOP × 5 m in NM with two decimals (`formatEpe`),
   five dashes without a fix. The format follows a photographed real unit, not the figure of the Pilot's Guide (5-30). The
@@ -360,10 +362,74 @@ prediction context of the main computer.
   input being a measurement of the solution) or NAV;
   TRAN in the transition tick; ACQ during the start model's acquisition, even when nothing can be acquired; INIT during
   the almanac and sky searches and before the first channel assignment.
-- When valid, `coords` come from `PLANE LATITUDE/LONGITUDE` and `groundspeed` from `GROUND VELOCITY`.
-    - `trackTrue` is the bearing between successive 1 Hz fixes, computed only when GS >= 2 kt (
-      `MIN_GROUND_SPEED_FOR_TRACK`, 3-35). `getTrackTrueRespectingGroundspeed()` returns null below that.
+- **The measurement** (`kln90b/GpsMeasurement.ts`, #402, design in
+  `docs/superpowers/specs/2026-11-01-fuzzy-gps-design.md`). When valid, `coords`, `groundspeed` and `trackTrue` come
+  from a `GpsMeasurement`, a strategy that `GPS` calls once per calculation tick and at each acceptance (`GPS.measure`;
+  `gpsAcquired` also runs outside the tick) with the sim position, the sim time and the cached solution.
+  `KLN90BPlatform.createGpsMeasurement()` chooses it: `SIM_PLATFORM` builds a `SimulatedMeasurement`, the test
+  harness's `FakePlatform` an `ExactMeasurement` (`bootUnit({simulatedGps: true})` opts in, see test/README.md).
+  `Sensors` passes it to `GPS` through `SensorsIn`. The same `coords`, ground speed and track go into the GPS SimVars
+  of `SensorsOut`, so their meaning in the public contract is unchanged: they are the unit's position, not the sim's.
+    - **`ExactMeasurement`** is the behavior of 2.x before #402: the position is `PLANE LATITUDE/LONGITUDE`, the
+      ground speed is `GROUND VELOCITY`, and the track is the bearing between successive 1 Hz positions (none while
+      the position does not change, so a pause holds the last one). It draws no random numbers.
+    - **`SimulatedMeasurement`** reads, besides the position, `VELOCITY WORLD Z` and `X` (north and east,
+      ground-relative; not the `GPS GROUND` SimVars, which the unit writes itself), `PLANE ALTITUDE` (only with an
+      altitude input) and the unit's own indicated altitude (`airdata.getIndicatedAlt()`, the value of the previous
+      tick, since `Airdata` ticks after `GPS`). Each SimVar is read at most once per update.
+    - **The error model** (`kln90b/GpsErrorModel.ts`): every satellite in use, keyed by PRN, carries a slow ranging
+      error (a first-order Gauss-Markov process, `SIGMA_SLOW_M` 4.9 m, `TAU_SLOW_S` 300 s, stepped exactly for any
+      `dt`), white receiver noise (`SIGMA_FAST_M`, 1 m) and white range-rate noise (`SIGMA_DOPPLER_MPS`, 0.05 m/s).
+      With the fast noise the range error stays `SIGMA_UERE_M` (5 m), so STA 2's estimate stays honest. A satellite
+      that enters the solution starts from the stationary distribution, and one that leaves forgets its state. The
+      altitude row's error is not random: it is the indicated altitude minus the true one, so a wrong altimeter
+      setting (about 1000 ft per inHg), the 100 ft encoder steps and a non-standard atmosphere all degrade the
+      position through the geometry. Its rate error is white noise (`SIGMA_ALT_RATE_MPS`). The draws are Box-Muller
+      on `Math.random`, which the tests seed.
+    - **From errors to a position error**: `computeGeometry` writes, for every row, the north and east coefficients
+      that map the whitened error of that row to a horizontal position error (`GpsGeometry.cNorth` and `cEast` are
+      the matching covariance entries). It recomputes only with the cached solution (above), and the error model
+      applies the coefficients every tick in one pass over at most nine rows. The altitude row enters with
+      `ALTITUDE_WEIGHT`. The frame is pinned by a test: the SDK's hour angle turns from north towards the west, so
+      the east is `-y`. Three satellites plus the altitude therefore give a much larger error than eight, and a wrong
+      altimeter setting matters most then.
+    - **The filter** (`kln90b/GpsPositionFilter.ts`): one Kalman filter per axis, north and east, with the state
+      position and velocity and a white-acceleration process noise (`PROCESS_NOISE`, (3 m/s²)²). The measured
+      position and the Doppler velocity go in, with variances from the diagonal of the covariance. The velocity is
+      measured so precisely that its estimate follows the truth within one tick, so a maneuver has no lag, while a
+      step in the measured position (a satellite joining or leaving) glides in over several seconds. The slow error
+      passes through, as on a real receiver. The output is `lat`, `lon` and the velocity, whose length and direction
+      become the ground speed and the track. Everything is written out as scalar math on reused fields, with no
+      allocation.
+    - **Life cycle**: `GPS.gpsAcquired` calls `restart()` and then `update`, so every fix, the first and every
+      regained one, starts from its measurement with no history, and `POSITION DIFFERS FROM LAST POSITION BY >2NM`
+      compares against the measured position. Power-on and power-off restart it too: nothing of the errors or the
+      filter is persisted. A lost fix holds the last values, and the error processes stop. `update` is skipped
+      without a sim-time step (the second update of the acquisition tick). The sim time runs on in the active pause
+      and in the pause, and `VELOCITY WORLD` keeps its last value while the aircraft stands still, so a pause is a
+      truth that moved less than a tenth of what the filter's velocity predicts (at least 1 m): every output is held,
+      and only the reference time follows. It is skipped too when the time, the position or the
+      velocities are not finite, and when the computed errors are not: the error model has then already stepped, but
+      the filter and the time reference stay as they were. Without a time reference (the first update after a
+      restart) a skipped update sets the outputs to the truth, at rest (`truthWithoutReference`). It restarts
+      everything when the sim time ran backwards (a new flight), and restarts only the filter when the gap exceeds
+      30 s (`MAX_UPDATE_GAP_S`) or when the move of the truth misses what the filter's velocity or the sim's predicts
+      by more than 50 m plus 20 m/s² · dt² / 2, at most 1 NM (`JUMP_DISTANCE_M`: slew or teleport). A slew reads a
+      velocity of 0 at its first and last tick, which is why both velocities are checked. The satellites are the same
+      ones after a gap, and the Gauss-Markov
+      step of their errors is exact for any `dt`, so the error processes step over the real `dt` and are not redrawn.
+      It uses the real `dt`, so time acceleration needs no special case.
+    - **`coords` is one `GeoPoint`** for the life of the unit, updated in place (`coords.set`). No reader keeps the
+      object, so one that needs a position over time copies it. The 1 Hz tick allocates nothing for the position.
+    - `trackTrue` is updated only when GS >= 2 kt (`MIN_GROUND_SPEED_FOR_TRACK`, 3-35), from the measurement's track
+      while it has one. `getTrackTrueRespectingGroundspeed()` returns null below that.
     - When invalid, the last values are frozen (4-13).
+    - **Tick cost** (a dated Node measurement, 2026-11-01): `SimulatedMeasurement.update` with eight satellites and
+      the altitude takes about 1.6 µs on average, and about 2.4 µs together with a `computeGeometry` recompute. That
+      is far inside the budget of CLAUDE.md. The in-sim measurement belongs to the first test flight.
+    - **Take-home mode** keeps its own dead reckoning in `GPS.tick`: the take-home tick never calls the strategy.
+      `gpsAcquired` does at acceptance, and `powerChanged` restarts it; with take-home's zero coefficients the
+      measurement equals the truth.
 - Last position, almanac time and ephemeris persist in the settings `lastLatitude`, `lastLongitude`,
   `lastAlmanacDownload` and `lastEphemeris` (`"prn:time,prn:time"`, restored into the SDK satellites at boot, so a new
   session within the 2 h of the ephemeris is a hot start).
@@ -1177,7 +1243,7 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - only `A-Z0-9 -` can be displayed
 - **Deliberate non-real additions:** `GPS COURSE TO STEER`, the roll-steering LVar for the autopilot, `bearingForAP` on
   arcs, the fast GPS acquisition setting (default on) and keyboard mode. Missing on purpose or not implemented: satellite
-  failures (#366), a fuzzy position (#402), CTA/TMA in the SUA filter (TODO), and the third line of the SUA
+  failures (#366), CTA/TMA in the SUA filter (TODO), and the third line of the SUA
   messages (the APT 4 reference for Class B/C and the controlling agency, #210: the sim's data has neither).
 - **Event bus topics** are typed by interfaces declared next to their owner. There is no central file:
     - `PowerEvent.powerEvent` (`PowerSupply.ts`)

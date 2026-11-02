@@ -277,7 +277,7 @@ export class KLN90BCore {
 
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
-        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler, this.hardware);
+        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement());
 
         //The display ticks run from the start of the boot, so that the Turn-On page shows and checks the boot while it is
         //still under way (#416). The calculations are added once their services exist

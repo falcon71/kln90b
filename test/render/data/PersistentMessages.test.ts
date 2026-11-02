@@ -335,7 +335,7 @@ describe('signal loss and RAIM messages (#453)', () => {
     /** A solution of the model with the given count and slope, the SDK's satellites unchanged */
     function spySolution(unit: HeadlessUnit, measurements: number, maxSlope: number) {
         const gps = unit.props.sensors.in.gps;
-        const geometry: GpsGeometry = {valid: true, satellites: measurements, altitudeAided: false, measurements, hdop: 1, epeNm: 0.01, maxSlope};
+        const geometry: GpsGeometry = {valid: true, satellites: measurements, altitudeAided: false, measurements, hdop: 1, cNorth: 0.5, cEast: 0.5, epeNm: 0.01, maxSlope};
         return vi.spyOn(gps, 'solution', 'get').mockReturnValue(geometry);
     }
 

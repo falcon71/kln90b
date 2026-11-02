@@ -140,7 +140,9 @@ The sim globals are installed once per test file by the setup files `test/harnes
   between runs. A test that needs another jitter passes `seed`. The SDK's `UserSetting` draws once per setting it
   builds, so `bootUnit` starts the sequence again from the seed once the `KLN90BCore` constructor has built the user
   settings: a new setting key does not move the GPS draws of the seeded tests. The teardown puts the real
-  `Math.random` back, so a later unit test of the file sees the real generator.
+  `Math.random` back, so a later unit test of the file sees the real generator. A test that injects its own seeded
+  random source into the code under test uses `mulberry32(seed)` from `sim/random.ts` and does not define its own
+  generator.
 
 ## Collectors and boot failures
 
@@ -443,6 +445,15 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS
   acquires while the welcome and self-test pages run. A warm start's time is drawn per power-on, so pass `seed` for
   the spread (`powerOnCold` in `GpsAcquisition.test.ts`).
+- **The simulated receiver.** The unit boots with `ExactMeasurement` (`GpsMeasurement.ts`): after a fix `coords` equals
+  the sim position exactly, so existing tests read exact values. `bootUnit({simulatedGps: true})` (and `Flight.start`
+  with the same option) navigates on `SimulatedMeasurement` instead, with its errors drawn from the harness's seeded
+  `Math.random`: the same `seed` gives the same flight, and another one a different error. `Aircraft.writeTo` writes
+  `VELOCITY WORLD Z` and `X` from the ground speed and track, which the simulated strategy reads as the truth
+  velocity; the boot alone writes them as 0. A `createGpsMeasurement` in the `platform` option wins over
+  `simulatedGps`, which is how a test records or replaces the strategy. Its flights are in
+  `test/flight/flights/simulatedGps.test.ts`; its standard-route flights fly on `navModeAutopilot()` (below) as well
+  as on the coupled autopilot, since most pilots fly the sim's autopilot.
 - **Losing satellites.** `inhibitAllBut(unit, n)` (`gps.ts`) keeps the first `n` satellites the SDK has in use (PRN
   order) and inhibits every other one on `gpsSatComputer` and on `raimPrediction`; it returns the PRNs kept and throws
   when fewer than `n` are in use. The inhibited satellites leave the solution at the SDK's next position update (every
@@ -626,7 +637,8 @@ await flight.flyUntil(() => flight.nav.activeIdent === 'ABC', {timeout: 30, desc
   roll rate. No wind. It writes the SimVars the unit reads, 16 times per simulated second.
 - **Pilots** (`flight/pilots.ts`): the default `coupledAutopilot()` banks as `L:KLN90B_RollCommand` says (positive
   left). `ManualPilot` lets the test set the bank, for example to leave the course on purpose. `scriptedPath(points)`
-  flies direct to each point independent of the unit.
+  flies direct to each point independent of the unit. `navModeAutopilot()` stands in for the sim's autopilot in
+  NAV/GPS mode: it banks on `GPS WP CROSS TRK` and `GPS WP TRACK ANGLE ERROR`, not on the roll command.
 - **`fly(seconds)`** runs every tick for that long. **`flyUntil(predicate, {timeout, description})`** advances in 250 ms
   steps (one display tick) and throws with the screen dump when the timeout passes. Both throw if a monitor failed.
 - **`jump(target)`** skips ahead without running the ticks in between: `nmBefore('ABC', 10)` or `minutes(5)`. Caveats:

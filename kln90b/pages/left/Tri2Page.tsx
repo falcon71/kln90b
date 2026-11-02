@@ -1,4 +1,4 @@
-import {Facility, FSComponent, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, GeoPoint, VNode} from '@microsoft/msfs-sdk';
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {TextDisplay} from "../../controls/displays/TextDisplay";
@@ -84,7 +84,8 @@ export class Tri2Page extends SixLineHalfPage {
         } else {
             const esa = this.props.msa.getMSAFromTo(this.props.sensors.in.gps.coords, wpt);
             const lines = ["ESA " + (esa?.toString().padStart(5, " ") ?? "-----") + "ft"];
-            airspacesAlongRoute([this.props.sensors.in.gps.coords, wpt], this.props.nearestUtils).then(airspaces => {
+            //A copy: the search reads the route again after its awaits, and gps.coords moves on in place (#402)
+            airspacesAlongRoute([new GeoPoint(0, 0).set(this.props.sensors.in.gps.coords), wpt], this.props.nearestUtils).then(airspaces => {
                 for (const airspace of airspaces) {
                     console.log("found airspace", airspace);
                     const name = airspace.facility.name;

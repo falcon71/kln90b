@@ -15,6 +15,7 @@ import {KLN90BPlatform} from '../../kln90b/KLN90BPlatform';
 import {ActualFacilityClient} from '../../kln90b/data/navdata/KLNFacilityLoader';
 import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityRepository';
 import {MemoryFacilityClient} from './navdata/MemoryFacilityClient';
+import {ExactMeasurement, GpsMeasurement} from '../../kln90b/GpsMeasurement';
 
 /**
  * The EFB side of FlightPlanRouteManager as the unit uses it (KlnEfbLoader, KlnEfbSaver): a synced route, and route
@@ -160,5 +161,10 @@ export class FakePlatform implements KLN90BPlatform {
         }
         // The unit uses only the members FakeRouteManager has
         return Promise.resolve(this.routeManager as unknown as FlightPlanRouteManager);
+    }
+
+    /** The exact sim position, so that the tests read exact values; bootUnit's simulatedGps replaces it (#402) */
+    public createGpsMeasurement(): GpsMeasurement {
+        return new ExactMeasurement();
     }
 }

@@ -12,7 +12,7 @@ import {
     SubscribableSet,
     UnitType,
 } from "@microsoft/msfs-sdk";
-import {Degrees, Knots} from "./data/Units";
+import {Degrees, Feet, Knots} from "./data/Units";
 import {TimeStamp} from "./data/Time";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
@@ -20,7 +20,8 @@ import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
 import {PowerEvent, PowerEventData} from "./PowerSupply";
 import {TICK_TIME_CALC} from "./TickController";
 import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
-import {computeGeometry, GpsGeometry, SIGMA_UERE_M} from "./GpsSolution";
+import {computeGeometry, GpsGeometry, MAX_ROWS, SIGMA_UERE_M} from "./GpsSolution";
+import {GpsMeasurement, MeasurementInputs} from "./GpsMeasurement";
 
 const SAVE_INTERVALL = 60000;
 const MIN_GROUND_SPEED_FOR_TRACK = 2; //3-35
@@ -37,6 +38,8 @@ const TAKE_HOME_SOLUTION: Readonly<GpsGeometry> = {
     altitudeAided: false, //The base: updateSolution takes the real value from the altitude input
     measurements: 8,
     hdop: 1,
+    cNorth: 0.5, //HDOP 1 split evenly
+    cEast: 0.5,
     epeNm: UnitType.METER.convertTo(2 * SIGMA_UERE_M, UnitType.NMILE), //The formula of GpsSolution at HDOP 1
     maxSlope: 0,
 };
@@ -137,7 +140,8 @@ export class KLNGPSSatComputer extends GPSSatComputer {
 
 
 export class GPS {
-    public coords: GeoPoint;
+    /** One object for the life of the unit, updated in place (#402): no reader keeps it */
+    public readonly coords: GeoPoint;
     public trackTrue: Degrees = 0; //Consider accessing this via getTrackRespectingGroundspeed
     public groundspeed: Knots = 0;
     public timeZulu: TimeStamp;
@@ -147,7 +151,6 @@ export class GPS {
     public readonly raimPrediction: GPSPredictionContext;
     /** The simulator's UNIX time of the last tick, for what the receiver reads from its satellites (STA 1) */
     public simTimeUnix: number = 0;
-    private lastCoords: GeoPoint;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
     private gpsStartTime: number = 0;
@@ -161,15 +164,23 @@ export class GPS {
     private readonly solutionPositions: number[] = []; //zenith, azimuth per satellite
     private solutionAltitude = false;
     private readonly solutionInputs: ReadonlyFloat64Array[] = [];
+    /** The coefficients of the error mapping of the cached solution, written by computeGeometry (#402) */
+    private readonly solutionCoefficients = new Float64Array(2 * MAX_ROWS);
+    /** Reused for every measurement update; the solution and the altitude are filled in before each */
+    private readonly measurementInputs: MeasurementInputs;
+    /** The measured position of a new fix, before it replaces coords */
+    private readonly acquiredPosition = new GeoPoint(0, 0);
     private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
     /**
-     * @param hasAltitude whether the altitude input is present, which the solution uses as a measurement (5-29)
+     * @param indicatedAltitude the altitude input, null when there is none. The solution uses it as a measurement (5-29)
+     * @param measurement where the position, the ground speed and the track come from while the unit has a fix (#402)
      */
     constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler,
-                private readonly hasAltitude: () => boolean) {
+                private readonly indicatedAltitude: () => Feet | null, private readonly measurement: GpsMeasurement) {
         this.takeHomeMode = options.takeHomeMode;
-        this._solution = this.takeHomeMode ? {...TAKE_HOME_SOLUTION} : computeGeometry([], false);
+        this._solution = this.takeHomeMode ? {...TAKE_HOME_SOLUTION} : computeGeometry([], false, this.solutionCoefficients);
+        this.measurementInputs = {geometry: this._solution, prns: this.solutionPrns, coefficients: this.solutionCoefficients, indicatedAltitudeFt: null};
         const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
 
         const gpsOptions: GPSSatComputerOptions = {
@@ -220,7 +231,6 @@ export class GPS {
             this.gpsSatComputer.downloadAlamanac(userSettings.getSetting("lastAlmanacDownload").get());
         }
 
-        this.lastCoords = this.coords;
         this.gpsSatComputer.syncLastKnownPosition(this.coords);
 
 
@@ -232,7 +242,8 @@ export class GPS {
     }
 
     tick() {
-        const actualUnixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
+        const simTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+        const actualUnixTime = this.absoluteTimeToUNIXTime(simTime);
         this.simTimeUnix = actualUnixTime;
         const lat = SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree);
         const lon = SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree);
@@ -240,7 +251,7 @@ export class GPS {
         if (this.takeHomeMode) {
             const distance = this.groundspeed / 60 / 60 / 1000 * TICK_TIME_CALC;
 
-            this.coords = this.coords.offset(this.trackTrue, UnitType.NMILE.convertTo(distance, UnitType.GA_RADIAN));
+            this.coords.offset(this.trackTrue, UnitType.NMILE.convertTo(distance, UnitType.GA_RADIAN)); //In place
 
             this.intSaveCount += TICK_TIME_CALC;
             if (this.intSaveCount >= SAVE_INTERVALL) {
@@ -269,24 +280,20 @@ export class GPS {
             }
 
             if (this.isValid()) {
-                this.lastCoords = this.coords;
-                this.coords = new GeoPoint(
-                    lat,
-                    lon,
-                );
+                this.measure(simTime, lat, lon);
+                this.coords.set(this.measurement.lat, this.measurement.lon);
                 if (!this.hasSdkSolution()) {
                     //Three satellites plus the altitude: the SDK has no solution of its own and would keep its last known
                     //position where its solution ended. Beyond 100 NM of it, its line-of-sight filter offers no satellite
                     //for a free channel and it searches blind in PRN order (#453, design 5.1, GpsSolution.test.ts)
                     this.gpsSatComputer.syncLastKnownPosition(this.coords);
                 }
-                this.groundspeed = SimVar.GetSimVarValue('GROUND VELOCITY', SimVarValueType.Knots);
+                this.groundspeed = this.measurement.groundspeedKt;
 
-                if (this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK) {
-                    //3-34 The manual mentions, that this can lag a bit, so this works for me
-                    if (!this.lastCoords.equals(this.coords)) { //Sim is paused
-                        this.trackTrue = this.lastCoords.bearingTo(this.coords);
-                    }
+                //3-35: the track is updated only from 2 kt (3-34: it may lag a bit). The measurement gives none while the
+                //sim is paused, and the last one is held
+                if (this.groundspeed >= MIN_GROUND_SPEED_FOR_TRACK && this.measurement.trackTrue !== null) {
+                    this.trackTrue = this.measurement.trackTrue;
                 }
 
                 this.intSaveCount += TICK_TIME_CALC;
@@ -350,13 +357,13 @@ export class GPS {
      */
     private updateSolution(): void {
         if (this.takeHomeMode) {
-            const aided = this.hasAltitude();
+            const aided = this.indicatedAltitude() !== null;
             if (aided !== this._solution.altitudeAided) {
                 this._solution = {...TAKE_HOME_SOLUTION, altitudeAided: aided};
             }
             return;
         }
-        const altitude = this.hasAltitude();
+        const altitude = this.indicatedAltitude() !== null;
         let changed = altitude !== this.solutionAltitude;
         let n = 0;
         for (const sat of this.gpsSatComputer.getSatellites()) {
@@ -385,8 +392,16 @@ export class GPS {
         this.solutionInputs.length = n;
         if (changed) {
             this.solutionAltitude = altitude;
-            this._solution = computeGeometry(this.solutionInputs, altitude);
+            this._solution = computeGeometry(this.solutionInputs, altitude, this.solutionCoefficients);
         }
+    }
+
+    /** One update of the measurement strategy with the current solution (#402) */
+    private measure(simTime: number, lat: number, lon: number): void {
+        const inputs = this.measurementInputs;
+        inputs.geometry = this._solution;
+        inputs.indicatedAltitudeFt = this.indicatedAltitude();
+        this.measurement.update(simTime, lat, lon, inputs);
     }
 
     /** 5-29: enough satellites are tracked, but the unit has not accepted the position yet */
@@ -451,13 +466,16 @@ export class GPS {
         console.log(`gpsAcquired in ${timeNow - this.gpsStartTime} seconds`);
         const actualUnixTime = this.absoluteTimeToUNIXTime(timeNow);
         const calculatedTime = this.calculateGPSTime(this.timeZulu.getTimestamp(), actualUnixTime);
-        const pos = new GeoPoint(
+        //#402, design 6.7: every fix starts the measurement from the current one, with no history. Also outside the
+        //calculation tick, for the forced acquisition of an engine-running start
+        this.measurement.restart();
+        this.measure(timeNow,
             SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree),
-            SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree),
-        );
+            SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree));
+        const pos = this.acquiredPosition.set(this.measurement.lat, this.measurement.lon);
 
         //B-3: only the first NAV after power-on is compared with the position at power-off. A fix regained in flight
-        //would compare with the position where the fix was lost (#454)
+        //would compare with the position where the fix was lost (#454). Before coords takes the new position
         if (firstFix && UnitType.GA_RADIAN.convertTo(this.coords.distance(pos), UnitType.NMILE) > 2) {
             this.messageHandler.addMessage(new OneTimeMessage(["POSITION DIFFERS FROM", "LAST POSITION BY >2NM"]));
         }
@@ -469,7 +487,7 @@ export class GPS {
 
         this.timeZulu = calculatedTime;
         this.gpsSatComputer.internalTime = actualUnixTime;
-        this.coords = pos;
+        this.coords.set(pos);
     }
 
     private powerChanged(evt: PowerEventData) {
@@ -483,12 +501,14 @@ export class GPS {
             this.search.start(this.coords); //The receiver starts from the position stored at power-off (#62)
             this._hadFixSincePowerOn = false;
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+            this.measurement.restart(); //Design 6.7: nothing of the receiver's errors and filter survives a power cycle
         } else {
             this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
             this.solutionAccepted = false;
             this.inTransition = false;
             this._hadFixSincePowerOn = false;
             this.search.end();
+            this.measurement.restart();
         }
     }
 

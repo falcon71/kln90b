@@ -226,6 +226,20 @@ describe('SET 1 CONFIRM? before the first fix (characterization)', () => {
         expect(messages(unit)).toContain(MESSAGE);
     });
 
+    // 3-18: CONFIRM? makes the entered position the present position of the unit
+    it('puts the confirmed position into the GPS position before the first fix', async () => {
+        const unit = await coldOnSet1();
+        await unit.panel.cursor('L');
+        await unit.panel.outer('L', 1);
+        await enterLatitude46N(unit);
+        await unit.panel.cursorTo('L', 'CONFIRM?');
+        await unit.panel.ent();
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(false); //Precondition: no fix has replaced it yet
+        expect(unit.props.sensors.in.gps.coords.lat).toBeCloseTo(46, 9);
+        expect(unit.props.sensors.in.gps.coords.lon).toBeCloseTo(POSITION.lon, 9);
+    });
+
     // KAAB lies at the aircraft's own position, so a confirmed KAAB leaves the first fix in agreement with it. A latitude
     // or a longitude that the page stored wrongly would post the message.
     it('takes the latitude and the longitude of a confirmed waypoint for the first fix', async () => {
