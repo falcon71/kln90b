@@ -10,7 +10,7 @@ import {
     FlightPlanSegmentType,
     LegType,
 } from "@microsoft/msfs-sdk";
-import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
+import {Interconnect} from "../Interconnect";
 import {ActiveWaypoint, ActiveWaypointChangedEvents} from "../data/flightplan/ActiveWaypoint";
 import {Hardware} from "../Hardware";
 
@@ -21,7 +21,7 @@ const DTO_PLAN_INDEX = 1;
 export class WTFlightplanSync {
     private readonly flightplanner: FlightPlanner;
 
-    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly planeSettings: KLN90PlaneSettings, private readonly activeWaypoint: ActiveWaypoint, private readonly hardware: Hardware) {
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly interconnect: Interconnect, private readonly activeWaypoint: ActiveWaypoint, private readonly hardware: Hardware) {
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.flightplanChanged.bind(this));
         bus.getSubscriber<ActiveWaypointChangedEvents>().on("activeWaypointChanged").handle(this.activeIdxChanged.bind(this));
 
@@ -51,7 +51,7 @@ export class WTFlightplanSync {
     }
 
     private flightplanChanged(klnPlan: Flightplan) {
-        if (klnPlan.idx !== 0 || !this.planeSettings.output.writeGPSSimVars) {
+        if (klnPlan.idx !== 0 || !this.interconnect.gps(this.interconnect.navData).isTransmitting) {
             return;
         }
 
@@ -68,7 +68,7 @@ export class WTFlightplanSync {
     }
 
     private activeIdxChanged(activeIdx: number) {
-        if (!this.planeSettings.output.writeGPSSimVars) {
+        if (!this.interconnect.gps(this.interconnect.navData).isTransmitting) {
             return;
         }
 

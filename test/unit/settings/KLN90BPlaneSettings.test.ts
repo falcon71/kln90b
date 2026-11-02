@@ -8,7 +8,7 @@ import {simEnv} from '../../harness/sim/install';
 /**
  * Contract with aircraft: the panel.xml keys, their defaults and the LVars the parser writes (CLAUDE.md "Public
  * contract with aircraft", the wiki page panel.xml customization, cfg/panel.xml, the doc comments of LVars.ts).
- * FuelUnit and FuelType are const enums, so their values are written as literals.
+ * FuelUnit, FuelType and the interface enums are const enums, so their values are written as literals.
  */
 
 const sample = readFileSync('cfg/panel.xml', 'utf8');
@@ -17,11 +17,15 @@ const DEFAULTS = {
     takeHomeMode: false, basePath: 'html_ui/Pages/VCockpit/Instruments/NavSystems/GPS/KLN90B', debugMode: false, vfrOnly: false,
     input: {
         altimeterInterfaced: true, obsSource: 1, headingInput: false, headingSimVar: 'PLANE HEADING DEGREES GYRO', electricitySimVar: '',
-        airdata: {isInterfaced: false, baroSource: 0},
+        airdata: {isInterfaced: false, baroSource: 0, interface: 'RS232'},
+        obsInterface: 'Analog', headingInterface: 'ARINC429',
         fuelComputer: {isInterfaced: false, unit: 'GAL', type: 'Avgas', fobTransmitted: true, fuelUsedTransmitted: true},
         externalSwitches: {legObsSwitchInstalled: false, appArmSwitchInstalled: false},
     },
-    output: {obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true},
+    output: {
+        obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true, rmiInterface: 'OBI', dataInterface: 'ARINC429',
+        externalAnnunciators: {msgInstalled: false, wptInstalled: false, armInstalled: false, actvInstalled: false},
+    },
 };
 
 /** A deep copy of DEFAULTS with the field at the dotted path changed */
@@ -149,6 +153,15 @@ describe('panel.xml parser', () => {
             ['Output.ObsTarget', '<Output><ObsTarget>2</ObsTarget></Output>', 'output.obsTarget', 2],
             ['Output.AltitudeAlertEnabled', '<Output><AltitudeAlertEnabled>true</AltitudeAlertEnabled></Output>', 'output.altitudeAlertEnabled', true],
             ['Output.WriteGPSSimVars', '<Output><WriteGPSSimVars>false</WriteGPSSimVars></Output>', 'output.writeGPSSimVars', false],
+            // #451: the interfaces, only used by the failure simulation (#366)
+            ['Input.Airdata.Interface', '<Input><Airdata><Interface>ARINC429</Interface></Airdata></Input>', 'input.airdata.interface', 'ARINC429'],
+            ['Input.ObsInterface', '<Input><ObsInterface>ARINC429</ObsInterface></Input>', 'input.obsInterface', 'ARINC429'],
+            ['Input.HeadingInterface', '<Input><HeadingInterface>RS232</HeadingInterface></Input>', 'input.headingInterface', 'RS232'],
+            ['Output.RmiInterface', '<Output><RmiInterface>ARINC429</RmiInterface></Output>', 'output.rmiInterface', 'ARINC429'],
+            ['Output.DataInterface', '<Output><DataInterface>RS232</DataInterface></Output>', 'output.dataInterface', 'RS232'],
+            ['Output.ExternalAnnunciators.MsgInstalled', '<Output><ExternalAnnunciators><MsgInstalled>true</MsgInstalled></ExternalAnnunciators></Output>', 'output.externalAnnunciators.msgInstalled', true],
+            ['Output.ExternalAnnunciators.WptInstalled', '<Output><ExternalAnnunciators><WptInstalled>true</WptInstalled></ExternalAnnunciators></Output>', 'output.externalAnnunciators.wptInstalled', true],
+            ['Output.ExternalAnnunciators.ActvInstalled', '<Output><ExternalAnnunciators><ActvInstalled>true</ActvInstalled></ExternalAnnunciators></Output>', 'output.externalAnnunciators.actvInstalled', true],
         ])('%s is read and nothing else changes', (_key, inner, path, value) => {
             expect(parse(kln(inner))).toEqual(withField(path, value));
         });
@@ -246,6 +259,7 @@ describe('panel.xml parser', () => {
             ['<VFROnly>\n    true\n</VFROnly>', 'vfrOnly', true],
             ['<Input><ObsSource> 2 </ObsSource></Input>', 'input.obsSource', 2],
             ['<Input><FuelComputer><Unit>\tKG\n</Unit></FuelComputer></Input>', 'input.fuelComputer.unit', 'KG'],
+            ['<Output><DataInterface> RS232 </DataInterface></Output>', 'output.dataInterface', 'RS232'],
         ])('accepts the value of %j with the whitespace around it', (inner, path, value) => {
             const {settings, problems} = parseWithProblems(kln(inner));
 
@@ -273,6 +287,12 @@ describe('panel.xml parser', () => {
             ['<Input><Airdata><BaroSource>1.5</BaroSource></Airdata></Input>', 'Input.Airdata.BaroSource: "1.5" is not one of 0, 1, 2. The default 0 is used.'],
             ['<Input><FuelComputer><Unit>gal</Unit></FuelComputer></Input>', 'Input.FuelComputer.Unit: "gal" is not one of GAL, IMP, L, KG, LB. The default GAL is used.'],
             ['<Input><FuelComputer><Type>Jet A1</Type></FuelComputer></Input>', 'Input.FuelComputer.Type: "Jet A1" is not one of Avgas, JetA1, JetB. The default Avgas is used.'],
+            ['<Output><DataInterface>rs232</DataInterface></Output>', 'Output.DataInterface: "rs232" is not one of ARINC429, RS232. The default ARINC429 is used.'],
+            ['<Input><Airdata><Interface>ARINC 429</Interface></Airdata></Input>', 'Input.Airdata.Interface: "ARINC 429" is not one of RS232, ARINC429. The default RS232 is used.'],
+            ['<Input><ObsInterface>analog</ObsInterface></Input>', 'Input.ObsInterface: "analog" is not one of Analog, ARINC429. The default Analog is used.'],
+            ['<Input><HeadingInterface>RS-232</HeadingInterface></Input>', 'Input.HeadingInterface: "RS-232" is not one of ARINC429, RS232. The default ARINC429 is used.'],
+            ['<Output><RmiInterface>Obi</RmiInterface></Output>', 'Output.RmiInterface: "Obi" is not one of OBI, ARINC429. The default OBI is used.'],
+            ['<Output><ExternalAnnunciators><MsgInstalled>1</MsgInstalled></ExternalAnnunciators></Output>', 'Output.ExternalAnnunciators.MsgInstalled: "1" is not true or false. The default false is used.'],
         ])('uses the default for %s and records the problem', (inner, problem) => {
             const {settings, problems} = parseWithProblems(kln(inner));
 
@@ -310,6 +330,35 @@ describe('panel.xml parser', () => {
 
             expect(settings).toEqual(withField('vfrOnly', true));
             expect(problems).toEqual(['Input.ExternalSwitches.AppArmSwitchInstalled: a VFR only unit (VFROnly true) has no approach arm switch. The default false is used.']);
+        });
+
+        // #451, Installation Manual 2-6 and figure 2-17 sheet 8 (2-57): the approach arm select pin 30 is strapped to pin
+        // 16 APPROACH ACTIVE for VFR only, and to pin 17 APPROACH ARM for IFR en route only. The strapped pin drives no
+        // lamp, so the annunciator falls back to not installed
+        it('drops the ACTV annunciator of a VFR only unit (#451)', () => {
+            const {settings, problems} = parseWithProblems(kln('<VFROnly>true</VFROnly>'
+                + '<Output><ExternalAnnunciators><ActvInstalled>true</ActvInstalled></ExternalAnnunciators></Output>'));
+
+            expect(settings).toEqual(withField('vfrOnly', true));
+            expect(problems).toEqual(['Output.ExternalAnnunciators.ActvInstalled: pin 16 of a VFR only unit (VFROnly true) is strapped and drives no ACTV lamp. The default false is used.']);
+        });
+
+        it('drops the ARM annunciator of an IFR unit without the approach arm switch (#451)', () => {
+            const {settings, problems} = parseWithProblems(kln('<Output><ExternalAnnunciators><ArmInstalled>true</ArmInstalled></ExternalAnnunciators></Output>'));
+
+            expect(settings).toEqual(DEFAULTS);
+            expect(problems).toEqual(['Output.ExternalAnnunciators.ArmInstalled: pin 17 of an IFR unit without the approach arm switch (AppArmSwitchInstalled false) is strapped and drives no ARM lamp. The default false is used.']);
+        });
+
+        it('keeps the ARM and ACTV annunciators with the approach arm switch (#451)', () => {
+            const {settings, problems} = parseWithProblems(kln('<Input><ExternalSwitches><AppArmSwitchInstalled>true</AppArmSwitchInstalled></ExternalSwitches></Input>'
+                + '<Output><ExternalAnnunciators><ArmInstalled>true</ArmInstalled><ActvInstalled>true</ActvInstalled></ExternalAnnunciators></Output>'));
+
+            const expected = withField('input.externalSwitches.appArmSwitchInstalled', true);
+            expected.output.externalAnnunciators.armInstalled = true;
+            expected.output.externalAnnunciators.actvInstalled = true;
+            expect(settings).toEqual(expected);
+            expect(problems).toEqual([]);
         });
 
         it('records no problem for a VFR only unit without the approach arm switch', () => {

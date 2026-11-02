@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {beforeEach, describe, expect, it} from 'vitest';
 import {FuelComputer} from '../../kln90b/Sensors';
+import {Interconnect} from '../../kln90b/Interconnect';
 import {KLN90BPlaneSettingsParser} from '../../kln90b/settings/KLN90BPlaneSettings';
 import {fuelComputer, panelXml} from '../harness/panelXml';
 import {simEnv} from '../harness/sim/install';
@@ -24,7 +25,7 @@ function fobFor(unit: string, type: string): number {
     // The fuel computer reads the number of engines in its constructor, so the sim has them before it is built
     simEnv().sim.set('NUMBER OF ENGINES', 'number', 1);
     simEnv().sim.set('FUEL TOTAL QUANTITY WEIGHT EX1', 'pounds', POUNDS_ON_BOARD);
-    const computer = new FuelComputer(settings);
+    const computer = new FuelComputer(settings, new Interconnect(settings));
     computer.tick();
     return computer.fob;
 }

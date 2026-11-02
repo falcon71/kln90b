@@ -2,7 +2,7 @@
 import {beforeEach, describe, expect, it} from 'vitest';
 import {KLN90BPlaneSettingsParser, KLN90PlaneSettings} from '../../../kln90b/settings/KLN90BPlaneSettings';
 import {
-    AIRDATA, ALTITUDE_ALERT, fuelComputer, HEADING_INPUT, LEG_OBS_SWITCH, NO_ALTIMETER, NO_GPS_SIMVARS, NO_OBS,
+    AIRDATA, ALTITUDE_ALERT, APR_ARM_SWITCH, fuelComputer, HEADING_INPUT, LEG_OBS_SWITCH, NO_ALTIMETER, NO_GPS_SIMVARS, NO_OBS,
     PANEL_KEYS, PanelKey, panelXml, PanelOptions, VFR_ONLY,
 } from '../../harness/panelXml';
 import {simEnv} from '../../harness/sim/install';
@@ -14,7 +14,8 @@ const parse = (xml: string) =>
     new KLN90BPlaneSettingsParser().parsePlaneSettings(new DOMParser().parseFromString(xml, 'text/xml'));
 
 // A value the parser does not default to, and where the parser puts the key
-const CASES: Record<PanelKey, [string | number | boolean, (s: KLN90PlaneSettings) => unknown]> = {
+// A third element holds keys the value needs: the ARM annunciator exists only with the approach arm switch (#451)
+const CASES: Record<PanelKey, [string | number | boolean, (s: KLN90PlaneSettings) => unknown, PanelOptions?]> = {
     'TakeHomeMode': [true, s => s.takeHomeMode],
     'BasePath': ['custom/path', s => s.basePath],
     'VFROnly': [true, s => s.vfrOnly],
@@ -34,13 +35,22 @@ const CASES: Record<PanelKey, [string | number | boolean, (s: KLN90PlaneSettings
     'Output.ObsTarget': [1, s => s.output.obsTarget],
     'Output.AltitudeAlertEnabled': [true, s => s.output.altitudeAlertEnabled],
     'Output.WriteGPSSimVars': [false, s => s.output.writeGPSSimVars],
+    'Input.Airdata.Interface': ['ARINC429', s => s.input.airdata.interface],
+    'Input.ObsInterface': ['ARINC429', s => s.input.obsInterface],
+    'Input.HeadingInterface': ['RS232', s => s.input.headingInterface],
+    'Output.RmiInterface': ['ARINC429', s => s.output.rmiInterface],
+    'Output.DataInterface': ['RS232', s => s.output.dataInterface],
+    'Output.ExternalAnnunciators.MsgInstalled': [true, s => s.output.externalAnnunciators.msgInstalled],
+    'Output.ExternalAnnunciators.WptInstalled': [true, s => s.output.externalAnnunciators.wptInstalled],
+    'Output.ExternalAnnunciators.ArmInstalled': [true, s => s.output.externalAnnunciators.armInstalled, APR_ARM_SWITCH],
+    'Output.ExternalAnnunciators.ActvInstalled': [true, s => s.output.externalAnnunciators.actvInstalled],
 };
 
 describe('panelXml (harness)', () => {
     it.each(PANEL_KEYS)('reaches the parser with %s', key => {
-        const [value, read] = CASES[key];
-        expect(read(parse(panelXml()))).not.toEqual(value);
-        expect(read(parse(panelXml({[key]: value})))).toEqual(value);
+        const [value, read, needs = {}] = CASES[key];
+        expect(read(parse(panelXml(needs)))).not.toEqual(value);
+        expect(read(parse(panelXml({...needs, [key]: value})))).toEqual(value);
     });
 
     it('refuses a key the parser does not read', () => {

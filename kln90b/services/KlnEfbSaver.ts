@@ -10,7 +10,7 @@ import {
     RunwayUtils,
 } from "@microsoft/msfs-sdk";
 import {Flightplan, KLNFlightplanLeg, KLNLegType} from "../data/flightplan/Flightplan";
-import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
+import {Interconnect} from "../Interconnect";
 import {isUserWaypoint} from "../data/navdata/IcaoBuilder";
 import {Hardware} from "../Hardware";
 
@@ -19,12 +19,13 @@ import {Hardware} from "../Hardware";
  */
 export class KlnEfbSaver {
 
-    constructor(private readonly options: KLN90PlaneSettings, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan, private readonly hardware: Hardware) {
+    constructor(private readonly interconnect: Interconnect, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly fpl0: Flightplan, private readonly hardware: Hardware) {
         this.flightPlanRouteManager.avionicsRouteRequested.on(this.handleAvionicsRouteRequested.bind(this));
     }
 
     private handleAvionicsRouteRequested(sender: FlightPlanRouteManager, requestId: number): void {
-        if (!this.options.output.writeGPSSimVars) {
+        //Real unit: the route stands for the flight plan the unit sends as navigation data (see WTFlightplanSync)
+        if (!this.interconnect.gps(this.interconnect.navData).isTransmitting) {
             return;
         }
         if (this.hardware.isDisabled) {
