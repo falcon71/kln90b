@@ -94,14 +94,19 @@ From the "Real unit:" comments that already name each value's interface in `Sens
 | Analog nav, pins 18-22, 25 | `GPS WP CROSS TRK`, `L:KLN90B_HSI_TF_FLAGS`, `GPS CDI SCALING`, `GPS IS ACTIVE FLIGHT PLAN`, `GPS IS ACTIVE WAY POINT` |
 | ARINC 429 TX, pins 23/24 | `K:VOR1_SET`/`K:VOR2_SET` (label 100), `L:KLN90B_XTK` (116), `L:KLN90B_RollCommand` (121), `L:KLN90B_IntegrityWarn` (261), `GPS WP ETE` (252), `GPS ETE` (352) |
 | Annunciator pins 14, 15 | `L:KLN90B_WptLight`, `L:KLN90B_MsgLight` |
-| Annunciator pins 16, 17 | `GPS APPROACH MODE`, `GPS IS APPROACH ACTIVE`, through the approach lamp group (below) |
+| Annunciator pins 16, 17 | `GPS APPROACH MODE`, through the approach lamp group (below) |
 
-**Approach lamp group (maintainer's decision).** `GPS APPROACH MODE` and `GPS IS APPROACH ACTIVE` carry both the ARM
-lamp (pin 17) and the ACTV lamp (pin 16), and aircraft light their lamps from them; expecting aircraft authors to move
-to new per-lamp LVars is not realistic. So they are written through one group port over the ARM and ACTV ports. In
+**Approach lamp group (maintainer's decision).** `GPS APPROACH MODE` carries both the ARM lamp (pin 17) and the ACTV
+lamp (pin 16); it is the SimVar the wiki documents for aircraft to light their lamps, and expecting aircraft authors to
+move to new per-lamp LVars is not realistic. So it is written through one group port over the ARM and ACTV ports. In
 #451 it passes every write through. In #366 the group changes the value for a failed lamp instead of dropping the
 write (ARM failed: mode 1 becomes 0, the self-test 3 becomes 2), so the writers stay unchanged. The group's API must
 allow that: it receives the value, not only a go/no-go.
+
+**`GPS IS APPROACH ACTIVE` is data, not a lamp (maintainer's decision).** It is not documented for lamps, so it is
+routed with `Output.DataInterface` (ARINC 429 label 261 bits 25-27, RS-232 item t character c). The "Real unit:"
+comment on `SensorsOut.setMode` is split accordingly: `GPS APPROACH MODE` is the annunciator pins 16/17 for the lamps,
+`GPS IS APPROACH ACTIVE` the digital approach state.
 
 **`L:KLN90B_AnnunTest` is deprecated (maintainer's decision).** The self-test already lights every lamp through the
 lamp SimVars (`GPS APPROACH MODE` 3, the steady WPT light, the MSG light). It keeps today's behavior, written through
@@ -121,7 +126,8 @@ with the analog deviation `GPS WP CROSS TRK` it scales (label 326 would be the E
 Routed by a key:
 - `Output.DataInterface`: `GPS POSITION LAT/LON`, `GPS GROUND SPEED`, `GPS GROUND TRUE/MAGNETIC TRACK`, `GPS MAGVAR`,
   `GPS WP DISTANCE`, `GPS WP DESIRED TRACK`, `GPS WP BEARING`, `GPS WP TRUE BEARING`, `GPS OBS VALUE`,
-  `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT *`, `GPS WP PREV *`, `K:GPS_OBS_ON/OFF`, the SDK planner `"kln90b"`
+  `GPS FLIGHT PLAN WP COUNT/INDEX`, `GPS WP NEXT *`, `GPS WP PREV *`, `K:GPS_OBS_ON/OFF`, `GPS IS APPROACH ACTIVE`,
+  the SDK planner `"kln90b"`
   (`WTFlightplanSync`) and the EFB route answer (`KlnEfbSaver`).
 - `Output.RmiInterface`: `L:KLN90B_GPS_WP_BEARING`.
 - `Input.Airdata.Interface`: `PRESSURE ALTITUDE`, `AIRSPEED TRUE`, `AIRSPEED MACH`, `AMBIENT TEMPERATURE`,
