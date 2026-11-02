@@ -383,7 +383,7 @@ describe('the turn latch of L:KLN90B_RollCommand (#100)', () => {
         const {unit, nav, mid, dtk} = await latchedRight();
         const gps = unit.props.sensors.in.gps;
         const left = pointFrom(mid, dtk - 90, 0.3);
-        gps.coords = new GeoPoint(left.lat, left.lon);
+        gps.coords.set(left.lat, left.lon);
         gps.trackTrue = (dtk + 190) % 360;
 
         new RollSteeringController(unit.props.sensors, unit.props.memory, unit.props.planeSettings).tick();

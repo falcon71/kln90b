@@ -200,7 +200,7 @@ describe('STA 1 receiver states (5-29)', () => {
 describe('STA 1 states from the receiver solution (5-29, #453)', () => {
     /** A valid six-measurement geometry whose horizontal protection level exceeds the 2 NM en-route limit (200 x 5 m x 5.3 = 2.9 NM) */
     const POOR_GEOMETRY: GpsGeometry = {
-        valid: true, satellites: 6, altitudeAided: false, measurements: 6, hdop: 1, epeNm: 0.01, maxSlope: 200,
+        valid: true, satellites: 6, altitudeAided: false, measurements: 6, hdop: 1, cNorth: 0.5, cEast: 0.5, epeNm: 0.01, maxSlope: 200,
     };
 
     async function staOneWithFix(options: Parameters<typeof bootUnit>[0] = {}): Promise<HeadlessUnit> {

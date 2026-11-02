@@ -83,6 +83,10 @@ export class Aircraft {
         sim.set('PLANE ALTITUDE', 'feet', this.altitudeFt);
         sim.set('PRESSURE ALTITUDE', 'feet', this.altitudeFt);
         sim.set('GROUND VELOCITY', 'knots', this.groundspeedKt);
+        //The ground velocity north and east, which SimulatedMeasurement reads (#402)
+        const groundspeedMps = this.groundspeedKt * KNOT_MPS;
+        sim.set('VELOCITY WORLD Z', 'meters per second', groundspeedMps * Math.cos(this.trackTrue * Math.PI / 180));
+        sim.set('VELOCITY WORLD X', 'meters per second', groundspeedMps * Math.sin(this.trackTrue * Math.PI / 180));
         sim.set('AIRSPEED TRUE', 'knots', this.groundspeedKt);
         sim.set('PLANE HEADING DEGREES TRUE', 'degrees', this.trackTrue);
         sim.set('PLANE HEADING DEGREES GYRO', 'degrees', norm360(this.trackTrue - magvar));

@@ -1,4 +1,4 @@
-import {Facility, FSComponent, GeoPoint, VNode} from '@microsoft/msfs-sdk';
+import {Facility, FSComponent, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -103,10 +103,7 @@ export class Set1Page extends SixLineHalfPage {
 
     private confirmPosition(): void {
         const gps = this.props.sensors.in.gps;
-        gps.coords = new GeoPoint(
-            this.lat,
-            this.lon,
-        );
+        gps.coords.set(this.lat, this.lon);
         gps.groundspeed = this.groundspeed;
         gps.trackTrue = this.props.magvar.magToTrue(this.track); //The page shows and edits the magnetic track, 3-19
         gps.gpsSatComputer.syncLastKnownPosition(gps.coords);

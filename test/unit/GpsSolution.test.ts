@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSPredictionContext, GPSSatelliteState} from '@microsoft/msfs-sdk';
-import {computeGeometry, GpsGeometry, predictRaim, Raim, raimStatus} from '../../kln90b/GpsSolution';
+import {GeoPoint, GPSPredictionContext, GPSSatellite, GPSSatelliteState, Vec3Math} from '@microsoft/msfs-sdk';
+import {ALTITUDE_WEIGHT, computeGeometry, GpsGeometry, MAX_ROWS, predictRaim, Raim, raimStatus} from '../../kln90b/GpsSolution';
 import {RAIM_ENROUTE_NOT_APPROACH, stubSatellites} from '../harness/predictionStub';
 
 // #453: the receiver solution. Every expected value below is derived by hand, never by calling the module.
@@ -123,6 +123,155 @@ describe('computeGeometry', () => {
     });
 });
 
+// #402: the coefficients that map the error of a row to a position error, and the covariance entries.
+describe('computeGeometry error coefficients (#402)', () => {
+    // Rows (x, y, z, clock) with s = sin 80°, c = cos 80°, w = 1/6:
+    //   (0.5, 0, 0.866025, 1), (0, s, c, 1), (0, -s, c, 1) and the altitude row (0, 0, w, 0).
+    // N = GtG is block diagonal: yy = 2 s² = 1.939693, and over (x, z, clock)
+    //   [[0.25, 0.433013, 0.5], [0.433013, 0.838085, 1.213321], [0.5, 1.213321, 3]].
+    // Inverted (numpy, outside the project): C xx = 75.031616, C yy = 0.515546, and the column of the altitude row
+    // C g = (-49.851160 w, 0, 36 w, -6.251334 w) = (-8.308527, 0, 6, -1.041889).
+    // Its z entry is 6 = 1/w: a whitened error of 100 w moves z by exactly 100 m, so the sign is right (too high moves up).
+    // The horizontal part of the column is the north coefficient, -8.308527, so the north shift is
+    // -8.308527 * (100 w) = -138.4754 m. There is no east part, the satellites are symmetric east-west.
+    const SYMMETRIC = [sky(30, 0), sky(80, 90), sky(80, 270)];
+
+    it('maps an altitude error to the north only when the satellites are symmetric east-west', () => {
+        const coefficients = new Float64Array(2 * MAX_ROWS);
+        const g = computeGeometry(SYMMETRIC, true, coefficients);
+        expect(g.valid).toBe(true);
+        const whitened = 100 * ALTITUDE_WEIGHT;
+        expect(coefficients[6] * whitened).toBeCloseTo(-138.4754, 3);
+        expect(coefficients[7] * whitened).toBeCloseTo(0, 9);
+    });
+
+    it('gives the north and east entries of the covariance separately', () => {
+        const g = computeGeometry(SYMMETRIC, true);
+        expect(g.cNorth).toBeCloseTo(75.031616, 4);
+        expect(g.cEast).toBeCloseTo(0.515546, 5);
+    });
+
+    it('cNorth + cEast equals hdop squared', () => {
+        const g = computeGeometry(SYMMETRIC, true);
+        expect(g.hdop * g.hdop).toBeCloseTo(75.031616 + 0.515546, 4);
+        expect(g.cNorth + g.cEast).toBeCloseTo(g.hdop * g.hdop, 9);
+    });
+
+    it('the covariance entries are NaN when the normal matrix is singular', () => {
+        const g = computeGeometry([horizon(0), horizon(90), horizon(180), horizon(270)], false);
+        expect(g.cNorth).toBeNaN();
+        expect(g.cEast).toBeNaN();
+    });
+
+    // ZENITH_AND_FOUR: the column of a horizon satellite at azimuth a has the horizontal part 0.5 (cos a, sin a) in the
+    // frame of the geometry (north, west: see the frame pin below), the zenith satellite has none. The rows are in the
+    // order of the input. East is -sin a: the satellite at 90° (west) gives -0.5, the one at 270° (east) +0.5
+    it('writes the coefficients row by row in input order, with east as the second entry', () => {
+        const coefficients = new Float64Array(2 * MAX_ROWS);
+        computeGeometry(ZENITH_AND_FOUR, false, coefficients);
+        const expected = [
+            0, 0, // zenith
+            0.5, 0, // azimuth 0
+            0, -0.5, // 90
+            -0.5, 0, // 180
+            0, 0.5, // 270
+        ];
+        for (let i = 0; i < expected.length; i++) {
+            expect(coefficients[i]).toBeCloseTo(expected[i], 9);
+        }
+    });
+
+    it('leaves the coefficients alone when the solution is invalid', () => {
+        const coefficients = new Float64Array(2 * MAX_ROWS).fill(7);
+        // Singular, and an error estimate above 3.8 NM
+        computeGeometry([horizon(0), horizon(90), horizon(180), horizon(270)], false, coefficients);
+        computeGeometry([sky(70, 0), sky(65, 8.5), sky(60, 17), sky(55, 25.5)], false, coefficients);
+        // Too few rows
+        computeGeometry(THREE_ON_THE_HORIZON, false, coefficients);
+        expect(Array.from(coefficients)).toEqual(new Array(2 * MAX_ROWS).fill(7));
+    });
+
+    // The SDK turns a plane position and a satellite position into [zenith, -hourAngle] (GPSSatellite.applyProjection).
+    // A = plane x north pole points west, B = plane x satellite points north for a satellite due east, so the hour angle
+    // of a satellite due east is +90° and its second value -90°: setFromSpherical puts it on -y, and a satellite due
+    // north has azimuth 0 and goes on x. Here this is derived from the SDK itself, with four satellites at the bearings
+    // 20°, 110°, 200° and 290° of a plane at 47N 8E (bearing b: north cos b, east sin b), all at one zenith angle s.
+    // (Due north and due south are avoided: the SDK takes the acos of a dot product that rounds to above 1 there and
+    // returns NaN.) The rows are 90° apart, so N has xx = yy = 2 sin²(zenith) and no cross terms, and the column of a
+    // satellite at bearing b has the horizontal part (cos b, sin b) / (2 sin(zenith)) in (north, east). A satellite
+    // due east must therefore move the position to the east and not to the north. The altitude row is the fifth.
+    it('pins the frame: the SDK hour angle of a satellite due east maps to the east axis', () => {
+        const plane = new GeoPoint(47, 8);
+        const up = plane.toCartesian(new Float64Array(3));
+        const lambda = 8 * DEG;
+        const east = Vec3Math.set(-Math.sin(lambda), Math.cos(lambda), 0, new Float64Array(3));
+        const north = Vec3Math.cross(up, east, new Float64Array(3)); // up x east = north in a right-handed frame
+        expect(north[2]).toBeGreaterThan(0);
+
+        const project = (bearingDeg: number): Float64Array => {
+            const b = bearingDeg * DEG;
+            const direction = Vec3Math.add(
+                Vec3Math.multScalar(north, Math.cos(b), new Float64Array(3)),
+                Vec3Math.multScalar(east, Math.sin(b), new Float64Array(3)),
+                new Float64Array(3),
+            );
+            const satellite = Vec3Math.add(
+                Vec3Math.multScalar(up, 1.6, new Float64Array(3)),
+                Vec3Math.multScalar(direction, 1.5, new Float64Array(3)),
+                new Float64Array(3),
+            );
+            const projected = new Float64Array(2);
+            const fake = {
+                positionCartesian: {get: () => satellite},
+                vec3Cache: [0, 1, 2, 3, 4].map(() => new Float64Array(3)),
+                data: {position: new Float64Array(2)},
+                position: {set: (v: Float64Array) => projected.set(v)},
+                hasComputedPosition: false,
+            };
+            GPSSatellite.prototype.applyProjection.call(fake as never, plane, 0);
+            return projected;
+        };
+        const bearings = [20, 110, 200, 290];
+        const skies = bearings.map(project);
+        // The same distance in the tangent plane: one zenith angle, 1.5 out and 0.6 up (68.2°, steep enough that the
+        // geometry needs no help from the altitude row)
+        const zenith = Math.atan(1.5 / 0.6);
+        for (const projected of skies) {
+            expect(projected[0]).toBeCloseTo(zenith, 6);
+        }
+
+        const coefficients = new Float64Array(2 * MAX_ROWS);
+        const g = computeGeometry(skies, true, coefficients);
+        expect(g.valid).toBe(true);
+        const scale = 1 / (2 * Math.sin(zenith)); // 0.538511
+        for (let i = 0; i < bearings.length; i++) {
+            expect(coefficients[2 * i]).toBeCloseTo(scale * Math.cos(bearings[i] * DEG), 5); // north
+            expect(coefficients[2 * i + 1]).toBeCloseTo(scale * Math.sin(bearings[i] * DEG), 5); // east
+        }
+        // The altitude row is the fifth: it acts on z only, so it has no horizontal part
+        expect(coefficients[8]).toBeCloseTo(0, 9);
+        expect(coefficients[9]).toBeCloseTo(0, 9);
+    });
+
+    // Three satellites and the altitude have no redundancy: a 300 m altitude error goes into the position. Hand-solved
+    // as above for the symmetric constellation: the north shift is -8.308527 * (300 w) = -415.43 m. Eight well spread
+    // satellites (zenith/azimuth 20/0, 50/0, 50/90, 50/180, 50/270, 70/45, 70/165, 70/285) hold the altitude row
+    // down: the shift is 1.218 m (numpy)
+    it('a 300 m altitude error moves 3 satellites + altitude far more than 8 satellites + altitude', () => {
+        const shift = (satellites: Float64Array[]): number => {
+            const coefficients = new Float64Array(2 * MAX_ROWS);
+            const g = computeGeometry(satellites, true, coefficients);
+            const altitudeRow = g.measurements - 1;
+            return Math.hypot(coefficients[2 * altitudeRow], coefficients[2 * altitudeRow + 1]) * 300 * ALTITUDE_WEIGHT;
+        };
+        const few = shift(SYMMETRIC);
+        const many = shift([sky(20, 0), sky(50, 0), sky(50, 90), sky(50, 180), sky(50, 270), sky(70, 45), sky(70, 165), sky(70, 285)]);
+        expect(few).toBeCloseTo(415.43, 1);
+        expect(many).toBeCloseTo(1.218, 2);
+        expect(few / many).toBeGreaterThanOrEqual(5);
+    });
+});
+
 describe('raimStatus', () => {
     const geometry = (measurements: number, maxSlope: number): GpsGeometry => ({
         valid: true,
@@ -130,6 +279,8 @@ describe('raimStatus', () => {
         altitudeAided: false,
         measurements,
         hdop: 1,
+        cNorth: 0.5,
+        cEast: 0.5,
         epeNm: 0.01,
         maxSlope,
     });

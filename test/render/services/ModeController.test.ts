@@ -451,7 +451,7 @@ describe('integrity at the approach (6-3, 6-20, #453)', () => {
 
     /** A solution of the model with the given count and slope, the SDK's satellites unchanged */
     function spySolution(unit: HeadlessUnit, measurements: number, maxSlope: number) {
-        const geometry: GpsGeometry = {valid: true, satellites: measurements, altitudeAided: false, measurements, hdop: 1, epeNm: 0.01, maxSlope};
+        const geometry: GpsGeometry = {valid: true, satellites: measurements, altitudeAided: false, measurements, hdop: 1, cNorth: 0.5, cEast: 0.5, epeNm: 0.01, maxSlope};
         return vi.spyOn(unit.props.sensors.in.gps, 'solution', 'get').mockReturnValue(geometry);
     }
 

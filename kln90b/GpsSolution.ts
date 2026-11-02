@@ -10,7 +10,17 @@ import type {GPSPredictionContext} from '@microsoft/msfs-sdk';
  *
  * The solution is a weighted least squares fit on whitened rows, so the normal matrix is G^T G. Every satellite is one
  * row [x, y, z, 1] of the unit vector of its line of sight and a clock column. The altitude is one row [0, 0, w, 0]
- * with w = SIGMA_UERE_M / SIGMA_ALT_M.
+ * with w = ALTITUDE_WEIGHT = SIGMA_UERE_M / SIGMA_ALT_M.
+ *
+ * The same pass gives the error coefficients of #402: how an error of every row moves the solution to the north and to
+ * the east (design 6.4), and the north and east entries of the covariance. The SDK gives a satellite as [zenith angle,
+ * hour angle], and the hour angle turns from north towards the west (GPSSatellite.applyProjection, held by a test).
+ * setFromSpherical therefore puts the north in x and the west in y, so the east is -y.
+ *
+ * Signs: a satellite row is +u, the unit vector toward the satellite, so its coefficient has the sign of its line of
+ * sight and a positive range error moves the position the other way. That is fine for zero-mean errors, but a later
+ * single-satellite bias (#366) must flip it. The sign of the altitude row is physical: a reading too high moves the
+ * position up.
  *
  * This is a pure math module: it imports nothing from the project, so that Gps can import it without a cycle. The alert
  * limit of a flight phase is `halForMode` in services/ModeController.
@@ -20,6 +30,8 @@ import type {GPSPredictionContext} from '@microsoft/msfs-sdk';
 export const SIGMA_UERE_M = 5;
 /** The error of the altitude input in meters: 100 ft encoder steps plus the error of the altimeter setting */
 export const SIGMA_ALT_M = 30;
+/** The altitude row is scaled by this, because its error is SIGMA_ALT_M and not SIGMA_UERE_M */
+export const ALTITUDE_WEIGHT = SIGMA_UERE_M / SIGMA_ALT_M;
 /** The protection level factor for a missed-detection probability of 0.001 */
 export const RAIM_K = 5.3;
 /** B-4: above this error estimate the solution is not valid */
@@ -28,7 +40,7 @@ export const MAX_EPE_NM = 3.8;
 const METERS_PER_NM = 1852;
 const SINGULAR = 1e-9;
 /** More rows than any receiver has channels, so the scratch arrays never overflow. Extra satellites are ignored */
-const MAX_ROWS = 16;
+export const MAX_ROWS = 16;
 
 export const enum Raim {
     Available,
@@ -45,6 +57,10 @@ export interface GpsGeometry {
     measurements: number;
     /** In units of SIGMA_UERE_M. NaN when the normal matrix is singular */
     hdop: number;
+    /** The north entry of the covariance C = (G^T G)^-1, in units of SIGMA_UERE_M squared. NaN when singular */
+    cNorth: number;
+    /** The east entry of the covariance, as cNorth. cNorth + cEast is hdop squared */
+    cEast: number;
     /** The 95% error estimate: 2 × HDOP × SIGMA_UERE_M. NaN when the normal matrix is singular */
     epeNm: number;
     /** The largest horizontal slope over all measurements. Infinity when the geometry is invalid */
@@ -59,8 +75,13 @@ const los = new Float64Array(3);
 /**
  * @param satellites [zenith, azimuth] in rad of each satellite in use, as GPSSatellite.position.get() returns it
  * @param altitudeAided whether the altitude input is present
+ * @param coefficients Written when the solution is valid and left alone otherwise: the north and the east position
+ * error in meters per meter of whitened error of row i, at [2 i] and [2 i + 1]. The rows are in the order of the input,
+ * the altitude row last. A satellite's error enters as it is, the altitude error multiplied by ALTITUDE_WEIGHT. The
+ * coefficient of a satellite row has the sign of its line of sight (+u toward the satellite), see the header, the one
+ * of the altitude row is physical. At least 2 * MAX_ROWS long.
  */
-export function computeGeometry(satellites: readonly ReadonlyFloat64Array[], altitudeAided: boolean): GpsGeometry {
+export function computeGeometry(satellites: readonly ReadonlyFloat64Array[], altitudeAided: boolean, coefficients?: Float64Array): GpsGeometry {
     const satelliteCount = Math.min(satellites.length, altitudeAided ? MAX_ROWS - 1 : MAX_ROWS);
     for (let i = 0; i < satelliteCount; i++) {
         const sat = satellites[i];
@@ -74,7 +95,7 @@ export function computeGeometry(satellites: readonly ReadonlyFloat64Array[], alt
     if (altitudeAided) {
         rows[n * 4] = 0;
         rows[n * 4 + 1] = 0;
-        rows[n * 4 + 2] = SIGMA_UERE_M / SIGMA_ALT_M;
+        rows[n * 4 + 2] = ALTITUDE_WEIGHT;
         rows[n * 4 + 3] = 0;
         n++;
     }
@@ -85,6 +106,8 @@ export function computeGeometry(satellites: readonly ReadonlyFloat64Array[], alt
         altitudeAided: altitudeAided,
         measurements: n,
         hdop: NaN,
+        cNorth: NaN,
+        cEast: NaN,
         epeNm: NaN,
         maxSlope: Infinity,
     };
@@ -141,7 +164,9 @@ export function computeGeometry(satellites: readonly ReadonlyFloat64Array[], alt
     }
 
     // The covariance C is symmetric. Its entry (r, c) is augmented[r * 8 + 4 + c]
-    const hdop = Math.sqrt(augmented[4] + augmented[8 + 5]);
+    result.cNorth = augmented[4];
+    result.cEast = augmented[8 + 5];
+    const hdop = Math.sqrt(result.cNorth + result.cEast);
     result.hdop = hdop;
     result.epeNm = 2 * hdop * SIGMA_UERE_M / METERS_PER_NM;
     if (!(result.epeNm <= MAX_EPE_NM)) {
@@ -165,6 +190,10 @@ export function computeGeometry(satellites: readonly ReadonlyFloat64Array[], alt
                 hr += augmented[r * 8 + 4 + c] * rows[o + c];
             }
             hg += rows[o + r] * hr;
+        }
+        if (coefficients !== undefined) {
+            coefficients[2 * i] = h0;
+            coefficients[2 * i + 1] = -h1; // y points west
         }
         const horizontal = Math.sqrt(h0 * h0 + h1 * h1);
         const s = 1 - hg;

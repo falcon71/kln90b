@@ -31,6 +31,16 @@ describe('Aircraft', () => {
         // g·tan(18.34°)/v at 120 kt = 3.0°/s
         expect(a.trackTrue / 10).toBeCloseTo(3.0, 1);
     });
+
+    // #402: SimulatedMeasurement reads the ground velocity north (Z) and east (X)
+    it('writes the ground velocity north and east', () => {
+        const a = new Aircraft({lat: 0, lon: 0, altitudeFt: 3000, groundspeedKt: 120, trackTrue: 60});
+        const sim = new FakeSim();
+        a.writeTo(sim, 0);
+        // 120 kt = 61.7333 m/s; north = v cos 60°, east = v sin 60°
+        expect(sim.get('VELOCITY WORLD Z', 'meters per second')).toBeCloseTo(30.8667, 3);
+        expect(sim.get('VELOCITY WORLD X', 'meters per second')).toBeCloseTo(53.4626, 3);
+    });
 });
 
 describe('coupledAutopilot', () => {

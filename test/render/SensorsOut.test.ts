@@ -133,7 +133,7 @@ describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
         const gps = unit.props.sensors.in.gps;
         expect(gps.isValid()).toBe(true);
         expect(unit.env.sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0); // Precondition: the real sky is healthy
-        const geometry: GpsGeometry = {valid: true, satellites: 6, altitudeAided: false, measurements: 6, hdop: 1, epeNm: 0.01, maxSlope};
+        const geometry: GpsGeometry = {valid: true, satellites: 6, altitudeAided: false, measurements: 6, hdop: 1, cNorth: 0.5, cEast: 0.5, epeNm: 0.01, maxSlope};
         vi.spyOn(gps, 'solution', 'get').mockReturnValue(geometry);
 
         await vi.advanceTimersByTimeAsync(2000);

@@ -92,11 +92,14 @@ change what they mean; add new ones instead:
   objects in hot paths instead of allocating, as the SDK's geo classes do.
 - **GPS** (`Gps.ts`) wraps the SDK `GPSSatComputer`. It models hot, warm and almanac-search starts from the stored
   position, almanac, ephemeris and clock (`GpsSearch.ts`), and the GPS week rollover.
-  Once there is a fix it uses the exact sim position; there is no noise. The unit has its own receiver solution
-  (`GpsSolution.ts`): a fix needs four satellites, or three with the altitude input, and RAIM availability follows from
-  the slope method against the alert limit of the flight phase. STA 1, STA 2, the messages and the approach gate use it,
-  and STA 5 and the gate predict it through an SDK prediction context. Satellite failures (#366) and a fuzzy position
-  (#402) are not modeled. The wrapper reaches into private SDK internals, so recheck it after SDK upgrades.
+  Once there is a fix, a measurement strategy (`GpsMeasurement.ts`) gives the position, ground speed and track: in the
+  sim a simulated receiver (`GpsErrorModel.ts`, `GpsPositionFilter.ts`) whose errors follow the satellite geometry and
+  the altitude input and are smoothed by a Kalman filter, and in the tests the exact sim position unless a test opts
+  in. The unit has its own receiver solution (`GpsSolution.ts`): a fix needs four satellites, or three with the
+  altitude input, and RAIM availability follows from the slope method against the alert limit of the flight phase.
+  STA 1, STA 2, the messages and the approach gate use it, and STA 5 and the gate predict it through an SDK prediction
+  context. Satellite failures (#366) are not modeled. The wrapper reaches into private SDK internals, so recheck it
+  after SDK upgrades.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.
     - `data/flightplan/`: 26 flight plans (FPL 0 is active) of at most 30 en-route legs (FPL 0 up to 45 with
       procedures), and `ActiveWaypoint` with its turn stack.

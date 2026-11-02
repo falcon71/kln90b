@@ -31,6 +31,7 @@ import {
     LVAR_XTK,
 } from "./LVars";
 import {GPS} from "./Gps";
+import {GpsMeasurement} from "./GpsMeasurement";
 import {Hardware} from "./Hardware";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
 
@@ -264,10 +265,11 @@ export class SensorsIn implements CalcTickable {
     public airdata: Airdata;
 
 
-    constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, messageHandler: MessageHandler) {
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, messageHandler: MessageHandler,
+                gpsMeasurement: GpsMeasurement) {
         this.airdata = new Airdata(userSettings, options);
         //5-29: the altitude input is a measurement of the GPS solution. Airdata reports none until its first tick
-        this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.pressureAltitude !== null);
+        this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.getIndicatedAlt(), gpsMeasurement);
         this.fuelComputer = new FuelComputer(options);
     }
 
@@ -872,8 +874,9 @@ export class Sensors implements CalcTickable {
     public out: SensorsOut;
 
 
-    constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, audioGenerator: AudioGenerator, messageHandler: MessageHandler, hardware: Hardware) {
-        this.in = new SensorsIn(bus, userSettings, options, messageHandler);
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, audioGenerator: AudioGenerator, messageHandler: MessageHandler, hardware: Hardware,
+                gpsMeasurement: GpsMeasurement) {
+        this.in = new SensorsIn(bus, userSettings, options, messageHandler, gpsMeasurement);
         this.out = new SensorsOut(options, audioGenerator, hardware);
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));

@@ -18,6 +18,7 @@ import {Screen} from './render/screen';
 import {resetSingletons} from './singletons';
 import {pointFrom} from './flight/geo';
 import {defaultNavdata} from './fixtures';
+import {SimulatedMeasurement} from '../../kln90b/GpsMeasurement';
 
 /**
  * How long a test advances the clock for the nearest lists to search and show their result. The nearest lists
@@ -73,6 +74,11 @@ export interface BootOptions {
      * only while it is built: the fuel computer reads NUMBER OF ENGINES in its constructor (Sensors.ts)
      */
     simVars?: { name: string; unit: string; value: number | boolean | string }[];
+    /**
+     * Navigates on the simulated receiver (kln90b/GpsMeasurement.ts, SimulatedMeasurement) instead of the exact sim
+     * position (#402). Its errors draw from the seeded Math.random. A createGpsMeasurement in platform wins. Default false
+     */
+    simulatedGps?: boolean;
 }
 
 export interface HeadlessUnit {
@@ -228,6 +234,8 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
     env.sim.set('PLANE ALTITUDE', 'feet', altitude);
     env.sim.set('PRESSURE ALTITUDE', 'feet', altitude);
     env.sim.set('GROUND VELOCITY', 'knots', 0);
+    env.sim.set('VELOCITY WORLD Z', 'meters per second', 0); //North, for SimulatedMeasurement
+    env.sim.set('VELOCITY WORLD X', 'meters per second', 0); //East
     env.sim.set('GPS DRIVES NAV1', 'bool', true);
     for (const v of opts.simVars ?? []) {
         env.sim.set(v.name, v.unit, v.value);
@@ -273,7 +281,10 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
     };
 
     const efb = opts.efb ? new FakeRouteManager() : undefined;
-    const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata, efb, opts.platform), args => core.onInteractionEvent(args));
+    const platform: Partial<KLN90BPlatform> = opts.simulatedGps
+        ? {createGpsMeasurement: () => new SimulatedMeasurement(), ...opts.platform}
+        : opts.platform ?? {};
+    const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata, efb, platform), args => core.onInteractionEvent(args));
     // The constructor built the user settings, and the SDK's UserSetting draws Math.random once per setting. Starting
     // the sequence again here keeps every later draw (the GPS jitter and start times) independent of the number of
     // setting keys, so a new key does not move the seeded tests

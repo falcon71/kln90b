@@ -1,6 +1,7 @@
 import {EventBus, FacilityLoader, FacilityRepository, FlightPlanRouteManager} from "@microsoft/msfs-sdk";
 import {KLNFacilityRepository} from "./data/navdata/KLNFacilityRepository";
 import {ActualFacilityClient} from "./data/navdata/KLNFacilityLoader";
+import {GpsMeasurement, SimulatedMeasurement} from "./GpsMeasurement";
 
 /**
  * What KLN90BCore needs from its environment that is not reached through the sim's global APIs (SimVar, Coherent,
@@ -23,10 +24,16 @@ export interface KLN90BPlatform {
      * EFB route sync
      */
     getRouteManager(): Promise<FlightPlanRouteManager>;
+
+    /**
+     * Where the GPS takes its position, ground speed and track from while it has a fix (#402)
+     */
+    createGpsMeasurement(): GpsMeasurement;
 }
 
 export const SIM_PLATFORM: KLN90BPlatform = {
     createFacilityClient: (bus: EventBus) => new FacilityLoader(FacilityRepository.getRepository(bus)),
     getFacilityRepository: (bus: EventBus) => KLNFacilityRepository.getRepository(bus),
     getRouteManager: () => FlightPlanRouteManager.getManager(),
+    createGpsMeasurement: () => new SimulatedMeasurement(),
 };

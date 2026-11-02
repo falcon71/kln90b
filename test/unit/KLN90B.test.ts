@@ -2,6 +2,8 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 // A static import: the first import of the adapter takes seconds (it pulls in the whole instrument), and inside a test
 // that would run into the test timeout under load
 import '../../kln90b/KLN90B';
+import {SIM_PLATFORM} from '../../kln90b/KLN90BPlatform';
+import {SimulatedMeasurement} from '../../kln90b/GpsMeasurement';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -61,5 +63,12 @@ describe('KLN90B adapter (public contract)', () => {
 
         expect(ended).toHaveBeenCalledTimes(1);
         expect(ended).toHaveBeenCalledWith('a sound id');
+    });
+});
+
+// #402, design 6.1: in the sim the unit navigates on the simulated receiver; only the test harness uses the exact position
+describe('SIM_PLATFORM', () => {
+    it('creates the simulated GPS measurement', () => {
+        expect(SIM_PLATFORM.createGpsMeasurement()).toBeInstanceOf(SimulatedMeasurement);
     });
 });

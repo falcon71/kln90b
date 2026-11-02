@@ -145,7 +145,7 @@ describe('the GPS solution (5-29, #453)', () => {
         expect(gps.isValid()).toBe(true);
         // The constant, not the geometry of the forced acquisition
         expect(gps.solution).toEqual({
-            valid: true, satellites: 8, altitudeAided: true, measurements: 8, hdop: 1,
+            valid: true, satellites: 8, altitudeAided: true, measurements: 8, hdop: 1, cNorth: 0.5, cEast: 0.5,
             epeNm: expect.closeTo(2 * SIGMA_UERE_M / 1852, 12), maxSlope: 0, // The error estimate at HDOP 1
         });
     });
