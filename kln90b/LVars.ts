@@ -25,7 +25,10 @@ export const LVAR_MSG_LIGHT = "L:KLN90B_MsgLight"; //Boolean. true whenever the 
 // steady during the turn and on the self-test, as the real light does (3-29, 4-8, #437). Like L:KLN90B_MsgLight, the
 // aircraft adds no flash of its own
 export const LVAR_WPT_LIGHT = "L:KLN90B_WptLight";
-export const LVAR_ANNUN_TEST = "L:KLN90B_AnnunTest"; //Boolean. true if the self-test is shown and all external annunciator lights should light up
+// Boolean. true if the self-test is shown and all external annunciator lights should light up.
+// Deprecated (#451): still written as before, but not needed. On the self-test the lamp outputs light every lamp
+// themselves: L:KLN90B_MsgLight, L:KLN90B_WptLight and GPS APPROACH MODE 3 (ARM and ACTV)
+export const LVAR_ANNUN_TEST = "L:KLN90B_AnnunTest";
 
 // Number, 0 to 99. The altitude alert volume of SET 9 (3-57). The unit cannot set the loudness of kln_short_beep and
 // kln_long_beep itself; an aircraft that wants it maps this LVar to a Wwise RTPC on both sounds in its sound.xml. Please

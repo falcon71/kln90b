@@ -166,8 +166,8 @@ arrives.
     - `NavCalculator` outputs fixed test values (XTK -2.5, DIS 34.5, DTK 315 mag, FROM, waypoint alert on).
     - `RollSteeringController` sweeps 0 to -5 degrees of bank, but only with a heading input (without one the roll
       command stays 0, 2-69, #143).
-    - `SensorsOut.setMode` writes `GPS APPROACH MODE = 3` and `L:KLN90B_AnnunTest = true`, so external annunciators
-      light up.
+    - `SensorsOut.setMode` writes `GPS APPROACH MODE = 3`, which lights the ARM and ACTV lamps, and the WPT and MSG
+      light LVars light theirs. `SensorsOut.setAnnunTest` still writes `L:KLN90B_AnnunTest = true` (deprecated, #451).
 
 **Hot-swap disable**: the 100 ms poll of `SimVarSync` is the only reader of `L:KLN90B_Disabled`. `setDisabled` keeps
 the state in `Hardware.isDisabled` (a unit taken out of the aircraft, not one switched off; its doc comment lists what a
@@ -475,7 +475,8 @@ on them.
           flagged until GPS APR.
         - `L:KLN90B_XTK` (#158): the ARINC 429 label 116 cross track in NM, positive = fly left, 0 without an
           active waypoint. Not smoothed, unlike `GPS WP CROSS TRK`.
-        - `L:KLN90B_MsgLight`, `L:KLN90B_WptLight`, `L:KLN90B_AnnunTest`.
+        - `L:KLN90B_MsgLight`, `L:KLN90B_WptLight`, `L:KLN90B_AnnunTest` (deprecated, #451: the lamp outputs light every
+          lamp on the self-test themselves).
         - `L:KLN90B_AlertVolume` (#197): the SET 9 alert volume, 0 to 99, written by `AudioGenerator` at boot and on
           every change of `altAlertVolume`.
     - Writable by aircraft:
@@ -491,6 +492,23 @@ on them.
 Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` every 1 Hz tick. Most are gated by
 `output.writeGPSSimVars`.
 
+**Interfaces (#451).** Every SimVar the unit reads or writes for an input or an output goes through a port of
+`Interconnect` (`kln90b/Interconnect.ts`): one object per P901 interface (the ARINC 429 transmitter and receivers,
+RS-232 OUT and IN, the analog nav outputs, the OBI bus, each annunciator pin, the gray code, the discretes, the power),
+each documented with its pins. One `Interconnect` is built in `KLN90BCore.init()` and given to `Sensors` (exposed as
+`sensors.interconnect`), `SimVarSync`, `WTFlightplanSync` and `KlnEfbSaver`.
+- Devices the real unit takes on either of two interfaces are routed by panel.xml keys, through the getters `navData`,
+  `rmi`, `airdata`, `obs` and `heading`. The getters read the settings on every access, so a runtime override that
+  `SimVarSync` writes into `planeSettings` takes effect at the next write. **No consumer stores what a getter returns**;
+  keep the `Interconnect` and ask it at the moment of use.
+- `gps(port)` is the gate of the GPS SimVars: the port while `writeGPSSimVars` is set, `NULL_OUTPUT` otherwise. It
+  replaced the `if (!writeGPSSimVars) return` lines; the L:KLN90B_* outputs go to their port directly.
+- `GPS APPROACH MODE` goes through `approachLamps`, a group over the ARM and ACTV pins that #366 will let change the
+  value for a failed lamp. `L:KLN90B_AnnunTest` (deprecated) and the fictional constants go through `sim`, which never
+  fails.
+- The ports only carry the value until the failure simulation (#366) makes them fail.
+  `test/render/Interconnect.test.ts` holds the SimVar-to-port table and fails on a SimVar that bypasses the ports.
+
 - **Gated** by `writeGPSSimVars`:
     - `GPS OVERRIDDEN` (set to true every tick)
     - `GPS CDI SCALING`, `GPS IS ACTIVE FLIGHT PLAN`, `GPS IS ACTIVE WAY POINT`, `GPS OBS VALUE`
@@ -503,8 +521,9 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - `GPS IS APPROACH ACTIVE`, `GPS APPROACH MODE` (0 = ENR, 1 = ARM, 2 = APR, 3 = self-test)
     - Vertical outputs are forced to 0 (`GPS GSI SCALING`, `GPS HAS GLIDEPATH=false`, ...) because the KLN has no
       vertical guidance.
-- `GPS WP CROSS TRK` is written at 16 Hz from the filter by `setFilteredOutputs`, which has the `writeGPSSimVars` check
-  of its own: the filter is fed only through the gated `setXTK`.
+- `GPS WP CROSS TRK` is written at 16 Hz from the filter by `setFilteredOutputs`, through the gate of its own. `setXTK`
+  feeds the filter whatever `writeGPSSimVars` says, so the deviation starts from the current value when the option is
+  switched on.
 - The OBS mode is set through key events `K:GPS_OBS_ON/OFF`, because the `GPS OBS ACTIVE` SimVar is effectively
   read-only. This happens only when **no** external LEG/OBS switch is installed. With a switch installed, `SimVarSync`
   *reads* `GPS OBS ACTIVE` and calls `modeController.setExternalObsMode`.
@@ -512,7 +531,7 @@ Writers live in `SensorsOut` and are called from `NavCalculator.setOutput()` eve
     - All KLN LVars, `K:VOR{1,2}_SET` (when `obsTarget` is set and the GPS drives NAV1).
     - Annunciators: `setMessageLight` and `setWptAlertLight` (called from `controls/StatusLine.tsx` in the display
       tick: the MSG light flashes while there are unread messages, the WPT light as `isWptLightOn` decides) and
-      `setAnnunTest` (from NavCalculator).
+      `setAnnunTest` (from NavCalculator, deprecated).
 - Other outputs:
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
@@ -1135,13 +1154,16 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 
 - It finds the `<Instrument>` whose `<Name>` is `KLN90B` and reads dotted paths with `getBoolean`, `getChoice` or
   `getString(tag, "Input.Airdata.IsInterfaced", default)`. A boolean must be exactly `true` or `false`, and a choice key
-  (`ObsSource`, `ObsTarget`, `BaroSource`, `Unit`, `Type`) one of its documented values, both after trimming the
-  whitespace around them. `BasePath` and `ElectricitySimVar` are free text. `Input.HeadingInput` (`getHeadingSimVar`)
+  (`ObsSource`, `ObsTarget`, `BaroSource`, `Unit`, `Type`, the `*Interface` keys) one of its documented values, both
+  after trimming the whitespace around them. `BasePath` and `ElectricitySimVar` are free text. `Input.HeadingInput` (`getHeadingSimVar`)
   is `true`, `false` or a SimVar name (#405): a name starts with a letter, has a space or a colon and does not end in a
   colon, so a misspelled boolean is still rejected.
 - An invalid value is never used (#145): the key gets its default, and the parser records one line in `problems`. So
   does `AppArmSwitchInstalled=true` on a `VFROnly` unit, which cannot have the switch (Installation Manual 2-6); the
-  switch falls back to false. `KLN90BCore` publishes the lines as `panelXmlErrors`, and `controls/PanelXmlErrorPage`
+  switch falls back to false. Two annunciators on a strapped pin are dropped the same way (#451, Installation Manual 2-6,
+  figure 2-17 sheet 8): `ActvInstalled` on a `VFROnly` unit (pin 16 carries the VFR strap) and `ArmInstalled` on an IFR
+  unit without the approach arm switch (pin 17 carries the IFR en route strap). An ARM lamp on a `VFROnly` unit is no
+  strap conflict and is accepted. `KLN90BCore` publishes the lines as `panelXmlErrors`, and `controls/PanelXmlErrorPage`
   shows them to the aircraft developer; OK closes it and the unit runs on. The runtime override LVars are not checked.
 - Keys of an interface that is not installed are ignored, not rejected: the fuel computer keys without
   `FuelComputer.IsInterfaced`, and `BaroSource` without `Airdata.IsInterfaced`. Code asks `isBaroTransmitted(settings)`
@@ -1154,11 +1176,16 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
     - `Input.ObsSource` = 1
     - `Input.HeadingInput` = false (true reads `PLANE HEADING DEGREES GYRO`; a SimVar name reads that SimVar, #405)
     - `Input.ElectricitySimVar` = `""`
-    - `Input.Airdata.{IsInterfaced=false, BaroSource=0}`
+    - `Input.Airdata.{IsInterfaced=false, BaroSource=0, Interface=RS232}`
+    - `Input.{ObsInterface=Analog, HeadingInterface=ARINC429}`
     - `Input.FuelComputer.{IsInterfaced=false, Unit=GAL, Type=AVGAS, FOBTransmitted=true, FuelUsedTransmitted=true}`
     - `Input.ExternalSwitches.{LegObsSwitchInstalled=false, AppArmSwitchInstalled=false}`
     - `Output.{ObsTarget=0, AltitudeAlertEnabled=false, WriteGPSSimVars=true}` (`AltitudeAlertEnabled` was true before
       #141)
+    - `Output.{RmiInterface=OBI, DataInterface=ARINC429}`
+    - `Output.ExternalAnnunciators.{MsgInstalled, WptInstalled, ArmInstalled, ActvInstalled}` = false
+    - The `*Interface` keys and the annunciator keys (#451) change no read or write. `Interconnect` routes by the
+      interface keys (Core 4); both only matter to the failure simulation (#366).
     - `debugMode` = false (hard-coded)
 - The sample `cfg/panel.xml` sets `AltitudeAlertEnabled=false`, the default. An aircraft that wants the altitude alerter
   sets it to true and declares the `kln_short_beep` and `kln_long_beep` sounds.
@@ -1168,9 +1195,10 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   Without a heading input a stored HDG up map orientation is drawn north up (`effectiveMapOrientation`, #368). The
   stored setting is never changed. A runtime change of the input applies to the orientation fields and to the CAL 3 and
   OTH 9 layout at the next page build, while the NAV 5 and Super NAV 5 maps follow the input at once.
-- Consumers: `Sensors` (all inputs and outputs), `ModeController`, `NavCalculator.setMode` (writeObs),
+- Consumers: `Sensors` (all inputs and outputs), `Interconnect` (the interface keys and `writeGPSSimVars`),
+  `ModeController`, `NavCalculator.setMode` (writeObs),
   `PersistentMessages` (obsTarget chooses between `AdjustCourse...` variants; `AltitudeFailMessage`),
-  `BrightnessManager`, `AudioGenerator`, `AltAlert`, `HtAboveAirportAlert`, `WTFlightplanSync`, `KlnEfbSaver`, `MSA` and
+  `BrightnessManager`, `AudioGenerator`, `AltAlert`, `HtAboveAirportAlert`, `MSA` and
   `Gps` (basePath), and pages (`VFROnlyPage`, `SelfTestRightPage`, `PageTreeController`, `WelcomePage`).
 
 ## Core 9. Messages, status line and annunciators

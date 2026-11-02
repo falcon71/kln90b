@@ -27,6 +27,26 @@ export const enum FuelType {
     JET_B = "JetB",
 }
 
+/**
+ * The interface a device is wired to, when the real unit can take it on more than one (#451). The Interconnect routes
+ * the device's SimVars by them; they change no value, they only say which SimVars a failed interface takes with it in
+ * the failure simulation (#366)
+ */
+export const enum DataInterface {
+    ARINC429 = "ARINC429",
+    RS232 = "RS232",
+}
+
+export const enum ObsInterface {
+    ANALOG = "Analog",
+    ARINC429 = "ARINC429",
+}
+
+export const enum RmiInterface {
+    OBI = "OBI",
+    ARINC429 = "ARINC429",
+}
+
 export interface KLN90PlaneSettings {
     takeHomeMode: boolean;
     basePath: string,
@@ -41,7 +61,10 @@ export interface KLN90PlaneSettings {
         airdata: {
             isInterfaced: boolean,
             baroSource: number;
+            interface: DataInterface,
         },
+        obsInterface: ObsInterface,
+        headingInterface: DataInterface,
         fuelComputer: {
             isInterfaced: boolean,
             unit: FuelUnit,
@@ -58,6 +81,14 @@ export interface KLN90PlaneSettings {
         obsTarget: number;
         altitudeAlertEnabled: boolean;
         writeGPSSimVars: boolean;
+        rmiInterface: RmiInterface,
+        dataInterface: DataInterface,
+        externalAnnunciators: {
+            msgInstalled: boolean,
+            wptInstalled: boolean,
+            armInstalled: boolean,
+            actvInstalled: boolean,
+        },
     }
 }
 
@@ -73,6 +104,12 @@ const OBS_DEVICES = [0, 1, 2] as const;
 const BARO_SOURCES = [0, 1, 2] as const;
 const FUEL_UNITS = [FuelUnit.GAL, FuelUnit.IMP, FuelUnit.L, FuelUnit.KG, FuelUnit.LB] as const;
 const FUEL_TYPES = [FuelType.AVGAS, FuelType.JET_A1, FuelType.JET_B] as const;
+//The first of each list is the default; the message of an invalid value lists them in this order
+const AIRDATA_INTERFACES = [DataInterface.RS232, DataInterface.ARINC429] as const;
+const HEADING_INTERFACES = [DataInterface.ARINC429, DataInterface.RS232] as const;
+const DATA_INTERFACES = [DataInterface.ARINC429, DataInterface.RS232] as const;
+const OBS_INTERFACES = [ObsInterface.ANALOG, ObsInterface.ARINC429] as const;
+const RMI_INTERFACES = [RmiInterface.OBI, RmiInterface.ARINC429] as const;
 
 export class KLN90BPlaneSettingsParser {
 
@@ -140,7 +177,20 @@ export class KLN90BPlaneSettingsParser {
                     //A-13). The 429 air data receiver takes no baro setting label; it gets label 204 baro-corrected
                     //altitude instead (Installation manual 1-2, 2-68). Without either, the pilot enters the baro
                     baroSource: this.getChoice(instrumentsTag, "Input.Airdata.BaroSource", BARO_SOURCES, 0),
+                    //Real unit: which of the two the air data computer above is wired to (#451). RS232 = RS-232 IN, P901
+                    //pin 36, the common GA source: a Shadin, or an Aspen EFD1000 sending format C (Aspen install manual
+                    //900-00041-001 Rev F, figure 9-27). ARINC429 = the air data receiver, pins 8/9. The baro of BaroSource
+                    //comes over RS-232 in either case
+                    interface: this.getChoice(instrumentsTag, "Input.Airdata.Interface", AIRDATA_INTERFACES, DataInterface.RS232),
                 },
+                //Real unit: where the selected course of Input.ObsSource comes from (#451). Analog = the OBS resolver of
+                //the CDI/HSI, P901 pins 26, 37 and 31. ARINC429 = the EFIS receiver, pins 4/5, label 100, from an EFIS or
+                //a KA 90 (Installation manual 1-2, 1-6, 1-7)
+                obsInterface: this.getChoice(instrumentsTag, "Input.ObsInterface", OBS_INTERFACES, ObsInterface.ANALOG),
+                //Real unit: where the heading of Input.HeadingInput comes from (#451). ARINC429 = the EFIS receiver, pins
+                //4/5, label 320 or 314, from an EFIS or a KA 90. RS232 = RS-232 IN, pin 36, format C or D (Installation
+                //manual 1-2, 2-69, A-13)
+                headingInterface: this.getChoice(instrumentsTag, "Input.HeadingInterface", HEADING_INTERFACES, DataInterface.ARINC429),
                 fuelComputer: {
                     //Real unit: RS-232 IN, P901 pin 36, fuel/air data format A, B, C or D, sent every 1.6 s (Installation
                     //manual 2-7, A-10 to A-13). false = pin 36 looped to pin 13 RS-232 OUT, otherwise NO RS-232 DATA is
@@ -181,6 +231,30 @@ export class KLN90BPlaneSettingsParser {
                 //Real unit: fictional. It switches the sim's GPS SimVars and the Working Title flight plan, which stand for
                 //the unit's analog nav outputs, its ARINC 429 transmitter and its RS-232 OUT together (see SensorsOut)
                 writeGPSSimVars: this.getBoolean(instrumentsTag, "Output.WriteGPSSimVars", true),
+                //Real unit: how the RMI gets the bearing to the active waypoint (#451). OBI = the OBI bus, P901 pins 10,
+                //11 and 12 (Installation manual 1-7, 2-4). ARINC429 = the transmitter, pins 23/24, label 115, through a
+                //KA 90 -0201/-0202 (KA 90 manual 1-2)
+                rmiInterface: this.getChoice(instrumentsTag, "Output.RmiInterface", RMI_INTERFACES, RmiInterface.OBI),
+                //Real unit: the interface of the digital navigation data an EFIS, a distance indicator or a moving map
+                //shows: position, ground speed, track, distance, waypoints, flight plan (#451). ARINC429 = the transmitter,
+                //pins 23/24, which both the Aspen EFD1000 (install manual 900-00041-001 Rev F, 5.4.2, figure 9-13) and
+                //the G5 through a GAD 29 (install manual 190-01112-10 Rev 11, 1.6.2.3) prefer, and which feeds a distance
+                //indicator (Installation manual 2-69). RS232 = RS-232 OUT, pin 13 (Installation manual appendix A). A
+                //display takes one navigator on one of the two, never on both
+                dataInterface: this.getChoice(instrumentsTag, "Output.DataInterface", DATA_INTERFACES, DataInterface.ARINC429),
+                //Real unit: the remote lamps wired to the annunciator outputs, each pulled low to light its lamp
+                //(Installation manual 1-7, 2-5). false = no lamp on the pin. The lamp LVars and GPS APPROACH MODE are
+                //written either way; a lamp only fails (#366) when it is installed (#451)
+                externalAnnunciators: {
+                    //Real unit: P901 pin 15 MSG
+                    msgInstalled: this.getBoolean(instrumentsTag, "Output.ExternalAnnunciators.MsgInstalled", false),
+                    //Real unit: P901 pin 14 WPT ALERT
+                    wptInstalled: this.getBoolean(instrumentsTag, "Output.ExternalAnnunciators.WptInstalled", false),
+                    //Real unit: P901 pin 17 APPROACH ARM, the ARM lamp of the GPS APR switch-annunciator
+                    armInstalled: this.getBoolean(instrumentsTag, "Output.ExternalAnnunciators.ArmInstalled", false),
+                    //Real unit: P901 pin 16 APPROACH ACTIVE, the ACTV lamp of the GPS APR switch-annunciator
+                    actvInstalled: this.getBoolean(instrumentsTag, "Output.ExternalAnnunciators.ActvInstalled", false),
+                },
             },
             debugMode: false,
         };
@@ -190,6 +264,17 @@ export class KLN90BPlaneSettingsParser {
         if (options.vfrOnly && options.input.externalSwitches.appArmSwitchInstalled) {
             this.problems.push("Input.ExternalSwitches.AppArmSwitchInstalled: a VFR only unit (VFROnly true) has no approach arm switch. The default false is used.");
             options.input.externalSwitches.appArmSwitchInstalled = false;
+        }
+
+        //Installation manual 2-6, figure 2-17 sheet 8 (2-57): pin 30 APPROACH ARM SELECT is strapped to pin 16 APPROACH
+        //ACTIVE for VFR only, and to pin 17 APPROACH ARM for IFR en route only. A strapped pin drives no lamp (#451)
+        if (options.vfrOnly && options.output.externalAnnunciators.actvInstalled) {
+            this.problems.push("Output.ExternalAnnunciators.ActvInstalled: pin 16 of a VFR only unit (VFROnly true) is strapped and drives no ACTV lamp. The default false is used.");
+            options.output.externalAnnunciators.actvInstalled = false;
+        }
+        if (!options.vfrOnly && !options.input.externalSwitches.appArmSwitchInstalled && options.output.externalAnnunciators.armInstalled) {
+            this.problems.push("Output.ExternalAnnunciators.ArmInstalled: pin 17 of an IFR unit without the approach arm switch (AppArmSwitchInstalled false) is strapped and drives no ARM lamp. The default false is used.");
+            options.output.externalAnnunciators.armInstalled = false;
         }
 
         console.log("Plane Settings", options, xmlConfig);

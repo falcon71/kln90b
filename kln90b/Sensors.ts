@@ -34,6 +34,7 @@ import {GPS} from "./Gps";
 import {GpsMeasurement} from "./GpsMeasurement";
 import {Hardware} from "./Hardware";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
+import {Interconnect} from "./Interconnect";
 
 //"Real unit:" comments say how a real KLN 90B takes in or puts out each value (#366):
 //- P901 pins and RS-232 items: Installation manual 006-10521-0005 Rev 5. RS-232 is in appendix A: OUT on pin 13, IN on
@@ -67,11 +68,11 @@ export class FuelComputer implements CalcTickable {
     public static readonly IMP_GALLON_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'imperial gallon', 3.5408);
     private static readonly LITER_FUEL_JETB = new SimpleUnit(UnitFamily.Weight, 'liter', 0.7789);
 
-    constructor(private readonly options: KLN90PlaneSettings) {
+    constructor(private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect) {
         if (this.options.input.fuelComputer.isInterfaced) {
             //Real unit: RS-232 IN, fuel/air data formats B, C and D. A single-engine aircraft sends asterisks in all
             //engine one and engine two fields (Installation manual A-11). Format A has no engine fields at all
-            this.realNumberOfEngines = SimVar.GetSimVarValue('NUMBER OF ENGINES', SimVarValueType.Number);
+            this.realNumberOfEngines = this.interconnect.rs232In.read('NUMBER OF ENGINES', SimVarValueType.Number);
             this.numberOfEngines = this.realNumberOfEngines === 2 ? 2 : 1;
         }
     }
@@ -134,34 +135,34 @@ export class FuelComputer implements CalcTickable {
         //Real unit: RS-232 IN, fuel remaining: format A bytes 3-6, formats B, C and D bytes 3-8 (Installation manual A-10).
         //No ARINC 429 label carries fuel
         if (this.options.input.fuelComputer.fobTransmitted) {
-            this.fob = UnitType.POUND.convertTo(SimVar.GetSimVarValue('FUEL TOTAL QUANTITY WEIGHT EX1', SimVarValueType.Pounds), targetUnit);
+            this.fob = UnitType.POUND.convertTo(this.interconnect.rs232In.read('FUEL TOTAL QUANTITY WEIGHT EX1', SimVarValueType.Pounds), targetUnit);
         }
 
         if (this.realNumberOfEngines === 2) {
             //Real unit: RS-232 IN, formats B, C and D: engine one fuel flow bytes 17-22, engine two bytes 24-29
             //(Installation manual A-11)
-            this.fuelFlow1 = UnitType.POUND.convertTo(SimVar.GetSimVarValue('ENG FUEL FLOW PPH:1', SimVarValueType.PPH), targetUnit);
-            this.fuelFlow2 = UnitType.POUND.convertTo(SimVar.GetSimVarValue('ENG FUEL FLOW PPH:2', SimVarValueType.PPH), targetUnit);
+            this.fuelFlow1 = UnitType.POUND.convertTo(this.interconnect.rs232In.read('ENG FUEL FLOW PPH:1', SimVarValueType.PPH), targetUnit);
+            this.fuelFlow2 = UnitType.POUND.convertTo(this.interconnect.rs232In.read('ENG FUEL FLOW PPH:2', SimVarValueType.PPH), targetUnit);
 
             //Real unit: RS-232 IN, formats B, C and D: engine one fuel used bytes 38-43, engine two bytes 45-50
             //(Installation manual A-11)
             if (this.options.input.fuelComputer.fuelUsedTransmitted) {
-                this.fuelUsed1 = UnitType.POUND.convertTo(SimVar.GetSimVarValue('GENERAL ENG FUEL USED SINCE START:1', SimVarValueType.Pounds), targetUnit);
-                this.fuelUsed2 = UnitType.POUND.convertTo(SimVar.GetSimVarValue('GENERAL ENG FUEL USED SINCE START:2', SimVarValueType.Pounds), targetUnit);
+                this.fuelUsed1 = UnitType.POUND.convertTo(this.interconnect.rs232In.read('GENERAL ENG FUEL USED SINCE START:1', SimVarValueType.Pounds), targetUnit);
+                this.fuelUsed2 = UnitType.POUND.convertTo(this.interconnect.rs232In.read('GENERAL ENG FUEL USED SINCE START:2', SimVarValueType.Pounds), targetUnit);
             }
         } else {
             //Real unit: RS-232 IN, total fuel flow: format A bytes 8-11, formats B, C and D bytes 10-15 (Installation
             //manual A-10)
             this.fuelFlow1 = 0;
             for (let i = 1; i <= this.realNumberOfEngines; i++) {
-                this.fuelFlow1 += UnitType.POUND.convertTo(SimVar.GetSimVarValue(`ENG FUEL FLOW PPH:${i}`, SimVarValueType.PPH), targetUnit);
+                this.fuelFlow1 += UnitType.POUND.convertTo(this.interconnect.rs232In.read(`ENG FUEL FLOW PPH:${i}`, SimVarValueType.PPH), targetUnit);
             }
 
             //Real unit: RS-232 IN, formats B, C and D, total fuel used bytes 31-36 (Installation manual A-11)
             if (this.options.input.fuelComputer.fuelUsedTransmitted) {
                 this.fuelUsed1 = 0;
                 for (let i = 1; i <= this.realNumberOfEngines; i++) {
-                    this.fuelUsed1 += UnitType.POUND.convertTo(SimVar.GetSimVarValue(`GENERAL ENG FUEL USED SINCE START:${i}`, SimVarValueType.Pounds), targetUnit);
+                    this.fuelUsed1 += UnitType.POUND.convertTo(this.interconnect.rs232In.read(`GENERAL ENG FUEL USED SINCE START:${i}`, SimVarValueType.Pounds), targetUnit);
                 }
             }
         }
@@ -184,7 +185,7 @@ export class Airdata implements CalcTickable {
 
     private barometersetting: UserSetting<number>;
 
-    constructor(private readonly userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings) {
+    constructor(private readonly userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect) {
         this.barometersetting = userSettings.getSetting("barosetting");
         this.barometer = this.barometersetting.get();
 
@@ -198,7 +199,7 @@ export class Airdata implements CalcTickable {
                 //Gray Code. Not very precise
                 //Real unit: gray code pressure altitude in 100 ft steps on P901 pins 41-50 = D4, A1, A2, A4, B1, B2, B4,
                 //C1, C2, C4 (Installation manual 1-6, 2-7, figure 2-17 sheet 3 on 2-47)
-                this.pressureAltitude = Math.round(SimVar.GetSimVarValue('PRESSURE ALTITUDE', SimVarValueType.Feet) / 100) * 100;
+                this.pressureAltitude = Math.round(this.interconnect.grayCode.read('PRESSURE ALTITUDE', SimVarValueType.Feet) / 100) * 100;
             }
             return;
         }
@@ -206,10 +207,10 @@ export class Airdata implements CalcTickable {
         //No ARINC 429 input: the air data receiver takes no baro label (Installation manual 1-2), and GAMA 11 defines none
         switch (this.options.input.airdata.baroSource) {
             case 1:
-                this.barometer = SimVar.GetSimVarValue('KOHLSMAN SETTING HG:1', SimVarValueType.InHG);
+                this.barometer = this.interconnect.rs232In.read('KOHLSMAN SETTING HG:1', SimVarValueType.InHG);
                 break;
             case 2:
-                this.barometer = SimVar.GetSimVarValue('KOHLSMAN SETTING HG:2', SimVarValueType.InHG);
+                this.barometer = this.interconnect.rs232In.read('KOHLSMAN SETTING HG:2', SimVarValueType.InHG);
                 break;
         }
 
@@ -222,28 +223,28 @@ export class Airdata implements CalcTickable {
         //- RS-232 IN, format C or D, bytes 64-69 pressure altitude in feet with a sign (Installation manual A-12), or
         //  format D bytes 114-119 baro-corrected altitude (A-13). The 429 value wins when both send it (A-11)
         //- without an air data computer: the gray code above
-        this.pressureAltitude = SimVar.GetSimVarValue('PRESSURE ALTITUDE', SimVarValueType.Feet);
+        this.pressureAltitude = this.interconnect.airdata.read('PRESSURE ALTITUDE', SimVarValueType.Feet);
 
         //Real unit: true airspeed, either
         //- ARINC 429 air data receiver, label 210: BNR, bits 14-28 knots with a 0.0625 kt LSB, bit 29 always 0 (GAMA 11
         //  page 16)
         //- RS-232 IN, format C or D, bytes 56-58 TAS in knots (Installation manual A-12)
-        this.tas = SimVar.GetSimVarValue('AIRSPEED TRUE', SimVarValueType.Knots);
+        this.tas = this.interconnect.airdata.read('AIRSPEED TRUE', SimVarValueType.Knots);
         //Real unit: Mach, either
         //- ARINC 429 air data receiver, label 205 (Installation manual 1-2). GAMA 11 gives no layout for 205 and refers to
         //  ARINC 429 itself for it (GAMA 11 page 4-2)
         //- RS-232 IN, format C or D, bytes 60-62 Mach in thousandths (Installation manual A-12)
-        this.mach = SimVar.GetSimVarValue('AIRSPEED MACH', SimVarValueType.Mach);
+        this.mach = this.interconnect.airdata.read('AIRSPEED MACH', SimVarValueType.Mach);
         //Real unit: static air temperature, either
         //- ARINC 429 air data receiver, label 213: BNR, bits 18-28 deg C with a 0.25 deg LSB, bit 29 = 1 below zero (GAMA
         //  11 page 16)
         //- RS-232 IN, format C or D, bytes 104-106 SAT in deg C with a sign (Installation manual A-13)
-        this.sat = SimVar.GetSimVarValue('AMBIENT TEMPERATURE', SimVarValueType.Celsius);
+        this.sat = this.interconnect.airdata.read('AMBIENT TEMPERATURE', SimVarValueType.Celsius);
         //Real unit: total air temperature, either
         //- ARINC 429 air data receiver, label 211 (Installation manual 1-2). GAMA 11 gives no layout for 211 and refers to
         //  ARINC 429 itself for it (GAMA 11 page 4-2)
         //- RS-232 IN, format C or D, bytes 78-80 TAT in deg C with a sign (Installation manual A-12)
-        this.tat = SimVar.GetSimVarValue('TOTAL AIR TEMPERATURE', SimVarValueType.Celsius);
+        this.tat = this.interconnect.airdata.read('TOTAL AIR TEMPERATURE', SimVarValueType.Celsius);
     }
 
     public getIndicatedAlt(): Feet | null {
@@ -265,19 +266,19 @@ export class SensorsIn implements CalcTickable {
     public airdata: Airdata;
 
 
-    constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, messageHandler: MessageHandler,
-                gpsMeasurement: GpsMeasurement) {
-        this.airdata = new Airdata(userSettings, options);
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect,
+                messageHandler: MessageHandler, gpsMeasurement: GpsMeasurement) {
+        this.airdata = new Airdata(userSettings, options, interconnect);
         //5-29: the altitude input is a measurement of the GPS solution. Airdata reports none until its first tick
         this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.getIndicatedAlt(), gpsMeasurement);
-        this.fuelComputer = new FuelComputer(options);
+        this.fuelComputer = new FuelComputer(options, interconnect);
     }
 
     tick() {
         //Real unit: P901 pin 1 GPS DISPLAYED. Open = an indicator's resolver is connected to the KLN, grounded = not
         //displayed. The NAV/GPS relay grounds it in the NAV position (Installation manual 1-6, 2-4, figure 2-17 sheets 4
         //to 6 on 2-49 to 2-53)
-        this.gpsIsNavSource = SimVar.GetSimVarValue('GPS DRIVES NAV1', SimVarValueType.Bool);
+        this.gpsIsNavSource = this.interconnect.gpsDisplayed.read('GPS DRIVES NAV1', SimVarValueType.Bool);
 
         //Real unit: the selected course, either
         //- the OBS resolver of the CDI/HSI: P901 pin 26 sine in and pin 37 cosine in, excited by the 450 Hz of pin 31 OBS
@@ -287,10 +288,10 @@ export class SensorsIn implements CalcTickable {
         if (this.gpsIsNavSource) {
             switch (this.options.input.obsSource) {
                 case 1:
-                    this.obsMag = SimVar.GetSimVarValue('Nav OBS:1', SimVarValueType.Degree);
+                    this.obsMag = this.interconnect.obs.read('Nav OBS:1', SimVarValueType.Degree);
                     break;
                 case 2:
-                    this.obsMag = SimVar.GetSimVarValue('Nav OBS:2', SimVarValueType.Degree);
+                    this.obsMag = this.interconnect.obs.read('Nav OBS:2', SimVarValueType.Degree);
                     break;
                 default: //0 ignores the external course, also after L:KLN90B_ObsSource switched to it at runtime
                     this.obsMag = null;
@@ -307,7 +308,7 @@ export class SensorsIn implements CalcTickable {
         //  24)
         //- RS-232 IN, format C or D, bytes 100-102 magnetic heading (Installation manual A-13)
         if (this.options.input.headingInput) {
-            this.headingGyro = SimVar.GetSimVarValue(this.options.input.headingSimVar, SimVarValueType.Degree); //PLANE HEADING DEGREES GYRO unless the aircraft names its own (#405)
+            this.headingGyro = this.interconnect.heading.read(this.options.input.headingSimVar, SimVarValueType.Degree); //PLANE HEADING DEGREES GYRO unless the aircraft names its own (#405)
         } else {
             this.headingGyro = null; //The input can be switched off at runtime (#368)
         }
@@ -330,15 +331,16 @@ export class SensorsOut {
 
     private xtkFilter = new SignalOutputFilter();
 
-    constructor(private readonly options: KLN90PlaneSettings, public readonly audioGenerator: AudioGenerator, private readonly hardware: Hardware) {
+    constructor(private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect, public readonly audioGenerator: AudioGenerator, private readonly hardware: Hardware) {
         this.reset();
     }
 
     public setObs(obsMag: number | null) {
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         this.obsOut = obsMag;
         if (obsMag !== null) {
             //Real unit: P901 pin 1 GPS DISPLAYED (see SensorsIn.tick)
-            const gpsIsNavSource = SimVar.GetSimVarValue('GPS DRIVES NAV1', SimVarValueType.Bool);
+            const gpsIsNavSource = this.interconnect.gpsDisplayed.read('GPS DRIVES NAV1', SimVarValueType.Bool);
             //Real unit: ARINC 429 transmitter, label 100 selected course #1 (Installation manual 1-3) to a remotely driven
             //course pointer: an EFIS directly, or an HSI through a KA 90 -0201/-0202 (KA 90 manual 1-2). BNR, bits 17-28
             //with a 180/4096 deg LSB, bit 29 = 1 for 180-360 deg, bit 11 = 1 when the LRN controls the course select
@@ -347,30 +349,29 @@ export class SensorsOut {
             if (gpsIsNavSource) {
                 switch (this.options.output.obsTarget) {
                     case 1:
-                        SimVar.SetSimVarValue('K:VOR1_SET', SimVarValueType.Number, obsMag);
+                        this.interconnect.arinc429Tx.write('K:VOR1_SET', SimVarValueType.Number, obsMag);
                         break;
                     case 2:
-                        SimVar.SetSimVarValue('K:VOR2_SET', SimVarValueType.Number, obsMag);
+                        this.interconnect.arinc429Tx.write('K:VOR2_SET', SimVarValueType.Number, obsMag);
                         break;
                 }
             }
         }
 
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
         //Real unit: the OBS course, either
         //- ARINC 429 transmitter, label 100 selected course #1 (see above)
         //- RS-232 OUT, item I desired track, which in OBS mode is the course at the active waypoint, magnetic with its
         //  variation, in tenths of a degree (Installation manual A-5, A-6)
         if (obsMag === null) {
-            SimVar.SetSimVarValue('GPS OBS VALUE', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS OBS VALUE', SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue('GPS OBS VALUE', SimVarValueType.Degree, obsMag);
+            gpsNavData.write('GPS OBS VALUE', SimVarValueType.Degree, obsMag);
         }
     }
 
     public setXTK(xtk: number | null, scaling: number) {
+        const gpsAnalogNav = this.interconnect.gps(this.interconnect.analogNav);
+        const gpsSim = this.interconnect.gps(this.interconnect.sim);
         //The LVar is an output of the unit (ARINC 429 label 116), independent of the GPS SimVars
         //Real unit: the cross track, either
         //- ARINC 429 transmitter, label 116 cross track distance: BNR, bits 14-28 nm with a 128/32768 nm LSB (bits 11-13 an
@@ -378,37 +379,34 @@ export class SensorsOut {
         //  (GAMA 11 page 12)
         //- RS-232 OUT, item G cross track error: R or L for the aircraft right or left of course, then nm x 100
         //  (Installation manual A-5)
-        SimVar.SetSimVarValue(LVAR_XTK, SimVarValueType.NM, xtk ?? 0);
+        this.interconnect.arinc429Tx.write(LVAR_XTK, SimVarValueType.NM, xtk ?? 0);
 
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
         //Real unit: the CDI scale, either
         //- analog: the deviation voltage of P901 pin 22 against pin 25 is 30, 150 or 500 mV per nm for a full scale of 5,
         //  1 or 0.3 nm (Installation manual 1-7)
         //- ARINC 429 transmitter, label 326 lateral deviation scale factor: BNR, bits 14-28 full-scale deflection in nm
         //  with a 128/32768 nm LSB (GAMA 11 page 24)
-        SimVar.SetSimVarValue('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
+        gpsAnalogNav.write('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
         //Real unit: fictional, no output says whether there is an active waypoint. The nearest are the NAV flag (P901 pin
         //19 against pin 25, flag in view below 50 mV), the NAV superflag (P901 pin 18, invalid below 3.5 V) (Installation
         //manual 1-7, 2-5) and ARINC 429 label 275 bit 29 HSI valid, 0 = nav warning (GAMA 11 page 19)
         if (xtk === null) {
             this.xtkFilter.setValue(0, scaling);
-            SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
-            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
+            gpsAnalogNav.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
+            gpsAnalogNav.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
         } else {
             this.xtkFilter.setValue(-xtk, scaling);
-            SimVar.SetSimVarValue('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
-            SimVar.SetSimVarValue('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
+            gpsAnalogNav.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
+            gpsAnalogNav.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
         }
 
         //The KLN does not output vertical information
         //Real unit: fictional, the unit has no vertical deviation output. Written as constants
-        SimVar.SetSimVarValue('GPS GSI SCALING', SimVarValueType.Meters, 0);
-        SimVar.SetSimVarValue('GPS VERTICAL ANGLE', SimVarValueType.Degree, 0);
-        SimVar.SetSimVarValue('GPS VERTICAL ANGLE ERROR', SimVarValueType.Degree, 0);
-        SimVar.SetSimVarValue('GPS VERTICAL ERROR', SimVarValueType.Meters, 0);
-        SimVar.SetSimVarValue('GPS HAS GLIDEPATH', SimVarValueType.Bool, false);
+        gpsSim.write('GPS GSI SCALING', SimVarValueType.Meters, 0);
+        gpsSim.write('GPS VERTICAL ANGLE', SimVarValueType.Degree, 0);
+        gpsSim.write('GPS VERTICAL ANGLE ERROR', SimVarValueType.Degree, 0);
+        gpsSim.write('GPS VERTICAL ERROR', SimVarValueType.Meters, 0);
+        gpsSim.write('GPS HAS GLIDEPATH', SimVarValueType.Bool, false);
     }
 
     public setToFrom(toFrom: boolean | null) {
@@ -420,9 +418,9 @@ export class SensorsOut {
         //- ARINC 429 transmitter, label 275: bit 23 = 1 TO, bit 24 = 1 FROM (GAMA 11 page 19)
         //- RS-232 OUT, item t GPS discretes, character e: T or F, dashed while NAV is flagged (Installation manual A-6)
         if (toFrom === null) {
-            SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+            this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
         } else {
-            SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, toFrom === TO ? 1 : 2);
+            this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, toFrom === TO ? 1 : 2);
         }
     }
 
@@ -430,12 +428,9 @@ export class SensorsOut {
      * The deviation bar signal is filtered by analog circuitry (see SignalOutputFilter), so we set this more often
      */
     public setFilteredOutputs() {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
         //Real unit: the analog CDI deviation, P901 pin 22 +RIGHT against pin 25 +LEFT/NAV FLAG -, +/-150 mV at full scale
         //and +/-300 mV at most (Installation manual 1-7, 2-5). The digital cross track is ARINC 429 label 116 (setXTK)
-        SimVar.SetSimVarValue('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(this.xtkFilter.getCurrentValue(), UnitType.METER));
+        this.interconnect.gps(this.interconnect.analogNav).write('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(this.xtkFilter.getCurrentValue(), UnitType.METER));
     }
 
     /**
@@ -447,9 +442,7 @@ export class SensorsOut {
      * @param magvar the variation at the aircraft
      */
     public setDesiredTrack(dtkTrue: number | null, actualTrack: number | null, magvar: number) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: GPS WP TRACK ANGLE ERROR is fictional. No output carries it; a receiver can subtract ARINC 429 label
         //313 track from label 114 desired track
         //Real unit: GPS WP DESIRED TRACK, any of
@@ -459,20 +452,21 @@ export class SensorsOut {
         //  in LEG mode, the course at the active waypoint with its variation in OBS mode (Installation manual A-5, A-6)
         //- ARINC 429 transmitter, label 100 selected course, in OBS mode (setObs)
         if (dtkTrue === null) {
-            SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
-            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
+            gpsNavData.write('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
+            gpsNavData.write('GPS WP DESIRED TRACK', SimVarValueType.Radians, 0);
         } else {
             if (actualTrack === null) {
-                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
+                gpsNavData.write('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, 0);
             } else {
-                SimVar.SetSimVarValue('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(actualTrack, dtkTrue), UnitType.RADIAN));
+                gpsNavData.write('GPS WP TRACK ANGLE ERROR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(NavMath.diffAngle(actualTrack, dtkTrue), UnitType.RADIAN));
             }
-            SimVar.SetSimVarValue('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(dtkTrue, magvar), UnitType.RADIAN));
+            gpsNavData.write('GPS WP DESIRED TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(dtkTrue, magvar), UnitType.RADIAN));
 
         }
     }
 
     public setWpBearing(bearingForAP: number | null, bearingToActive: number | null, magvar: number) {
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //The LVar is an output of the unit, independent of the GPS SimVars
         //Real unit: the bearing to the active waypoint for an RMI, any of
         //- P901 pins 10, 11 and 12 OBI DATA, CLOCK and SYNC, a Honeywell serial bus that drives some Honeywell RMIs
@@ -483,31 +477,26 @@ export class SensorsOut {
         //  at the aircraft in LEG mode, the radial with the waypoint's variation +/-180 in OBS mode (Installation manual
         //  A-5, A-6)
         if (bearingToActive === null) {
-            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+            this.interconnect.rmi.write(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
         } else {
-            SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
+            this.interconnect.rmi.write(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
         }
 
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
         //Real unit: GPS WP TRUE BEARING is ARINC 429 transmitter label 115 waypoint bearing, true: BNR, bits 17-28 with a
         //180/4096 deg LSB, bit 29 = 1 for 180-360 deg, measured from the aircraft to the waypoint (GAMA 11 page 12). GPS
         //WP BEARING is its magnetic form, which the unit sends only as RS-232 item L and on the OBI bus (see above). The
         //real unit has one bearing; on a DME arc bearingForAP is the DTK instead, which is fictional
         if (bearingForAP === null) {
-            SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, 0);  //This SimVar appears to be readonly??
-            SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, 0);
+            gpsNavData.write('GPS WP BEARING', SimVarValueType.Radians, 0);  //This SimVar appears to be readonly??
+            gpsNavData.write('GPS WP TRUE BEARING', SimVarValueType.Radians, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingForAP, magvar), UnitType.RADIAN));  //This SimVar appears to be readonly??
-            SimVar.SetSimVarValue('GPS WP TRUE BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingForAP, UnitType.RADIAN));
+            gpsNavData.write('GPS WP BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingForAP, magvar), UnitType.RADIAN));  //This SimVar appears to be readonly??
+            gpsNavData.write('GPS WP TRUE BEARING', SimVarValueType.Radians, UnitType.DEGREE.convertTo(bearingForAP, UnitType.RADIAN));
         }
     }
 
     public setDistance(distance: NauticalMiles | null) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the distance to the active waypoint, any of
         //- ARINC 429 transmitter, label 251 distance to go: BNR, bits 14-28 nm with a 0.125 nm LSB, bit 29 always 0
         //  (GAMA 11 page 17)
@@ -516,28 +505,26 @@ export class SensorsOut {
         //  test (Installation manual 2-69)
         //- RS-232 OUT, item E distance to active waypoint, nm x 10 (Installation manual A-5)
         if (distance === null) {
-            SimVar.SetSimVarValue('GPS WP DISTANCE', SimVarValueType.Meters, 0);
+            gpsNavData.write('GPS WP DISTANCE', SimVarValueType.Meters, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP DISTANCE', SimVarValueType.Meters, UnitType.NMILE.convertTo(distance, UnitType.METER));
+            gpsNavData.write('GPS WP DISTANCE', SimVarValueType.Meters, UnitType.NMILE.convertTo(distance, UnitType.METER));
         }
     }
 
     public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number, integretyWarning: boolean) {
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //The LVar is an output of the unit, independent of the GPS SimVars
         //Real unit: ARINC 429 transmitter, label 261 GPS discrete word bit 24 GPS integrity, 1 = fail (GAMA 11 page 18).
         //The caller passes true when the position has no fix, or RAIM is unavailable at the alert limit of the current
         //flight phase (#453). No analog or RS-232 output carries it
-        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
+        this.interconnect.arinc429Tx.write(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
 
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
         //Real unit: the magnetic variation, either
         //- ARINC 429 transmitter, label 147 magnetic variation: BNR, bits 17-28 with a 180/4096 deg LSB, bit 29 = 1 West,
         //  bit 11 = 1 pilot entered, 0 computed (GAMA 11 page 14)
         //- RS-232 OUT, item Q magnetic variation, E or W and tenths of a degree: at the aircraft in LEG mode, at the active
         //  waypoint in OBS mode (Installation manual A-5, A-6)
-        SimVar.SetSimVarValue('GPS MAGVAR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(magvar, UnitType.RADIAN));
+        gpsNavData.write('GPS MAGVAR', SimVarValueType.Radians, UnitType.DEGREE.convertTo(magvar, UnitType.RADIAN));
 
         //Real unit: the present position, either
         //- ARINC 429 transmitter, labels 310 latitude and 311 longitude: BNR, bits 9-28 with a 180/1048576 deg LSB and no
@@ -545,11 +532,11 @@ export class SensorsOut {
         //- RS-232 OUT, items A latitude and B longitude: N/S or E/W, degrees, minutes, hundredths of minutes
         //  (Installation manual A-5)
         if (pos === null) {
-            SimVar.SetSimVarValue('GPS POSITION LAT', SimVarValueType.Degree, 0);
-            SimVar.SetSimVarValue('GPS POSITION LON', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS POSITION LAT', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS POSITION LON', SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue('GPS POSITION LAT', SimVarValueType.Degree, pos.lat);
-            SimVar.SetSimVarValue('GPS POSITION LON', SimVarValueType.Degree, pos.lon);
+            gpsNavData.write('GPS POSITION LAT', SimVarValueType.Degree, pos.lat);
+            gpsNavData.write('GPS POSITION LON', SimVarValueType.Degree, pos.lon);
         }
         //Real unit: the ground speed, any of
         //- ARINC 429 transmitter, label 312 ground speed: BNR, bits 14-28 knots with a 0.125 kt LSB, bit 29 always 0
@@ -557,27 +544,25 @@ export class SensorsOut {
         //- ARINC 429 transmitter, label 012 ground speed: BCD, bits 11-29 in tenths of a knot (GAMA 11 page 2)
         //- RS-232 OUT, item D ground speed in knots (Installation manual A-5)
         if (speed === null) {
-            SimVar.SetSimVarValue('GPS GROUND SPEED', SimVarValueType.MetersPerSecond, 0);
+            gpsNavData.write('GPS GROUND SPEED', SimVarValueType.MetersPerSecond, 0);
         } else {
-            SimVar.SetSimVarValue('GPS GROUND SPEED', SimVarValueType.MetersPerSecond, UnitType.KNOT.convertTo(speed, UnitType.MPS));
+            gpsNavData.write('GPS GROUND SPEED', SimVarValueType.MetersPerSecond, UnitType.KNOT.convertTo(speed, UnitType.MPS));
         }
         //Real unit: GPS GROUND TRUE TRACK is ARINC 429 transmitter label 313 track angle, true: BNR, bits 17-28 with a
         //180/4096 deg LSB, bit 29 = 1 for 180-360 deg (GAMA 11 page 23). GPS GROUND MAGNETIC TRACK is RS-232 OUT item C
         //track, magnetic, dashed below 2 kt: with the variation at the aircraft in LEG mode, at the active waypoint in
         //OBS mode (Installation manual A-5, A-6)
         if (track === null) {
-            SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, 0);
-            SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, 0);
+            gpsNavData.write('GPS GROUND TRUE TRACK', SimVarValueType.Radians, 0);
+            gpsNavData.write('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, 0);
         } else {
-            SimVar.SetSimVarValue('GPS GROUND TRUE TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(track, UnitType.RADIAN));
-            SimVar.SetSimVarValue('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(track, magvar), UnitType.RADIAN));
+            gpsNavData.write('GPS GROUND TRUE TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(track, UnitType.RADIAN));
+            gpsNavData.write('GPS GROUND MAGNETIC TRACK', SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(track, magvar), UnitType.RADIAN));
         }
     }
 
     public setWPTETE(ete: Seconds | null, eta: Seconds | null) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsArinc429Tx = this.interconnect.gps(this.interconnect.arinc429Tx);
         //Real unit: GPS WP ETE, either
         //- ARINC 429 transmitter, label 252 time to go: BNR, bits 20-28 minutes with a 1 min LSB, bit 29 always 0 (GAMA 11
         //  page 17)
@@ -587,55 +572,49 @@ export class SensorsOut {
         //Real unit: GPS WP ETA is fictional. The unit only sends the time itself, ARINC 429 label 150 GMT: BNR, bits 12-17
         //seconds, 18-23 minutes, 24-28 hours (GAMA 11 page 14)
         if (ete === null) {
-            SimVar.SetSimVarValue('GPS WP ETE', SimVarValueType.Seconds, 0);
+            gpsArinc429Tx.write('GPS WP ETE', SimVarValueType.Seconds, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP ETE', SimVarValueType.Seconds, ete);
+            gpsArinc429Tx.write('GPS WP ETE', SimVarValueType.Seconds, ete);
         }
         if (eta === null) {
-            SimVar.SetSimVarValue('GPS WP ETA', SimVarValueType.Seconds, 0);
+            gpsArinc429Tx.write('GPS WP ETA', SimVarValueType.Seconds, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP ETA', SimVarValueType.Seconds, eta);
+            gpsArinc429Tx.write('GPS WP ETA', SimVarValueType.Seconds, eta);
         }
     }
 
     public setDestETE(ete: Seconds | null, eta: Seconds | null) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsArinc429Tx = this.interconnect.gps(this.interconnect.arinc429Tx);
         //Real unit: GPS ETE is ARINC 429 transmitter label 352 time to destination via the flight plan: BNR, bits 17-28
         //minutes with a 1 min LSB, bit 29 always 0 (GAMA 11 page 25). No RS-232 item; RS-232 item l is only the distance
         //to the destination (Installation manual A-6).
         //Real unit: GPS ETA is fictional, as GPS WP ETA is (setWPTETE)
         if (ete === null) {
-            SimVar.SetSimVarValue('GPS ETE', SimVarValueType.Seconds, 0);
+            gpsArinc429Tx.write('GPS ETE', SimVarValueType.Seconds, 0);
         } else {
-            SimVar.SetSimVarValue('GPS ETE', SimVarValueType.Seconds, ete);
+            gpsArinc429Tx.write('GPS ETE', SimVarValueType.Seconds, ete);
         }
         if (eta === null) {
-            SimVar.SetSimVarValue('GPS ETA', SimVarValueType.Seconds, 0);
+            gpsArinc429Tx.write('GPS ETA', SimVarValueType.Seconds, 0);
         } else {
-            SimVar.SetSimVarValue('GPS ETA', SimVarValueType.Seconds, eta);
+            gpsArinc429Tx.write('GPS ETA', SimVarValueType.Seconds, eta);
         }
     }
 
     public setWPIndex(index: number, countTotal: number) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the flight plan output (see WTFlightplanSync), either
         //- RS-232 OUT, item w flight plan data, one item per waypoint and at most 32: bits 0-4 of the sequence byte are
         //  the waypoint number, bit 5 = 1 for the active waypoint, bit 6 = 1 for the last one (Installation manual A-8)
         //- ARINC 429 transmitter, label 074 data record header, bits 9-15 the number of records; label 075 active
         //  waypoint from/to, the TO record number in BCD with the tens in bits 13-16 and the units in bits 21-24 (GAMA 11
         //  pages 9, 10)
-        SimVar.SetSimVarValue('GPS FLIGHT PLAN WP COUNT', SimVarValueType.Number, countTotal);
-        SimVar.SetSimVarValue('GPS FLIGHT PLAN WP INDEX', SimVarValueType.Number, index + 1);
+        gpsNavData.write('GPS FLIGHT PLAN WP COUNT', SimVarValueType.Number, countTotal);
+        gpsNavData.write('GPS FLIGHT PLAN WP INDEX', SimVarValueType.Number, index + 1);
     }
 
     public setNextWpt(wpt: Facility | null) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the active waypoint, any of
         //- RS-232 OUT, item K active waypoint identifier, five ASCII characters (Installation manual A-5)
         //- RS-232 OUT, the item w record whose sequence byte has the active bit: bytes 2-6 identifier, 7-13 packed
@@ -645,34 +624,32 @@ export class SensorsOut {
         //  labels 306 latitude and 307 longitude, BNR bits 9-28 with a 180/1048576 deg LSB, bit 29 = 1 South or West
         //  (GAMA 11 pages 21 to 23)
         if (wpt === null) {
-            SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, '');
-            SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, 0);
-            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS WP NEXT ID', SimVarValueType.String, '');
+            gpsNavData.write('GPS WP NEXT LAT', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS WP NEXT LON', SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP NEXT ID', SimVarValueType.String, wpt.icaoStruct.ident);
-            SimVar.SetSimVarValue('GPS WP NEXT LAT', SimVarValueType.Degree, wpt.lat);
-            SimVar.SetSimVarValue('GPS WP NEXT LON', SimVarValueType.Degree, wpt.lon);
+            gpsNavData.write('GPS WP NEXT ID', SimVarValueType.String, wpt.icaoStruct.ident);
+            gpsNavData.write('GPS WP NEXT LAT', SimVarValueType.Degree, wpt.lat);
+            gpsNavData.write('GPS WP NEXT LON', SimVarValueType.Degree, wpt.lon);
         }
     }
 
     public setPrevWpt(wpt: Facility | null) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the from waypoint, either
         //- ARINC 429 transmitter, the record numbered as the FROM of label 075, BCD tens in bits 17-20 and units in bits
         //  25-28 (GAMA 11 page 10), with the words of setNextWpt
         //- RS-232 OUT, the item w record before the active one; it has no flag of its own (Installation manual A-8)
         if (wpt === null) {
-            SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, false);
-            SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, '');
-            SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, 0);
-            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS WP PREV VALID', SimVarValueType.Bool, false);
+            gpsNavData.write('GPS WP PREV ID', SimVarValueType.String, '');
+            gpsNavData.write('GPS WP PREV LAT', SimVarValueType.Degree, 0);
+            gpsNavData.write('GPS WP PREV LON', SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue('GPS WP PREV VALID', SimVarValueType.Bool, true);
-            SimVar.SetSimVarValue('GPS WP PREV ID', SimVarValueType.String, wpt.icaoStruct.ident);
-            SimVar.SetSimVarValue('GPS WP PREV LAT', SimVarValueType.Degree, wpt.lat);
-            SimVar.SetSimVarValue('GPS WP PREV LON', SimVarValueType.Degree, wpt.lon);
+            gpsNavData.write('GPS WP PREV VALID', SimVarValueType.Bool, true);
+            gpsNavData.write('GPS WP PREV ID', SimVarValueType.String, wpt.icaoStruct.ident);
+            gpsNavData.write('GPS WP PREV LAT', SimVarValueType.Degree, wpt.lat);
+            gpsNavData.write('GPS WP PREV LON', SimVarValueType.Degree, wpt.lon);
         }
     }
 
@@ -683,7 +660,7 @@ export class SensorsOut {
         //- ARINC 429 transmitter, label 275 bit 27 message alert, 1 = on (GAMA 11 page 19)
         //- RS-232 OUT, item t GPS discretes, character b: N new message, P persistent message, dashed otherwise
         //  (Installation manual A-6)
-        SimVar.SetSimVarValue(LVAR_MSG_LIGHT, SimVarValueType.Bool, lightOn);
+        this.interconnect.msgAnnunciator.write(LVAR_MSG_LIGHT, SimVarValueType.Bool, lightOn);
     }
 
     public setWptAlertLight(lightOn: boolean) {
@@ -693,14 +670,14 @@ export class SensorsOut {
         //- ARINC 429 transmitter, label 275 bit 11 waypoint alert, 1 = on (GAMA 11 page 19)
         //- RS-232 OUT, item t GPS discretes, character a: W waypoint alert, T in turn, dashed otherwise (Installation
         //  manual A-6)
-        SimVar.SetSimVarValue(LVAR_WPT_LIGHT, SimVarValueType.Bool, lightOn);
+        this.interconnect.wptAnnunciator.write(LVAR_WPT_LIGHT, SimVarValueType.Bool, lightOn);
     }
 
     public setAnnunTest(lightOn: boolean) {
         //Real unit: fictional as one signal. On the self-test page the unit pulls all four annunciator outputs low, P901
         //pins 14 WPT, 15 MSG, 16 APPROACH ACTIVE and 17 APPROACH ARM (Installation manual 2-69). The OBS and LEG lamps of
         //the GPS CRS switch are not the KLN's
-        SimVar.SetSimVarValue(LVAR_ANNUN_TEST, SimVarValueType.Bool, lightOn);
+        this.interconnect.sim.write(LVAR_ANNUN_TEST, SimVarValueType.Bool, lightOn);
     }
 
     /**
@@ -711,9 +688,8 @@ export class SensorsOut {
      * @param writeObs GPS OBS ACTIVE will become readonly when an external mode switch is installed
      */
     public setMode(mode: NavMode, isSelfTestActive: boolean, writeObs: boolean) {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
+        const gpsApproachLamps = this.interconnect.gps(this.interconnect.approachLamps);
 
         //Real unit: K:GPS_OBS_ON/K:GPS_OBS_OFF (GPS OBS ACTIVE) is LEG or OBS mode, any of
         //- no pin: with the GPS CRS switch, its own contacts light the OBS and LEG lamps, and the KLN reads its position
@@ -722,10 +698,11 @@ export class SensorsOut {
         //  (GAMA 11 page 19)
         //- RS-232 OUT, item t GPS discretes, character d: L leg, D direct to, O OBS, T OBS to leg transition
         //  (Installation manual A-6)
-        //Real unit: GPS IS APPROACH ACTIVE and GPS APPROACH MODE (0 en route, 1 armed, 2 active, 3 self-test) are the
-        //approach annunciation, any of
-        //- P901 pin 17 APPROACH ARM and pin 16 APPROACH ACTIVE, each pulled low (sinks up to 250 mA) to light its lamp
-        //  (Installation manual 1-7, 2-5). On the self-test page both are on (2-69), which 3 stands for
+        //Real unit: GPS APPROACH MODE (0 en route, 1 armed, 2 active, 3 self-test) is the approach annunciation for the
+        //lamps of the GPS APR switch-annunciator, the SimVar the wiki documents for them: P901 pin 17 APPROACH ARM and pin
+        //16 APPROACH ACTIVE, each pulled low (sinks up to 250 mA) to light its lamp (Installation manual 1-7, 2-5). On the
+        //self-test page both are on (2-69), which 3 stands for. It goes through the approach lamp group (#451)
+        //Real unit: GPS IS APPROACH ACTIVE is the approach state as data, not documented for lamps (#451), either
         //- ARINC 429 transmitter, label 261 bits 25-27 (read 27-26-25): 000 en route, 001 terminal, 010 approach; label 275
         //  bit 16 = 1 approach deviation scaling (GAMA 11 pages 18, 19). GAMA 11 has no approach arm bit
         //- RS-232 OUT, item t GPS discretes, character c: E en route, T terminal, R approach arm, A approach active
@@ -734,43 +711,43 @@ export class SensorsOut {
             case NavMode.ENR_LEG:
                 if (writeObs) {
                     //GPS OBS ACTIVE is marked writable in the docs, but appears to be readonly
-                    SimVar.SetSimVarValue('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
+                    gpsNavData.write('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
                     //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
                 }
-                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
-                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 0);
+                gpsNavData.write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
+                gpsApproachLamps.write('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 0);
                 break;
             case NavMode.ENR_OBS:
                 if (writeObs) {
-                    SimVar.SetSimVarValue('K:GPS_OBS_ON', SimVarValueType.Bool, true);
+                    gpsNavData.write('K:GPS_OBS_ON', SimVarValueType.Bool, true);
                     //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
                 }
-                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
-                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 0);
+                gpsNavData.write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
+                gpsApproachLamps.write('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 0);
                 break;
             case NavMode.ARM_LEG:
                 if (writeObs) {
-                    SimVar.SetSimVarValue('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
+                    gpsNavData.write('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
                     //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
                 }
-                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
-                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 1);
+                gpsNavData.write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
+                gpsApproachLamps.write('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 1);
                 break;
             case NavMode.ARM_OBS:
                 if (writeObs) {
-                    SimVar.SetSimVarValue('K:GPS_OBS_ON', SimVarValueType.Bool, true);
+                    gpsNavData.write('K:GPS_OBS_ON', SimVarValueType.Bool, true);
                     //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, true);
                 }
-                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
-                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 1);
+                gpsNavData.write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
+                gpsApproachLamps.write('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 1);
                 break;
             case NavMode.APR_LEG:
                 if (writeObs) {
-                    SimVar.SetSimVarValue('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
+                    gpsNavData.write('K:GPS_OBS_OFF', SimVarValueType.Bool, true);
                     //SimVar.SetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool, false);
                 }
-                SimVar.SetSimVarValue('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
-                SimVar.SetSimVarValue('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 2);
+                gpsNavData.write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, true);
+                gpsApproachLamps.write('GPS APPROACH MODE', SimVarValueType.Enum, isSelfTestActive ? 3 : 2);
                 break
 
         }
@@ -784,24 +761,23 @@ export class SensorsOut {
         //  commands 0, 5 deg right, 0 (2-70)
         //- analog roll steering, converted from label 121 by a KA 90 (KA 90 manual 1-2)
         if (bankAngle === null) {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+            this.interconnect.arinc429Tx.write(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
         } else {
-            SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
+            this.interconnect.arinc429Tx.write(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
         }
 
         //The real KLN does not have this, but we do and there is a SimVar for this...
-        //Real unit: GPS COURSE TO STEER is fictional, no output carries it
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
+        //Real unit: GPS COURSE TO STEER is fictional, no output carries it. It goes with the roll command it is derived
+        //from, on the transmitter (#451)
         //The maintainer held GPS COURSE TO STEER at 0 in the sim on 2026-10-19 and the default autopilot still tracked the
         //flight plan perfectly, so the sim's autopilot does not read it. It carries the course to steer of the roll
         //steering law, and 0 without a heading input or without a path (the maintainer's decision, 2026-10-19, reversing
         //the #143 exemption). The DTK goes to GPS WP DESIRED TRACK (setDesiredTrack), not here
+        const gpsArinc429Tx = this.interconnect.gps(this.interconnect.arinc429Tx);
         if (courseToSteer === null) {
-            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, 0);
+            gpsArinc429Tx.write('GPS COURSE TO STEER', SimVarValueType.Number, 0);
         } else {
-            SimVar.SetSimVarValue('GPS COURSE TO STEER', SimVarValueType.Number, UnitType.DEGREE.convertTo(courseToSteer, UnitType.RADIAN));
+            gpsArinc429Tx.write('GPS COURSE TO STEER', SimVarValueType.Number, UnitType.DEGREE.convertTo(courseToSteer, UnitType.RADIAN));
         }
     }
 
@@ -812,24 +788,20 @@ export class SensorsOut {
     public setPoweredOff(): void {
         //Real unit: without power the annunciator pins are open, the 429 transmitter is silent and the analog outputs
         //are flagged; each output's interface is on its setter above
-        SimVar.SetSimVarValue(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
-        SimVar.SetSimVarValue(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
-        SimVar.SetSimVarValue(LVAR_MSG_LIGHT, SimVarValueType.Bool, false);
-        SimVar.SetSimVarValue(LVAR_WPT_LIGHT, SimVarValueType.Bool, false);
-        SimVar.SetSimVarValue(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
-        SimVar.SetSimVarValue(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, false);
-        SimVar.SetSimVarValue(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
-        SimVar.SetSimVarValue(LVAR_XTK, SimVarValueType.NM, 0);
+        this.interconnect.arinc429Tx.write(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+        this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+        this.interconnect.msgAnnunciator.write(LVAR_MSG_LIGHT, SimVarValueType.Bool, false);
+        this.interconnect.wptAnnunciator.write(LVAR_WPT_LIGHT, SimVarValueType.Bool, false);
+        this.interconnect.sim.write(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
+        this.interconnect.arinc429Tx.write(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, false);
+        this.interconnect.rmi.write(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
+        this.interconnect.arinc429Tx.write(LVAR_XTK, SimVarValueType.NM, 0);
         this.xtkFilter.reset();
     }
 
     public setGpsOverriden(): void {
-        if (!this.options.output.writeGPSSimVars) {
-            return;
-        }
-
         //Real unit: fictional, the sim's claim that this gauge writes the GPS SimVars
-        SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, true);
+        this.interconnect.gps(this.interconnect.sim).write('GPS OVERRIDDEN', SimVarValueType.Bool, true);
     }
 
     public reset() {
@@ -874,10 +846,10 @@ export class Sensors implements CalcTickable {
     public out: SensorsOut;
 
 
-    constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, audioGenerator: AudioGenerator, messageHandler: MessageHandler, hardware: Hardware,
-                gpsMeasurement: GpsMeasurement) {
-        this.in = new SensorsIn(bus, userSettings, options, messageHandler, gpsMeasurement);
-        this.out = new SensorsOut(options, audioGenerator, hardware);
+    constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, public readonly interconnect: Interconnect, audioGenerator: AudioGenerator,
+                messageHandler: MessageHandler, hardware: Hardware, gpsMeasurement: GpsMeasurement) {
+        this.in = new SensorsIn(bus, userSettings, options, interconnect, messageHandler, gpsMeasurement);
+        this.out = new SensorsOut(options, interconnect, audioGenerator, hardware);
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));
     }

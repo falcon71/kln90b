@@ -38,6 +38,7 @@ import {PageManager} from "./pages/PageManager";
 import {TickController} from "./TickController";
 import {KLN90BPlaneSettingsParser, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {Sensors} from "./Sensors";
+import {Interconnect} from "./Interconnect";
 import {VolatileMemory} from "./data/VolatileMemory";
 import {NearestUtils} from "./data/navdata/NearestUtils";
 import {RemarksManager} from "./settings/RemarksManager";
@@ -251,6 +252,8 @@ export class KLN90BCore {
         //The xml is not available before init!
         const planeSettingsParser = new KLN90BPlaneSettingsParser();
         this.planeSettings = planeSettingsParser.parsePlaneSettings(xmlConfig);
+        //One wiring for the whole unit: every interface SimVar goes through its ports (#451)
+        const interconnect = new Interconnect(this.planeSettings);
 
         const forceReadyToUse = this.isForceReadyToUse();
 
@@ -277,7 +280,7 @@ export class KLN90BCore {
 
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
-        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement());
+        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, interconnect, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement());
 
         //The display ticks run from the start of the boot, so that the Turn-On page shows and checks the boot while it is
         //still under way (#416). The calculations are added once their services exist
@@ -357,7 +360,7 @@ export class KLN90BCore {
 
         const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
-        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, this.planeSettings, memory.navPage.activeWaypoint, this.hardware);
+        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, interconnect, memory.navPage.activeWaypoint, this.hardware);
 
         const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
         const vnav = new Vnav(memory.navPage, sensors, flightplans[0]);
@@ -387,7 +390,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerSupply, this.planeSettings, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
+        this.simvarSync = new SimVarSync(this.powerSupply, this.planeSettings, interconnect, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
 
         const msa = new MSA();
 
@@ -401,7 +404,7 @@ export class KLN90BCore {
         const sidstar = new SidStar(facilityLoader, facilityRepository, sensors);
 
         this.platform.getRouteManager().then(manager => {
-            this.efbSaver = new KlnEfbSaver(this.planeSettings!, manager, flightplans[0], this.hardware);
+            this.efbSaver = new KlnEfbSaver(interconnect, manager, flightplans[0], this.hardware);
             this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans, this.pageManager, facilityRepository, this.hardware, sidstar);
         });
 

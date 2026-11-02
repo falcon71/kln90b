@@ -11,7 +11,10 @@
             <Airdata>
                 <IsInterfaced>false</IsInterfaced> <!-- Will also provide altitude data -->
                 <BaroSource>0</BaroSource> <!-- 1 or 2 if the baro setting of the respective altimeter is transmitted -->
+                <Interface>RS232</Interface> <!-- RS232 or ARINC429, how the air data computer is wired. Only used by the failure simulation -->
             </Airdata>
+            <ObsInterface>Analog</ObsInterface> <!-- Analog (the OBS resolver of the CDI/HSI) or ARINC429 (an EFIS). Only used by the failure simulation -->
+            <HeadingInterface>ARINC429</HeadingInterface> <!-- ARINC429 or RS232, how the heading input is wired. Only used by the failure simulation -->
             <FuelComputer>
                 <IsInterfaced>false</IsInterfaced>
                 <Unit>GAL</Unit> <!-- GAL,IMP,L,KG or LB -->
@@ -28,6 +31,14 @@
             <ObsTarget>0</ObsTarget> <!-- 0 to disable. If 1 or 2 is set, the KLN writes the OBS to this device. Synced with L:KLN90B_ObsTarget -->
             <AltitudeAlertEnabled>false</AltitudeAlertEnabled> <!-- false if altitude alert is disabled completely. even if true, you will need to include an AvionicSounds entry for kln_short_beep and kln_long_beep in your sound.xml. The SET 9 volume is in L:KLN90B_AlertVolume (0 to 99), for an RTPC on both sounds-->
             <WriteGPSSimVars>true</WriteGPSSimVars> <!-- if true, the KLN90 will write various GPS SimVars, which can be used for the HSI, RMI etc. Synced with L:KLN90B_WriteGpsSimvars -->
+            <RmiInterface>OBI</RmiInterface> <!-- OBI or ARINC429, how the RMI receives L:KLN90B_GPS_WP_BEARING. Only used by the failure simulation -->
+            <DataInterface>ARINC429</DataInterface> <!-- ARINC429 or RS232, how an EFIS, distance indicator or moving map receives position, distance, waypoints and the flight plan. Only used by the failure simulation -->
+            <ExternalAnnunciators> <!-- true for each remote lamp the aircraft has. Only an installed lamp can fail in the failure simulation; the outputs are written either way -->
+                <MsgInstalled>false</MsgInstalled> <!-- L:KLN90B_MsgLight -->
+                <WptInstalled>false</WptInstalled> <!-- L:KLN90B_WptLight -->
+                <ArmInstalled>false</ArmInstalled> <!-- GPS APPROACH MODE 1. Requires Input.ExternalSwitches.AppArmSwitchInstalled -->
+                <ActvInstalled>false</ActvInstalled> <!-- GPS APPROACH MODE 2. Not with VFROnly -->
+            </ExternalAnnunciators>
         </Output>
     </Instrument>
 </PlaneHTMLConfig>

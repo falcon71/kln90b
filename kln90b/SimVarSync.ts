@@ -16,6 +16,7 @@ import {PageManager} from "./pages/PageManager";
 import {BrightnessManager} from "./BrightnessManager";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
 import {Hardware} from "./Hardware";
+import {Interconnect} from "./Interconnect";
 
 const SYNC_TICK = 100;
 
@@ -24,7 +25,7 @@ const SYNC_TICK = 100;
  */
 export class SimVarSync {
 
-    constructor(private readonly powerSupply: PowerSupply, private readonly settings: KLN90PlaneSettings, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware) {
+    constructor(private readonly powerSupply: PowerSupply, private readonly settings: KLN90PlaneSettings, private readonly interconnect: Interconnect, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -37,7 +38,7 @@ export class SimVarSync {
             }
 
             //Real unit: P901 pin 40 A/C POWER, 11 to 33 VDC, with pin 27 A/C GROUND (Installation manual 1-5, 2-6, 2-7)
-            this.powerSupply.setElectricityAvailable(!!SimVar.GetSimVarValue(this.settings.input.electricitySimVar, SimVarValueType.Bool));
+            this.powerSupply.setElectricityAvailable(!!this.interconnect.power.read(this.settings.input.electricitySimVar, SimVarValueType.Bool));
         }
 
         //The only read of L:KLN90B_Disabled: everything else reads hardware.isDisabled (#138)
@@ -50,7 +51,7 @@ export class SimVarSync {
             //pin 33 is a held level: grounded in OBS, open in LEG (Installation manual 2-6, figure 2-17 sheet 8 on 2-57).
             //GPS OBS ACTIVE is that switch position. The OBS and LEG lamps are lit by the switch's other contacts, not by
             //the KLN (Installation manual 2-69)
-            this.modeController.setExternalObsMode(!!SimVar.GetSimVarValue('GPS OBS ACTIVE', SimVarValueType.Bool));
+            this.modeController.setExternalObsMode(!!this.interconnect.legObsControl.read('GPS OBS ACTIVE', SimVarValueType.Bool));
         }
 
         //Real unit: fictional, runtime overrides of the panel.xml keys Input.ObsSource, Output.ObsTarget,
@@ -65,7 +66,7 @@ export class SimVarSync {
             this.settings.output.writeGPSSimVars = writeGpsSimvars;
             if (!this.hardware.isDisabled) { //A disabled unit has released the GPS for hot swapping, setDisabled claims it again
                 //Real unit: fictional, the sim's claim that this gauge writes the GPS SimVars
-                SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
+                this.interconnect.sim.write('GPS OVERRIDDEN', SimVarValueType.Bool, writeGpsSimvars);
             }
             if (writeGpsSimvars) {
                 this.wtFlightplanSync.sync(); //The planner has not been written while the option was off
@@ -88,7 +89,7 @@ export class SimVarSync {
 
         if (this.settings.output.writeGPSSimVars) {
             //Real unit: fictional, the sim's claim that this gauge writes the GPS SimVars
-            SimVar.SetSimVarValue('GPS OVERRIDDEN', SimVarValueType.Bool, !disabled); //Allows other devices to write GPS vars
+            this.interconnect.sim.write('GPS OVERRIDDEN', SimVarValueType.Bool, !disabled); //Allows other devices to write GPS vars
             if (!disabled) {
                 this.wtFlightplanSync.sync(); //#398: the planner was not written while the unit was disabled
             }
