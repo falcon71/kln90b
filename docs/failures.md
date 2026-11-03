@@ -23,7 +23,7 @@ manuals stop, the behavior is an informed guess, and this document says so.
 - Simulate the hardware and interface failures of Appendix B (B-1 to B-4) with their messages, and the realistic
   failures that have no message (a burnt bulb, the OBS resolver, the RMI output).
 - External events the pilot cannot repair in flight: GPS jamming, GPS spoofing, a faulty satellite. These are
-  triggered manually only.
+  triggered manually only, and like every failure they act on the KLN alone (see "Other GPS units").
 - The internal battery ages over the years of sim time and finally loses the user data.
 - A random failure rate set as an MTBF, and a fictional FLR page group to set it, to repair and to fail components by
   hand.
@@ -38,6 +38,8 @@ manuals stop, the behavior is an informed guess, and this document says so.
 - Not a failure: bad satellite geometry. It is already simulated (#453) and cannot be repaired.
 - No sudden impossible states: a full battery never dies, a component fails in a way real hardware fails (a loose
   cable, a burnt part).
+- Not possible: jamming or spoofing the sim's GPS itself, so that the other GPS units of the aircraft degrade with the
+  KLN. Ruled out in "Other GPS units".
 - **Anti-goal: a failure that changes how the unit behaves while failures are off.** With MTBF off and nothing failed,
   every existing test stays green and every output is written exactly as today.
 - Anti-goal: `DATA BASE CHECKSUM ERR` from a simulated failure. That message stays reserved for the real start-up
@@ -213,6 +215,42 @@ used), because a flagged satellite is simply excluded and has no measurable effe
   `L:KLN90B_IntegrityWarn` is true, approach active cannot be entered, and in approach active the NAV flag and `PRESS
   GPS APR FOR NAV` follow (6-20). En route the navigation stays valid.
 - When the satellite sets or leaves the solution, the error and the message go. The repair ends it.
+
+### Other GPS units
+
+Every failure acts on the KLN alone, the external events included. Each GPS unit of the aircraft, a Working Title GNS
+430/530 in a hot swap or as a second GPS, runs its own copy of the SDK's `GPSSatComputer` in its own instrument page.
+The KLN's inhibits live in the KLN's copy, and the faulty satellite's bias and the false position of spoofing in its
+measurement (`GpsMeasurement`). Since #463 the receiver's events stay on a bus of its own, so a KLN failure no longer
+reaches the display of another unit: before, a KLN jamming would have shown `SEARCHING` and NO GPS POSITION on the GNS.
+A failure persists with the KLN's settings, so it is still there after a hot swap away and back; while the other unit is
+in use, the KLN is disabled and its failure clock stands still.
+
+- **For the hardware failures this is the real behavior.** The other unit has its own antenna, receiver and ports.
+- **For jamming and spoofing it is not.** A real jammer or spoofer reaches every receiver of the aircraft, so a second
+  GPS that keeps navigating gives the scenario away at the first cross-check. The faulty satellite lies in between: a
+  receiver with fault detection and exclusion (a GNS 430W) would likely exclude the satellite and show nothing.
+- **The limit is accepted.** The wiki tells pilots that the failures affect the KLN only, and that jamming and spoofing
+  are best practiced without a second GPS unit to cross-check with.
+
+**Ruled out: jamming or spoofing the sim's GPS, so that every unit computes the same wrong result.** The SDK's
+`GPSSatComputer` computes no position from the satellites. From `PLANE LATITUDE`, `PLANE LONGITUDE`, `PLANE ALTITUDE`
+and `E:ABSOLUTE TIME` it models which satellites are in view, the channels and their acquisition, the DOP and a state
+(`Searching`, `Acquiring`, `SolutionAcquired`, ...). A Working Title unit takes its position from the sim's true position
+(`GNSSPublisher`); the receiver state only decides whether the unit shows it and how accurate it claims to be. The
+KLN's own receiver model (#453) is likewise the true position plus a modeled error, not a pseudorange solution. So:
+
+- there are no pseudoranges to spoof. A false position in every unit would mean moving the aircraft;
+- a jamming of the other units would have to reach their receivers, and none of their inputs can be reached. The true
+  position and the time are the same for everyone, each product loads its own satellite file once at its start, the
+  inhibits are a method call on an object in another instrument page (the GNS sets none), and the receiver reads no
+  failure SimVar;
+- publishing a false receiver state on the other unit's topics (the leak of #463, on purpose) is ruled out as well. The
+  other unit's own receiver overwrites it at its next state change, it depends on Working Title internals (the GNS's
+  receiver index 1 is hard-coded), and it fakes a display rather than simulating a loss of signal.
+
+An aircraft can degrade its other units through its own failure system, for example by taking a GNS's power away
+(see "Out of scope": a failure API for aircraft).
 
 ### EEPROM (`eeprom`)
 
@@ -500,7 +538,8 @@ strategy).
 - New persisted keys, in their own settings manager. No existing key changes meaning.
 - No H event or LVar changes. The outputs keep their meaning; a failure only changes their values as a real failure
   would.
-- Wiki (the maintainer updates it): a new page for the failures and the FLR pages; panel.xml
+- Wiki (the maintainer updates it): a new page for the failures and the FLR pages, with the limit that they affect the
+  KLN only (see "Other GPS units"); panel.xml
   customization (`Output.RmiInstalled`); External Annunciators (dark and stuck lamps); RMI (the new key).
 
 ## Testing
@@ -517,7 +556,8 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
   against the receiver model, the battery wipe at a power-on.
 - With MTBF off and nothing failed, the whole existing suite stays green unchanged.
 - Sim, before release: the failed ports with a hot swap to another GPS unit (the zeroing itself was tested on
-  2026-11-03, #462).
+  2026-11-03, #462), and jamming and an antenna failure with a Working Title GNS beside the KLN, which must keep its
+  position.
 
 ## Out of scope
 
