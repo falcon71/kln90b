@@ -15,6 +15,39 @@ import {GpsGeometry, Raim, raimStatus} from '../../kln90b/GpsSolution';
 // Public contract: the LVar is documented in LVars.ts (ARINC label 261, bit 24, GPS integrity: 1 = fail, true when there is
 // no valid fix or RAIM is unavailable at the alert limit of the flight phase; #453). An unset LVar reads 0, so "written as
 // 0" is asserted with lastWrite().
+/**
+ * Reaches a flight phase through the unit's own mode logic (a mode written into the memory is reverted by the next
+ * calculation tick): the approach world of Sta1Page.test.ts, loaded from APT 8, 20 NM out for ENR and ARM, inside the
+ * FAF for APR
+ */
+async function inMode(mode: NavMode, panel: Record<string, unknown> = {}): Promise<HeadlessUnit> {
+    const w = approachWorld();
+    const unit = await bootUnit({
+        facilities: w.facilities, position: w.north(mode === NavMode.APR_LEG ? 7.5 : 20),
+        panelXml: panelXml({...APR_ARM_SWITCH, ...panel}),
+        storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
+    });
+    await settle(unit);
+    if (mode === NavMode.ENR_OBS) {
+        await unit.panel.obsMode();
+    }
+    if (mode !== NavMode.ENR_LEG && mode !== NavMode.ENR_OBS) {
+        await unit.panel.loadProcedure('APT 8');
+        await vi.advanceTimersByTimeAsync(31_000);
+    }
+    if (mode === NavMode.ARM_OBS) {
+        await unit.panel.obsMode();
+    }
+    if (mode === NavMode.APR_LEG) {
+        //Inbound on the final course and inside 2 NM of the FAF (5 NM before the airport): the approach goes active
+        await moveAircraft(unit, w.north(5 + 1.95), {groundspeedKt: 120, trackTrue: 180});
+        await vi.advanceTimersByTimeAsync(1000);
+    }
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(unit.props.memory.navPage.navmode).toBe(mode); // Precondition
+    return unit;
+}
+
 describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
     it('is 1 while the GPS has no fix and 0 once it has one', async () => {
         // The last position and the almanac are valid, so the slow acquisition stays well below the cap
@@ -83,38 +116,6 @@ describe('L:KLN90B_IntegrityWarn (public contract) (#87)', () => {
         expect(sim.lastWrite('L:KLN90B_IntegrityWarn')?.value).toBe(0);
     }, 60_000);
 
-    /**
-     * Reaches a flight phase through the unit's own mode logic (a mode written into the memory is reverted by the next
-     * calculation tick): the approach world of Sta1Page.test.ts, loaded from APT 8, 20 NM out for ENR and ARM, inside the
-     * FAF for APR
-     */
-    async function inMode(mode: NavMode, panel: Record<string, unknown> = {}): Promise<HeadlessUnit> {
-        const w = approachWorld();
-        const unit = await bootUnit({
-            facilities: w.facilities, position: w.north(mode === NavMode.APR_LEG ? 7.5 : 20),
-            panelXml: panelXml({...APR_ARM_SWITCH, ...panel}),
-            storage: {...savedFlightplan(0, [w.enraa, w.kprc]), turnAnticipation: false},
-        });
-        await settle(unit);
-        if (mode === NavMode.ENR_OBS) {
-            await unit.panel.obsMode();
-        }
-        if (mode !== NavMode.ENR_LEG && mode !== NavMode.ENR_OBS) {
-            await unit.panel.loadProcedure('APT 8');
-            await vi.advanceTimersByTimeAsync(31_000);
-        }
-        if (mode === NavMode.ARM_OBS) {
-            await unit.panel.obsMode();
-        }
-        if (mode === NavMode.APR_LEG) {
-            //Inbound on the final course and inside 2 NM of the FAF (5 NM before the airport): the approach goes active
-            await moveAircraft(unit, w.north(5 + 1.95), {groundspeedKt: 120, trackTrue: 180});
-            await vi.advanceTimersByTimeAsync(1000);
-        }
-        await vi.advanceTimersByTimeAsync(2000);
-        expect(unit.props.memory.navPage.navmode).toBe(mode); // Precondition
-        return unit;
-    }
 
     // The alert limit of each flight phase is 2 NM (3704 m) en route, 1 NM (1852 m) armed and 0.3 NM (555.6 m) with the
     // approach active; the OBS modes use the limit of their phase. The protection level is maxSlope x 5 m x 5.3:
@@ -628,14 +629,111 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(0);
     });
 
-    it('leaves the GPS SimVars alone: only GPS OVERRIDDEN is asserted again', async () => {
+    // #462: a switched-off unit no longer leaves the GPS SimVars frozen at its last values, so a GPS-coupled autopilot
+    // loses its guidance. GPS OVERRIDDEN stays claimed: the unit is still the aircraft's GPS
+    it('writes the null state of the GPS SimVars (#462)', async () => {
         const unit = await banking();
-        const written = unit.env.sim.writes.length;
+        const sim = unit.env.sim;
+        expect(sim.get('GPS WP DISTANCE', 'meters')).toBeGreaterThan(0); // Preconditions: live values
+        expect(sim.get('GPS FLIGHT PLAN WP COUNT', 'number')).toBe(3);
+        expect(sim.get('GPS FLIGHT PLAN WP INDEX', 'number')).toBe(2);
+        expect(sim.get('GPS WP CROSS TRK', 'nautical miles')).not.toBe(0);
+        expect(sim.get('GPS OBS VALUE', 'degrees')).not.toBe(0);
+        expect(sim.get('GPS WP BEARING', 'radians')).not.toBe(0);
+        expect(sim.get('GPS WP TRUE BEARING', 'radians')).not.toBe(0);
+        expect(sim.get('GPS ETE', 'seconds')).not.toBe(0);
+        expect(sim.get('GPS ETA', 'seconds')).not.toBe(0);
 
         unit.send('KLN90B_Power_Off');
         await vi.advanceTimersByTimeAsync(3000);
 
-        expect(gpsWritesSince(unit, written)).toEqual(['GPS OVERRIDDEN']);
+        for (const [name, u] of [['GPS POSITION LAT', 'degrees'], ['GPS POSITION LON', 'degrees'], ['GPS GROUND SPEED', 'knots'],
+            ['GPS WP DISTANCE', 'meters'], ['GPS WP DESIRED TRACK', 'radians'], ['GPS WP CROSS TRK', 'meters'],
+            ['GPS IS ACTIVE WAY POINT', 'bool'], ['GPS IS ACTIVE FLIGHT PLAN', 'bool'], ['GPS WP NEXT LAT', 'degrees'],
+            ['GPS WP PREV VALID', 'bool'], ['GPS WP ETE', 'seconds'], ['GPS COURSE TO STEER', 'number'],
+            ['GPS IS APPROACH ACTIVE', 'bool'], ['GPS APPROACH MODE', 'enum'],
+            ['GPS FLIGHT PLAN WP COUNT', 'number'], ['GPS FLIGHT PLAN WP INDEX', 'number'], ['GPS OBS VALUE', 'degrees'],
+            ['GPS WP BEARING', 'radians'], ['GPS WP TRUE BEARING', 'radians'], ['GPS ETE', 'seconds'], ['GPS ETA', 'seconds']]) {
+            expect(sim.get(name, u), name).toBe(0);
+        }
+        expect(sim.get('GPS OVERRIDDEN', 'bool')).toBe(1);
+    });
+
+    // GPS APPROACH MODE lights the ARM and ACTV lamps of the GPS APR switch-annunciator: a dark unit lights neither
+    it('takes the approach annunciation to 0 from APR ACTV (#462)', async () => {
+        const unit = await inMode(NavMode.APR_LEG);
+        expect(unit.env.sim.get('GPS APPROACH MODE', 'enum')).toBe(2); // Preconditions
+        expect(unit.env.sim.get('GPS IS APPROACH ACTIVE', 'bool')).toBe(1);
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.get('GPS APPROACH MODE', 'enum')).toBe(0);
+        expect(unit.env.sim.get('GPS IS APPROACH ACTIVE', 'bool')).toBe(0);
+    }, 60_000);
+
+    it('writes no GPS SimVar and no K:GPS_OBS event while the unit stays off (#462)', async () => {
+        const unit = await banking();
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(1000);
+        const written = unit.env.sim.writes.length;
+        const keys = unit.env.sim.keyEvents.length;
+
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        expect(gpsWritesSince(unit, written)).toEqual([]);
+        expect(unit.env.sim.keyEvents.slice(keys).map(k => k.name)).toEqual([]);
+    });
+
+    // LEG/OBS is the state of a switch the aircraft owns (GPS OBS ACTIVE), not a value the unit clears at a power change
+    it('sends no K:GPS_OBS event at the power-off (#462)', async () => {
+        const unit = await banking();
+        await untilCalcTick(unit);
+        const keys = unit.env.sim.keyEvents.length;
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(unit.env.sim.keyEvents.slice(keys).map(k => k.name).filter(n => n.includes('GPS_OBS'))).toEqual([]);
+    });
+
+    // Another GPS of a hot-swap aircraft may have written the SimVars while the KLN was off
+    it('overwrites a value another writer left, at the power-on (#462)', async () => {
+        const unit = await banking();
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.env.sim.set('GPS POSITION LAT', 'degrees', 12);
+        unit.env.sim.set('GPS FLIGHT PLAN WP INDEX', 'number', 1);
+
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(100); // Before the first calculation tick
+
+        expect(unit.env.sim.get('GPS POSITION LAT', 'degrees')).toBe(0);
+        expect(unit.env.sim.get('GPS FLIGHT PLAN WP INDEX', 'number')).toBe(0);
+    });
+
+    it('writes the live GPS SimVars again after the power-on (#462)', async () => {
+        const unit = await banking();
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.send('KLN90B_Power_On');
+        await unit.panel.approveSelfTest();
+        await settle(unit);
+
+        expect(unit.env.sim.get('GPS WP DISTANCE', 'meters')).toBeGreaterThan(0);
+        expect(unit.env.sim.get('GPS FLIGHT PLAN WP COUNT', 'number')).toBe(3);
+    });
+
+    it('writes no GPS SimVar at a power cycle with Output.WriteGPSSimVars off (#462)', async () => {
+        const unit = await bootOnStandardRoute({panelXml: panelXml({...HEADING_INPUT, ...NO_GPS_SIMVARS}), magvar: 0});
+        const written = unit.env.sim.writes.length;
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(gpsWritesSince(unit, written)).toEqual([]);
     });
 
     it('zeroes the outputs when the aircraft power is lost, not only at the power switch', async () => {
@@ -692,6 +790,7 @@ describe('outputs at power-off (public contract)', () => {
         unit.env.sim.set('L:KLN90B_Disabled', 'bool', true);
         await vi.advanceTimersByTimeAsync(300);
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBeCloseTo(25, 6); // Precondition: frozen
+        const written = unit.env.sim.writes.length;
 
         unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
         await vi.advanceTimersByTimeAsync(3000);
@@ -699,6 +798,8 @@ describe('outputs at power-off (public contract)', () => {
         expect(unit.env.sim.get('L:KLN90B_RollCommand', 'degrees')).toBe(0);
         expect(unit.env.sim.get('L:KLN90B_HSI_TF_FLAGS', 'enum')).toBe(0);
         expect(unit.env.sim.get('L:KLN90B_GPS_WP_BEARING', 'radians')).toBe(0);
+        //The GPS belongs to the unit that replaced it (#350): no null state, not even GPS OVERRIDDEN (#462)
+        expect(gpsWritesSince(unit, written)).toEqual([]);
     });
 
     it('sibling C: the RMI bearing is the bearing to ABC (magvar 0) and the integrity warning 0 before the power-off', async () => {
@@ -920,5 +1021,50 @@ describe('GPS WP CROSS TRK after a power cycle (#158)', () => {
         await vi.advanceTimersByTimeAsync(100);
 
         expect(unit.env.sim.get('GPS WP CROSS TRK', 'nautical miles')).toBe(0);
+    });
+});
+
+// #462: GPS FLIGHT PLAN WP INDEX above 0 with GPS FLIGHT PLAN WP COUNT 0 crashes MSFS 2024 when another GPS unit takes over
+// in a hot swap (the sim tests of 2026-11-03, docs/sim-flight-record.md). The index is 1-based, and index = count, the last
+// waypoint active, is safe. So the unit never writes an index above the count, whoever calls setWPIndex
+describe('GPS FLIGHT PLAN WP INDEX never exceeds the count (#462)', () => {
+    it('setWPIndex keeps the index within the count', async () => {
+        const unit = await bootUnit();
+        const indexFor = (index: number, count: number): number => {
+            unit.props.sensors.out.setWPIndex(index, count);
+            return unit.env.sim.get('GPS FLIGHT PLAN WP INDEX', 'number');
+        };
+
+        expect(indexFor(0, 0)).toBe(0);
+        expect(indexFor(-1, 0)).toBe(0);
+        expect(indexFor(-1, 3)).toBe(0);
+        expect(indexFor(0, 3)).toBe(1);
+        expect(indexFor(2, 3)).toBe(3);
+        expect(indexFor(3, 3)).toBe(3);
+    });
+
+    it('holds in every write through a Direct To the last waypoint and a power cycle', async () => {
+        const unit = await bootOnStandardRoute({magvar: 0});
+        await unit.panel.directTo('KBBB');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.send('KLN90B_Power_On');
+        await unit.panel.approveSelfTest();
+        await settle(unit);
+
+        let count: number | null = null;
+        const indexes: number[] = [];
+        for (const w of unit.env.sim.writes) {
+            if (w.name === 'GPS FLIGHT PLAN WP COUNT') {
+                count = Number(w.value);
+            } else if (w.name === 'GPS FLIGHT PLAN WP INDEX') {
+                indexes.push(Number(w.value));
+                expect(count, 'a count is written before the index').not.toBeNull();
+                expect(Number(w.value), `index ${w.value} with count ${count}`).toBeLessThanOrEqual(count!);
+            }
+        }
+        expect(indexes).toContain(3); // The Direct To KBBB, the last of three, was written
+        expect(indexes).toContain(0); // The null state of the power-off
     });
 });

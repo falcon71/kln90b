@@ -168,3 +168,23 @@ describe('TK and the 2 kt limit (3-32, 3-35)', () => {
         expect(Screen.read().rows('L')[2]).toBe('TK     ---°');
     });
 });
+
+// #463: the SDK publishes every receiver event synced and cached, so it reaches every instrument of the aircraft. The
+// Working Title GNS 430/530 builds its receiver on index 1 and drives its display from gps_system_state_changed_1, so a
+// KLN receiver on index 1 sets the state the GNS shows (NO GPS POSITION after a KLN power-off, the sim on 2026-11-03).
+// The KLN subscribes to none of these topics, so its receiver belongs on an index no other GPS uses
+describe('the receiver events do not use the topics of other GPS units (#463)', () => {
+    it.fails('publishes nothing on gps_system_state_changed_1 through an acquisition and a power cycle (#463)', async () => {
+        const unit = await bootUnit({coldGps: true});
+        const states: unknown[] = [];
+        unit.core.bus.getSubscriber<any>().on('gps_system_state_changed_1').handle(s => states.push(s));
+        await settle(unit);
+
+        unit.send('KLN90B_Power_Off');
+        await vi.advanceTimersByTimeAsync(3000);
+        unit.send('KLN90B_Power_On');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(states).toEqual([]);
+    });
+});

@@ -135,18 +135,20 @@ A failed output port sends nothing, so the receiving equipment loses its data, f
   until repaired:
   - the `L:KLN90B_*` outputs on it get what `SensorsOut.setPoweredOff` writes: `L:KLN90B_RollCommand` 0,
     `L:KLN90B_XTK` 0, `L:KLN90B_IntegrityWarn` false, `L:KLN90B_GPS_WP_BEARING` 0, and so on;
-  - **the GPS SimVars on it are zeroed too**: what each setter of `SensorsOut` writes for a null value (the list
-    commented out in `SensorsOut.reset`), limited to the SimVars of the failed port. A GPS-coupled autopilot then loses
-    its guidance instead of following a frozen DTK.
-- The power-off path stays as it is: `setPoweredOff` still leaves the GPS SimVars alone. The power-off write is
-  dropped by a failed port, which is fine: the port already holds its null state.
-- **The hot-swap crash.** Writing the GPS SimVars' null state crashed FS2020 in a hot-swapping setup (the comment in
-  `SensorsOut.reset`: start on the runway, set `L:KLN90B_Disabled` true at once, then hot swap the other GPS units).
-  The crash was deterministic and is believed to belong to hot swapping in FS2020, which the project no longer
-  supports. The implementation must include a synthetic test in the real MSFS 2024 sim that zeroes the GPS SimVars of
-  every port in various setups: the unit powered and unpowered, `Output.WriteGPSSimVars` on and off, hot-swap enabled
-  and disabled including the FS2020 sequence, on the ground and in flight with the autopilot coupled to GPS. It is
-  prepared in code and run by the maintainer, and recorded in [sim-flight-record.md](sim-flight-record.md).
+  - **the GPS SimVars on it are zeroed too**: the null state `SensorsOut.reset` writes at every power change (#462),
+    limited to the SimVars of the failed port. It has no `K:GPS_OBS_ON`/`OFF` event (the LEG/OBS switch belongs to the
+    aircraft), writes `GPS WP CROSS TRK` 0 itself (only the signal tick writes it otherwise), and `setWPIndex` keeps the
+    index within the count. A GPS-coupled autopilot then loses its guidance instead of following a frozen DTK.
+- The power-off write of a failed port is dropped, which is fine: the port already holds its null state.
+- **The hot-swap crash (#462).** `GPS FLIGHT PLAN WP INDEX` above 0 with `GPS FLIGHT PLAN WP COUNT` 0 crashes MSFS 2024
+  to desktop when another GPS unit takes over in a hot swap. The old null state wrote that pair, which is why it was
+  disabled after a crash in FS2020. `setWPIndex` now keeps the index within the count for every caller, the failed
+  ports included. The synthetic zeroing test ran in the sim on 2026-11-03 and found the cause
+  ([sim-flight-record.md](sim-flight-record.md)).
+- **What the zeroing does to an autopilot** (the Duke's default autopilot, 2026-11-03): a failed analog nav port
+  (`GPS IS ACTIVE WAY POINT` false, deviation 0) drops it from NAV to HDG at once, and it stays in HDG after the repair.
+  Failed ARINC 429 nav data alone leave it in NAV, tracking on the deviation. With `GPS IS ACTIVE WAY POINT` false the sim
+  reports `GPS WP DISTANCE` 0, whatever the nav data port writes.
 - A failed input port reports `isReceiving` false. Its readers treat the value as missing (null, shown as dashes).
 - After a repair the port works again from the next tick.
 
@@ -246,7 +248,8 @@ some HSIs and autopilots, sees a flag; the unit itself works (B-2). In the sim:
 
 - `L:KLN90B_HSI_TF_FLAGS` reads 0 (flagged), and `GPS IS ACTIVE WAY POINT` and `GPS IS ACTIVE FLIGHT PLAN` read false.
 - The deviation (`GPS WP CROSS TRK`), the CDI scaling and everything else keep working.
-- The synthetic sim test of "A failed port in general" covers this failure too.
+- In the sim test of 2026-11-03, `GPS IS ACTIVE WAY POINT` false dropped the Duke's default autopilot from NAV to HDG
+  (see "A failed port in general"), so a superflag failure disconnects such an autopilot although the deviation works.
 
 ### Annunciators
 
@@ -513,7 +516,8 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
   failed port must drop exactly its SimVars), the receiver failures, jamming, spoofing and the faulty satellite
   against the receiver model, the battery wipe at a power-on.
 - With MTBF off and nothing failed, the whole existing suite stays green unchanged.
-- Sim: the synthetic zeroing test of "A failed port in general", before release.
+- Sim, before release: the failed ports with a hot swap to another GPS unit (the zeroing itself was tested on
+  2026-11-03, #462).
 
 ## Out of scope
 
