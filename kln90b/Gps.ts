@@ -198,9 +198,13 @@ export class GPS {
             },
         };
 
+        //#463: the SDK publishes the receiver's events synced to every instrument, on topics named by its index. Other GPS
+        //units use the same topics (the Working Title GNS reads gps_system_state_changed_1) and the KLN reads none of
+        //them, so the receiver gets a bus of its own that syncs nothing and asks for no resync
+        const receiverBus = new EventBus(() => ({sendSyncedEvent: () => undefined}), false);
         this.gpsSatComputer = new KLNGPSSatComputer(
             1,
-            bus,
+            receiverBus,
             `coui://${options.basePath}/Assets/gps_ephemeris.json`,
             `coui://${options.basePath}/Assets/gps_sbas.json`,
             5000,

@@ -27,12 +27,12 @@ const MINUTE = 60 * 1000;
 const WARM = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: START - DAY};
 
 /**
- * Seeds whose warm start lands at the ends of the observed spread. Found by a probe of seeds 1 to 40 on 2026-10-18, after
- * the harness began to start the sequence again once the user settings are built (test/harness/boot.ts): seed 12 had
- * its fix after 38 s, seed 34 after 105 s
+ * Seeds whose warm start lands at the ends of the observed spread. Found by a probe of seeds 1 to 40 on 2026-11-03, after
+ * the receiver got an event bus of its own (#463), whose id is one more draw of the sequence: seed 16 had its fix after
+ * 34 s, seed 12 after 102 s
  */
-const FAST_WARM_SEED = 12;
-const SLOW_WARM_SEED = 34;
+const FAST_WARM_SEED = 16;
+const SLOW_WARM_SEED = 12;
 
 /** The antipode of the boot position 47/8: no satellite is in view from both */
 const ANTIPODE = {lastLatitude: -47, lastLongitude: -172};

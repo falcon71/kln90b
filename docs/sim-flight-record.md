@@ -139,3 +139,13 @@ through the debugger)
 - **The GNS after a KLN power-off** (#463): swapped to after the KLN had been switched off, the GNS showed NO GPS
   POSITION, SEARCHING and its INTEG light for minutes, until the avionics master was cycled. Both receivers publish their
   synced events on index 1, and the GNS's display follows the KLN's reset. Not related to the GPS SimVars.
+
+**2026-11-03** (the check of #463: the same Duke, the KLN as primary and the GNS 430 as secondary GPS; a passive
+listener on the SDK's event-bus sync in the KDI 572 page, which recorded what reached the page and sent nothing)
+- **Before the fix.** One bus sent `gps_system_covar_matrix_1` and the three DOP topics every 5 s. It was the KLN's: the
+  KLN page's own listener never got its packages, the GNS 430 page did. With both receivers on a fix their states
+  agreed, which is why a primary/secondary setup showed no difference on the GNS.
+- **The check of the fix** (the #463 build, the receiver on a bus of its own that syncs nothing): no `gps_` topic on the
+  generic data listener or on the flow events for two minutes, the KLN's power-off and a swap to the GNS included. The
+  GNS showed its position after the swap. The listener saw no GNS receiver traffic on either channel, before or after
+  the fix, so the silence after the fix has no positive control; the GNS's position after the swap is the evidence.

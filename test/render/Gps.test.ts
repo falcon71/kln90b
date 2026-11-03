@@ -169,22 +169,49 @@ describe('TK and the 2 kt limit (3-32, 3-35)', () => {
     });
 });
 
-// #463: the SDK publishes every receiver event synced and cached, so it reaches every instrument of the aircraft. The
-// Working Title GNS 430/530 builds its receiver on index 1 and drives its display from gps_system_state_changed_1, so a
-// KLN receiver on index 1 sets the state the GNS shows (NO GPS POSITION after a KLN power-off, the sim on 2026-11-03).
-// The KLN subscribes to none of these topics, so its receiver belongs on an index no other GPS uses
-describe('the receiver events do not use the topics of other GPS units (#463)', () => {
-    it.fails('publishes nothing on gps_system_state_changed_1 through an acquisition and a power cycle (#463)', async () => {
-        const unit = await bootUnit({coldGps: true});
-        const states: unknown[] = [];
-        unit.core.bus.getSubscriber<any>().on('gps_system_state_changed_1').handle(s => states.push(s));
-        await settle(unit);
+// #463: the SDK publishes the receiver's state, SBAS state, inhibit, covariance and DOP events synced and cached, so they
+// reach every instrument of the aircraft. The Working Title GNS 430/530 builds its receiver on index 1 and drives its display from gps_system_state_changed_1, so a
+// KLN receiver on index 1 set the state the GNS showed (NO GPS POSITION after a KLN power-off, the sim on 2026-11-03).
+// The KLN subscribes to none of these topics, so none of them may leave the unit, whatever the index. The harness's
+// listener never becomes ready and the harness has no flow events, which keeps every bus local; this test records what
+// the buses would send on either sync channel of the SDK instead
+describe('the receiver events stay inside the unit (#463)', () => {
+    it('syncs no receiver event to other instruments through an acquisition and a power cycle (#463)', async () => {
+        const g = globalThis as any;
+        const original = g.RegisterGenericDataListener;
+        const originalFlow = g.LaunchFlowEvent;
+        const topics: string[] = [];
+        g.RegisterGenericDataListener = (onReady: () => void) => {
+            setTimeout(onReady, 0); //The SDK assigns the listener before its ready callback may use it
+            return {
+                send: (_key: string, pkg: { data: { topic: string }[] }) => topics.push(...pkg.data.map(d => d.topic)),
+                onDataReceived: () => undefined,
+            };
+        };
+        //The other channel, a bus built with the flow event sync
+        g.LaunchFlowEvent = (_event: string, key: string, _busId: string, json: string) => {
+            if (key === 'EB_EVENTS') {
+                topics.push(...(JSON.parse(json) as { data: { topic: string }[] }).data.map(d => d.topic));
+            }
+        };
+        try {
+            const unit = await bootUnit({coldGps: true});
+            await settle(unit);
 
-        unit.send('KLN90B_Power_Off');
-        await vi.advanceTimersByTimeAsync(3000);
-        unit.send('KLN90B_Power_On');
-        await vi.advanceTimersByTimeAsync(3000);
+            unit.send('KLN90B_Power_Off');
+            await vi.advanceTimersByTimeAsync(3000);
+            unit.send('KLN90B_Power_On');
+            await vi.advanceTimersByTimeAsync(3000);
+        } finally {
+            g.RegisterGenericDataListener = original;
+            if (originalFlow === undefined) {
+                delete g.LaunchFlowEvent; //The harness defines none
+            } else {
+                g.LaunchFlowEvent = originalFlow;
+            }
+        }
 
-        expect(states).toEqual([]);
+        expect(topics).toContain('event_bus'); //The unit's bus asks for a resync at its construction: the recorder is wired
+        expect(topics.filter(t => t.startsWith('gps_'))).toEqual([]);
     });
 });

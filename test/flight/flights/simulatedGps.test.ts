@@ -22,6 +22,11 @@ import {angleDiff, courseDeg, crossTrackNm, distanceNm, EARTH_RADIUS_NM, LatLon,
  */
 
 const SEED = 402;
+/**
+ * The satellite loss needs a seed with a large position step at the loss, to have a step worth gliding. Seeds 400 to 415
+ * stepped by 0.8 to 29 m (measured 2026-11-03, after the receiver's own event bus of #463 added a draw), 29 m with this one
+ */
+const LOSS_SEED = 408;
 const RAD = Math.PI / 180;
 const EARTH_RADIUS_M = EARTH_RADIUS_NM * 1852;
 
@@ -140,12 +145,12 @@ function speedProfile(gsAt: (seconds: number) => number): Pilot {
 /** Wings level from KAAA toward ABC, with no flight plan */
 function startStraight(o: {
     simulatedGps: boolean, groundspeedKt: number, altitudeFt?: number, trackTrue?: number, storage?: Record<string, unknown>,
-    platform?: Partial<KLN90BPlatform>,
+    platform?: Partial<KLN90BPlatform>, seed?: number,
 }): Promise<Flight> {
     const {kaaa, abc, kbbb} = standardRoute();
     const world = new World({magvar: 0}).add(kaaa, abc, kbbb);
     return Flight.start({
-        world, simulatedGps: o.simulatedGps, seed: SEED, storage: o.storage, platform: o.platform, pilot: new ManualPilot(),
+        world, simulatedGps: o.simulatedGps, seed: o.seed ?? SEED, storage: o.storage, platform: o.platform, pilot: new ManualPilot(),
         aircraft: {
             lat: kaaa.lat, lon: kaaa.lon, altitudeFt: o.altitudeFt ?? 3000, groundspeedKt: o.groundspeedKt,
             trackTrue: o.trackTrue ?? courseDeg(kaaa, abc),
@@ -331,7 +336,7 @@ describe('simulated GPS receiver (#402)', () => {
 
     it('does not jump when satellites leave', async () => {
         const probe = filterInputProbe();
-        const flight = await startStraight({simulatedGps: true, groundspeedKt: 120, platform: probe.platform});
+        const flight = await startStraight({simulatedGps: true, groundspeedKt: 120, platform: probe.platform, seed: LOSS_SEED});
         const samples = recordGpsTicks(flight, probe);
         await flight.fly(120);
         const inhibited = samples.length;
@@ -345,12 +350,11 @@ describe('simulated GPS receiver (#402)', () => {
         expect(samples[loss - 1].satellites).toBe(8);
         expect(samples.slice(loss).every(s => s.satellites === 4)).toBe(true);
         // The measured position steps at the loss (the four kept satellites map their errors differently, and the
-        // errors of the others drop out). Its size depends on the seed: 1.6 to 30 m over
-        // sixteen seeds measured 2026-11-01, 30 m with this one, which therefore has a step worth gliding
+        // errors of the others drop out). Its size depends on the seed (LOSS_SEED)
         expect(errorStepM(samples[loss - 1], samples[loss], s => s.measured!)).toBeGreaterThanOrEqual(10);
         // Design 6.10: beyond the move of the truth between two ticks (v·dt), the position moves at most 5 m per tick,
-        // from 5 s before the loss on. Held tighter here: the largest step is 1.18 m with this seed (measured 2026-11-02,
-        // 3.48 m while the harness still gave each tick a position up to 62 ms stale, #457), so a weaker glide fails too
+        // from 5 s before the loss on. Held tighter here: the largest step is 1.48 m with this seed (measured 2026-11-03),
+        // so a weaker glide fails too
         for (let i = loss - 5; i < samples.length; i++) {
             expect(errorStepM(samples[i - 1], samples[i], s => s.gps), `t = ${samples[i].t.toFixed(1)} s`).toBeLessThanOrEqual(2);
         }
