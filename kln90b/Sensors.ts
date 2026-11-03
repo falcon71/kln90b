@@ -601,6 +601,14 @@ export class SensorsOut {
         }
     }
 
+    /**
+     * GPS FLIGHT PLAN WP INDEX is 1-based: the active waypoint of FPL 0 is index + 1, and 0 without one. It never exceeds
+     * the count. An index above 0 with a count of 0 crashes MSFS 2024 to desktop when another GPS unit takes over in a hot
+     * swap; index = count (the last waypoint active) and an index above a non-zero count did not (#462, the sim tests of
+     * 2026-11-03 in docs/sim-flight-record.md). The guard is here so that no caller can write that pair
+     * @param index the index of the active waypoint in FPL 0, -1 without one
+     * @param countTotal the number of FPL 0 legs
+     */
     public setWPIndex(index: number, countTotal: number) {
         const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the flight plan output (see WTFlightplanSync), either
@@ -610,7 +618,7 @@ export class SensorsOut {
         //  waypoint from/to, the TO record number in BCD with the tens in bits 13-16 and the units in bits 21-24 (GAMA 11
         //  pages 9, 10)
         gpsNavData.write('GPS FLIGHT PLAN WP COUNT', SimVarValueType.Number, countTotal);
-        gpsNavData.write('GPS FLIGHT PLAN WP INDEX', SimVarValueType.Number, index + 1);
+        gpsNavData.write('GPS FLIGHT PLAN WP INDEX', SimVarValueType.Number, Math.max(0, Math.min(index + 1, countTotal)));
     }
 
     public setNextWpt(wpt: Facility | null) {
@@ -783,7 +791,7 @@ export class SensorsOut {
 
     /**
      * The ticks that write the L:KLN90B_* outputs stop when the unit loses power, so the zero state is written once.
-     * The GPS SimVars are left alone, see the note in reset().
+     * The GPS SimVars get their null state in reset() (#462).
      */
     public setPoweredOff(): void {
         //Real unit: without power the annunciator pins are open, the 429 transmitter is silent and the analog outputs
@@ -813,29 +821,33 @@ export class SensorsOut {
 
         this.setGpsOverriden();
 
-        //Code disabled for now.
-        //A CTD has been observed in the following conditions:
-        //Starting a flight on the runway and setting L:KLN90B_Disabled to true right away
-        //The sim crashes once hot swapping of other GPS units occur
-        //The crash can be prevented by the following:
-        //- Not setting GPS OVERRIDDEN to false when disabling the KLN (SimVarSync.setDisabled)
-        //- Running TickController.tickCalc at least once before setting GPS OVERRIDDEN to false when disabling the KLN
-        //- Or by not setting these GPS SimVars to 0
-        //- The exact offending SimVar is unknown at this time
-        /*
+        //The null state of the GPS SimVars, at every power change, so that a switched-off unit does not leave a
+        //GPS-coupled autopilot a frozen DTK and deviation (#462). The ticks write the real values from the next one on.
+        //It was disabled from d3c5230f (2024-03-03) to #462 after a crash to desktop in FS2020, whose cause was not known
+        //then. The sim tests of 2026-11-03 (MSFS 2024, docs/sim-flight-record.md) found it: GPS FLIGHT PLAN WP INDEX 1
+        //with GPS FLIGHT PLAN WP COUNT 0 crashes the sim when another GPS unit takes over in a hot swap. The same null
+        //state with index 0 does not, and that pair alone among live values does. The old guesses (a start on the runway,
+        //L:KLN90B_Disabled set at once, no calculation tick yet) were wrong. setWPIndex keeps the index within the count
         this.setXTK(null, 5);
+        //Real unit: the D-bar driver holds its pin through op-amp stages behind the RC filter (CMM 64-65,
+        //SignalOutputFilter), so without power the pin drops to 0 V at once (guess: the manuals do not describe the
+        //unpowered output). Only the signal tick writes the deviation, and it stops with the power
+        this.interconnect.gps(this.interconnect.analogNav).write('GPS WP CROSS TRK', SimVarValueType.Meters, 0);
         this.setObs(null);
         this.setDesiredTrack(null, null, 0);
-        this.setWpBearing(null, null);
+        this.setWpBearing(null, null, 0);
         this.setDistance(null);
         this.setWPTETE(null, null);
         this.setDestETE(null, null);
-        this.setPos(null, null, null, 0);
-        this.setWPIndex(0, 0);
+        this.setPos(null, null, null, 0, false);
+        this.setWPIndex(-1, 0);
         this.setPrevWpt(null);
         this.setNextWpt(null);
-        this.setMode(NavMode.ENR_LEG, false, !this.options.input.externalSwitches.legObsSwitchInstalled);
-         */
+        this.setRollCommand(null, null);
+        //Not setMode: K:GPS_OBS_ON/OFF is the position of the aircraft's LEG/OBS switch (GPS OBS ACTIVE), which a power
+        //change must not flip. The next calculation tick writes the real mode
+        this.interconnect.gps(this.interconnect.navData).write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
+        this.interconnect.gps(this.interconnect.approachLamps).write('GPS APPROACH MODE', SimVarValueType.Enum, 0);
     }
 }
 

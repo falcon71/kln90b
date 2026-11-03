@@ -27,6 +27,10 @@ autopilot. The KLN 89 trainer checks are in [kln89-trainer-record.md](kln89-trai
   - The error page keeps its text in the DOM after OK: `document.querySelector('.errormessage').innerHTML` through
     `simdbg.mjs eval`.
   - The sim time runs on in active and full pause, and the unit keeps ticking, so the log stays readable in a pause.
+  - The sim ignores the unit of a write to the GPS SimVars and takes the value in the SimVar's own unit (2026-11-03): a
+    distance written in nautical miles lands as meters, a magnetic variation in degrees as radians (−416°). A debugger
+    write uses the unit `SensorsOut` uses. A value read back in the same evaluation as its write is still the old one;
+    read it in a later evaluation. `GPS WP NEXT ID` and `GPS WP PREV ID` read back empty although the unit writes them.
 - **Adding an aircraft:** fly the route of the 2026-11-02 block with it, fit the constants of `simNavAutopilot` to the
   turns (or write a pilot of its own when its autopilot works differently), check the fit against a second flight that
   the fit did not see, and add a profile to `AIRCRAFT_PROFILES` and its bands to `MEASURED` in `aircraftTurns.test.ts`.
@@ -89,3 +93,49 @@ turn; read again from their logs on 2026-11-02)
   73 to 77 m inside (B 15 to 67), at most 135 to 137 m (B 100 to 155), under 30 m after 48 s (B 25 to 38), then 66 to 67 m
   outside (B 20 to 79). It gets the effect of the roll-in, but is about 35 m too far inside without it and converges more
   slowly than the Duke.
+
+**2026-11-03** (the zeroing test of `docs/failures.md` for #458, and the bisection of the hot-swap crash, #462: Black
+Square Turbine Duke, KTTS, its hot swap to a Garmin GNS; a throwaway build whose console fails an output port, which
+writes the null state of its outputs once, the GPS SimVars included, and then drops every write; single SimVars written
+through the debugger)
+- **On the ground, flight 1.** Each port failed in turn: about 1 s later every SimVar of the port read 0 and stayed 0;
+  the repair brought the live values back within a few seconds. The approach lamps showed nothing, being 0 en route.
+  With `L:KLN90B_WriteGpsSimvars` off, failing every port wrote no GPS SimVar: `GPS OVERRIDDEN` was 0 and the sim's own
+  GPS filled them (ETA 64171 s, course to steer 5.8). The null state of the old commented-out list in
+  `SensorsOut.reset`, written through every port at the instrument load and again at a power cycle with every port
+  failed, held through the self-test. No crash.
+- **The sim derives values from what the unit writes.** A DTK of 0 read back as 352.7°, 0 less the sim's own variation
+  of −7.3°, and the bearings likewise. With `GPS IS ACTIVE WAY POINT` false the sim reported `GPS WP DISTANCE` 0 although
+  that SimVar's port still worked.
+- **In flight, flight 1** (about 130 kt, 1000 ft, the default autopilot in NAV on GPS): the ARINC 429 nav data failed
+  for 30 s (DTK, distance and position 0): the autopilot stayed in NAV and closed from 113 m to about 20 m on the
+  deviation alone. The analog nav port failed (`GPS IS ACTIVE WAY POINT` false, deviation 0): the autopilot dropped from
+  NAV to HDG in the same second, turned to the heading bug and stayed in HDG after the repair. Every port failed: the
+  same as the analog port. After a repair every output came back within 1 s.
+- **Hot swaps, flight 2.** At the load the Duke set `L:KLN90B_Disabled` before the KLN powered on, so the unit wrote no
+  null state at its power-on; the Duke grays its hot swap out until the aircraft has loaded and holds each swap read-only
+  for a while. Several swaps from the KLN to the GNS and between the other units, and back: no crash.
+- **The crash.** Every port failed (the old null state), then a swap from the KLN to the GNS: the sim crashed to desktop
+  at the first swap. The bisection, each case one swap from the KLN to the GNS:
+
+  | Case | `GPS FLIGHT PLAN WP COUNT` / `WP INDEX` | The other GPS SimVars | Result |
+  |---|---|---|---|
+  | The old null state | 0 / 1 | zero | crash |
+  | A | 0 / 0 | zero | no crash |
+  | B | 0 / 1 | live values | crash |
+  | D: the unit working, Direct To TF3, the last of three | 3 / 3 | live | no crash |
+  | C | 1 / 2 | live values | no crash |
+
+  So an index above 0 with a count of 0 crashes the sim at a hot swap. The 1-based index the unit writes is safe. The
+  guesses of the FS2020 comment (a start on the runway, the unit disabled at once, no calculation tick yet) were wrong:
+  the unit had ticked for minutes before the crashing swap. The fix is #462.
+- **The check of the fix** (the #462 build, the same aircraft, FPL 0 active): with the KLN switched off its GPS SimVars
+  read the null state, `WP COUNT` / `WP INDEX` 0 / 0, position, distance and deviation 0, both active flags false,
+  `GPS OBS ACTIVE` unchanged and `GPS OVERRIDDEN` 1. The Duke's CDI needle returned to center quickly and smoothly, its
+  own animation. The swap to the GNS: no crash. Back on the switched-off KLN, `GPS OVERRIDDEN` read 0 although
+  `L:KLN90B_WriteGpsSimvars` was 1, so the sim's own GPS filled the SimVars with the live position; something on the
+  aircraft's side cleared the claim. Switched on, the KLN claimed the GPS again and wrote live values (TF1 to TF2, count
+  3, index 2).
+- **The GNS after a KLN power-off** (#463): swapped to after the KLN had been switched off, the GNS showed NO GPS
+  POSITION, SEARCHING and its INTEG light for minutes, until the avionics master was cycled. Both receivers publish their
+  synced events on index 1, and the GNS's display follows the KLN's reset. Not related to the GPS SimVars.
