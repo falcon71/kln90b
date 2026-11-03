@@ -43,7 +43,7 @@ sections below say `KLN90BCore` where the code moved and `KLN90B` where the adap
 
 **constructor** of `KLN90BCore` (runs before the XML config is available):
 
-- Creates `new EventBus()`, which is the single bus for everything.
+- Creates `new EventBus()`, which is the single bus for everything except the GPS receiver's private bus (#463).
 - Creates `KLN90BUserSettings(bus)` and `KLN90BSettingSaveManager`, then calls `load(saveKey)` and
   `startAutoSave(saveKey)` with
   `saveKey = "${SimVar 'ATC MODEL'}.profile_1"`. **All persistent data is per aircraft model.**
@@ -267,6 +267,11 @@ prediction context of the main computer.
     - The satellites' `data.lastEphemerisTime` (`restoreEphemeris()`, the persisted ephemeris; read back through the
       public `lastEphemerisTime` getter).
     - The SDK's `simTime` and `distanceFromLastKnownPos` are no longer read.
+- **The receiver has an event bus of its own** (#463). The SDK publishes the receiver's state, SBAS state, inhibit,
+  covariance and DOP events (`gps_system_state_changed_<index>` and so on) synced to every instrument, and other
+  GPS units use the same topics: the Working Title GNS drives its display from `gps_system_state_changed_1`. The unit
+  reads none of them, so `GPS` builds the receiver on a bus whose sync handler sends nothing and which asks for no
+  resync. Nothing in the unit may subscribe to the receiver's topics on the unit's bus.
 - **The start model** (`kln90b/GpsSearch.ts`, #62): what the unit believes decides how it searches. `GPS.powerChanged`
   calls `search.start(coords)` at power-on; on the next tick, once its prediction context is ready, it picks a mode
   from the stored position, the almanac age and the unit's own clock (`internalTime`). `GPS.tick` calls `search.tick()`

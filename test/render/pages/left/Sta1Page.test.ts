@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSSatellite, GPSSatelliteState, GPSSystemState} from '@microsoft/msfs-sdk';
+import {GPSSatellite, GPSSatelliteState} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {DEFAULT_START} from '../../../harness/sim/clock';
@@ -179,11 +179,13 @@ describe('STA 1 receiver states (5-29)', () => {
         await unit.panel.approveSelfTest();
         await unit.panel.selectPage('L', 'STA 1');
         const gps = unit.props.sensors.in.gps;
-        const sdkSolution = () => gps.gpsSatComputer.state === GPSSystemState.SolutionAcquired;
-        for (let i = 0; i < 600 && !sdkSolution(); i++) {
+        //The unit's own solution (#453), not the SDK's state: the unit's solution can come with three satellites and the
+        //altitude, before the SDK's, which needs four
+        const ownSolution = () => gps.solution.valid;
+        for (let i = 0; i < 600 && !ownSolution(); i++) {
             await vi.advanceTimersByTimeAsync(250);
         }
-        expect(sdkSolution()).toBe(true);
+        expect(ownSolution()).toBe(true);
         await vi.advanceTimersByTimeAsync(250); //one display tick
 
         expect(gps.isValid()).toBe(false);
