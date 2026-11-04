@@ -69,7 +69,7 @@ export class Nav5Page extends SixLineHalfPage {
         }
 
         let ctx: CoordinateCanvasDrawContext;
-        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.sensors.in.isHeadingAvailable())) {
             case Nav5Orientation.NORTH_UP:
                 ctx = this.children.get("canvas").getDrawingContextWithCenterRange(this.props.sensors.in.gps.coords, this.rangeSetting.get());
                 break;
@@ -86,7 +86,7 @@ export class Nav5Page extends SixLineHalfPage {
                 ctx = this.children.get("canvas").getDrawingContextWithOffsetCenterRangeRotation(this.props.sensors.in.gps.coords, this.rangeSetting.get(), tk);
                 break;
             case Nav5Orientation.HDG_UP:
-                const hdg = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro ?? 0);
+                const hdg = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro!);
                 ctx = this.children.get("canvas").getDrawingContextWithOffsetCenterRangeRotation(this.props.sensors.in.gps.coords, this.rangeSetting.get(), hdg);
                 break;
             default:
@@ -224,7 +224,7 @@ export class Nav5Page extends SixLineHalfPage {
     }
 
     private drawPlaneIcon(ctx: CoordinateCanvasDrawContext) {
-        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.sensors.in.isHeadingAvailable())) {
             case Nav5Orientation.NORTH_UP:
             case Nav5Orientation.DTK_UP:
                 ctx.drawIcon(this.props.sensors.in.gps.coords, "$");

@@ -12,7 +12,7 @@ export const PANEL_KEYS = [
     'Input.FuelComputer.FOBTransmitted', 'Input.FuelComputer.FuelUsedTransmitted',
     'Input.ExternalSwitches.LegObsSwitchInstalled', 'Input.ExternalSwitches.AppArmSwitchInstalled',
     'Output.ObsTarget', 'Output.AltitudeAlertEnabled', 'Output.WriteGPSSimVars',
-    'Input.Airdata.Interface', 'Input.ObsInterface', 'Input.HeadingInterface', 'Output.RmiInterface', 'Output.DataInterface',
+    'Input.Airdata.Interface', 'Input.ObsInterface', 'Input.HeadingInterface', 'Output.RmiInterface', 'Output.RmiInstalled', 'Output.DataInterface',
     'Output.ExternalAnnunciators.MsgInstalled', 'Output.ExternalAnnunciators.WptInstalled',
     'Output.ExternalAnnunciators.ArmInstalled', 'Output.ExternalAnnunciators.ActvInstalled',
 ] as const;

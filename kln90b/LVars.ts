@@ -35,6 +35,15 @@ export const LVAR_ANNUN_TEST = "L:KLN90B_AnnunTest";
 // see https://github.com/falcon71/kln90b/wiki/panel.xml-customization for details
 export const LVAR_ALERT_VOLUME = "L:KLN90B_AlertVolume";
 
+// Boolean. true while the unit transmits on its ARINC 429 output, or on its RS-232 output with the nav data
+// (Output.DataInterface RS232; without it the RS-232 output carries nothing in the sim). Fictional: no pin carries it. An
+// EFIS that takes the nav data and the MSG annunciation over the bus cannot see when the data stop, so it reads these: 0
+// while the unit is off, while it boots until the Self Test page shows (the main page at an engine-running start), and
+// while the failure simulation has failed that output (#458, FLR pages 429 OUTPUT and RS-232 OUT).
+// Please see https://github.com/falcon71/kln90b/wiki/Failures for details
+export const LVAR_ARINC429_OUTPUT_TRANSMITTED = "L:KLN90B_Arinc429OutputTransmitted";
+export const LVAR_RS232_OUTPUT_TRANSMITTED = "L:KLN90B_Rs232OutputTransmitted";
+
 //##############
 //###Writable###
 //##############

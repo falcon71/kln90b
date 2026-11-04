@@ -17,11 +17,11 @@ export class MapOrientationSelector extends SelectField {
     }
 
     public static build(options: KLN90PlaneSettings, orientationSetting: UserSetting<Nav5Orientation>, sensors: Sensors, modeController: ModeController): MapOrientationSelector {
-        return new MapOrientationSelector(this.getValueset(options), effectiveMapOrientation(orientationSetting.get(), options.input.headingInput), orientationSetting, sensors, modeController, (orientation) => this.saveMapOrientation(orientationSetting, orientation));
+        return new MapOrientationSelector(this.getValueset(sensors.in.isHeadingAvailable()), effectiveMapOrientation(orientationSetting.get(), sensors.in.isHeadingAvailable()), orientationSetting, sensors, modeController, (orientation) => this.saveMapOrientation(orientationSetting, orientation));
     }
 
-    private static getValueset(options: KLN90PlaneSettings): string[] {
-        return options.input.headingInput ? ["N^  ", "DTK^", "TK^ ", "HDG^"] : ["N^  ", "DTK^", "TK^ "];
+    private static getValueset(headingAvailable: boolean): string[] {
+        return headingAvailable ? ["N^  ", "DTK^", "TK^ ", "HDG^"] : ["N^  ", "DTK^", "TK^ "];
     }
 
     private static saveMapOrientation(orientationSetting: UserSetting<Nav5Orientation>, orientation: Nav5Orientation): void {
@@ -43,7 +43,7 @@ export class MapOrientationSelector extends SelectField {
         } else {
             this.ref!.instance.classList.remove("inverted");
 
-            switch (this.value) {
+            switch (effectiveMapOrientation(this.value, this.sensors.in.isHeadingAvailable())) {
                 case Nav5Orientation.NORTH_UP:
                     this.ref.instance.textContent = "N^  ";
                     break;

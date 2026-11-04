@@ -23,7 +23,7 @@ const DEFAULTS = {
         externalSwitches: {legObsSwitchInstalled: false, appArmSwitchInstalled: false},
     },
     output: {
-        obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true, rmiInterface: 'OBI', dataInterface: 'ARINC429',
+        obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true, rmiInterface: 'OBI', rmiInstalled: false, dataInterface: 'ARINC429',
         externalAnnunciators: {msgInstalled: false, wptInstalled: false, armInstalled: false, actvInstalled: false},
     },
 };
@@ -158,6 +158,7 @@ describe('panel.xml parser', () => {
             ['Input.ObsInterface', '<Input><ObsInterface>ARINC429</ObsInterface></Input>', 'input.obsInterface', 'ARINC429'],
             ['Input.HeadingInterface', '<Input><HeadingInterface>RS232</HeadingInterface></Input>', 'input.headingInterface', 'RS232'],
             ['Output.RmiInterface', '<Output><RmiInterface>ARINC429</RmiInterface></Output>', 'output.rmiInterface', 'ARINC429'],
+            ['Output.RmiInstalled', '<Output><RmiInstalled>true</RmiInstalled></Output>', 'output.rmiInstalled', true],
             ['Output.DataInterface', '<Output><DataInterface>RS232</DataInterface></Output>', 'output.dataInterface', 'RS232'],
             ['Output.ExternalAnnunciators.MsgInstalled', '<Output><ExternalAnnunciators><MsgInstalled>true</MsgInstalled></ExternalAnnunciators></Output>', 'output.externalAnnunciators.msgInstalled', true],
             ['Output.ExternalAnnunciators.WptInstalled', '<Output><ExternalAnnunciators><WptInstalled>true</WptInstalled></ExternalAnnunciators></Output>', 'output.externalAnnunciators.wptInstalled', true],
@@ -292,6 +293,7 @@ describe('panel.xml parser', () => {
             ['<Input><ObsInterface>analog</ObsInterface></Input>', 'Input.ObsInterface: "analog" is not one of Analog, ARINC429. The default Analog is used.'],
             ['<Input><HeadingInterface>RS-232</HeadingInterface></Input>', 'Input.HeadingInterface: "RS-232" is not one of ARINC429, RS232. The default ARINC429 is used.'],
             ['<Output><RmiInterface>Obi</RmiInterface></Output>', 'Output.RmiInterface: "Obi" is not one of OBI, ARINC429. The default OBI is used.'],
+            ['<Output><RmiInstalled>yes</RmiInstalled></Output>', 'Output.RmiInstalled: "yes" is not true or false. The default false is used.'],
             ['<Output><ExternalAnnunciators><MsgInstalled>1</MsgInstalled></ExternalAnnunciators></Output>', 'Output.ExternalAnnunciators.MsgInstalled: "1" is not true or false. The default false is used.'],
         ])('uses the default for %s and records the problem', (inner, problem) => {
             const {settings, problems} = parseWithProblems(kln(inner));

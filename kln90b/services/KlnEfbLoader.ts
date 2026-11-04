@@ -6,6 +6,7 @@ import {MainPage} from "../pages/MainPage";
 import {Fpl0Page} from "../pages/left/FplPage";
 import {PageManager} from "../pages/PageManager";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
+import {Interconnect} from "../Interconnect";
 import {Hardware} from "../Hardware";
 import {EfbRouteResolver} from "./EfbRouteResolver";
 import {fitEfbRoute} from "./EfbRouteFit";
@@ -24,7 +25,7 @@ export class KlnEfbLoader extends Flightplanloader {
     /** Counts the imports, so that one overtaken by a newer route can tell */
     private loadOpId = 0;
 
-    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly flightplans: Flightplan[], private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware, sidstar: SidStar) {
+    constructor(protected readonly bus: EventBus, protected readonly facilityLoader: FacilityClient, protected messageHandler: MessageHandler, private readonly flightPlanRouteManager: FlightPlanRouteManager, private readonly flightplans: Flightplan[], private readonly pageManager: PageManager, private readonly facilityRepository: KLNFacilityRepository, private readonly hardware: Hardware, sidstar: SidStar, private readonly interconnect: Interconnect) {
         super(bus, facilityLoader, messageHandler);
         this.fpl0 = flightplans[0];
         this.resolver = new EfbRouteResolver(bus, facilityLoader, facilityRepository, sidstar);
@@ -35,6 +36,13 @@ export class KlnEfbLoader extends Flightplanloader {
         if (this.hardware.isDisabled) { //#188. The state SimVarSync keeps, not the LVar (#353)
             //A route that is synced for the GPS that replaced the KLN must not change the FPL 0 of the suspended KLN. The route is dropped, not loaded on resume
             console.log("Ignoring route, because the unit is disabled for hot swapping");
+            return;
+        }
+
+        if (!this.interconnect.navData.isTransmitting) {
+            //#458: a failed nav data port is ignored in both directions. The port itself, not the gps() gate: the
+            //loader loads whatever Output.WriteGPSSimVars says
+            console.log("Ignoring route, because the nav data port is failed");
             return;
         }
 

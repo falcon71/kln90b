@@ -15,6 +15,9 @@ export interface DisplayTickable {
 export interface CalcTickable {
     tick(): void;
 
+    /** Called when the loops stop (power off, hot-swap disable), for a tickable that measures the time between ticks */
+    onTicksStopped?(): void;
+
 }
 
 /**
@@ -142,6 +145,9 @@ export class TickController {
             this.signalsIntervallID = window.setInterval(this.tickSignals.bind(this), TICK_TIME_SIGNALS);
         } else {
             console.log("ending ticks");
+            for (const tickable of this.calcTickables) {
+                tickable.onTicksStopped?.();
+            }
             window.clearInterval(this.displayIntervallID);
             window.clearInterval(this.calcIntervallID);
             window.clearInterval(this.signalsIntervallID);

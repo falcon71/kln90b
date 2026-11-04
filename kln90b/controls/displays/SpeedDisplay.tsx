@@ -42,7 +42,7 @@ export class MachDisplay implements UiElement {
     readonly children = NO_CHILDREN;
     private readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    constructor(public mach: number) {
+    constructor(public mach: number | null) {
     }
 
     render(): VNode {
@@ -57,6 +57,9 @@ export class MachDisplay implements UiElement {
     }
 
     private formatMach(): string {
+        if (this.mach === null) {
+            return "---"; //#458: a failed input leaves it missing. The cells of .29
+        }
         const clamped = Utils.Clamp(this.mach, 0, 0.99);
         return padFixed(clamped, 1, 2).substring(1);
     }

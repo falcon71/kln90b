@@ -449,3 +449,44 @@ describe('a power-off during the self-test (#400)', () => {
         expect(unit.errors).toEqual([]);
     });
 });
+
+// 3-4: a failed test flashes TEST FAIL in place of ANNUN ON. An active failure that the unit's own test would catch
+// (the ARINC 429 or RS-232 output) does the same (#458), without the #416 self-test failure and its message
+describe('TEST FAIL for an active failure (#458)', () => {
+    const lastRow = () => Screen.read().rows('L')[5];
+    const lastMask = () => Screen.read().maskRows('L')[5];
+
+    it('an active TEST FAIL failure flashes TEST FAIL (3-4)', async () => {
+        const unit = await bootToSelfTest({magvar: 0, storage: {failure_arinc429Out: '{}'}});
+
+        expect(lastRow()).toBe('TEST FAIL  ');
+        const masks: string[] = [];
+        for (let i = 0; i < 4; i++) {
+            masks.push(lastMask().slice(0, 9));
+            await vi.advanceTimersByTimeAsync(250);
+        }
+        expect(masks.every(m => m === 'B'.repeat(9) || m === '.'.repeat(9))).toBe(true);
+        expect(masks).toContain('B'.repeat(9));
+        expect(masks).toContain('.'.repeat(9));
+        expect(unit.props.memory.selfTestFailure).toBeNull();
+
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messages(unit)).not.toContain('DATA BASE CHECKSUM ERR');
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('a failure without TEST FAIL shows ANNUN ON', async () => {
+        await bootToSelfTest({magvar: 0, panelXml: HEADING_INPUT_XML_RS232, storage: {failure_rs232In: '{}'}});
+
+        expect(lastRow()).toBe('ANNUN    ON');
+    });
+
+    it('an ineligible TEST FAIL failure shows ANNUN ON', async () => {
+        await bootToSelfTest({magvar: 0, storage: {failure_rs232Out: '{}'}});
+
+        expect(lastRow()).toBe('ANNUN    ON');
+    });
+});
+
+const HEADING_INPUT_XML_RS232 = panelXml({...HEADING_INPUT, 'Input.HeadingInterface': 'RS232'});

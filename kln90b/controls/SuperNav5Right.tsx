@@ -28,7 +28,7 @@ export class SuperNav5Right implements UiElement {
             ndb: new SelectField(["OFF", " ON"], this.props.userSettings.getSetting("superNav5Ndb").get() ? 1 : 0, this.saveNdb.bind(this)),
             apt: new SelectField(["OFF", " ON"], this.props.userSettings.getSetting("superNav5Apt").get() ? 1 : 0, this.saveApt.bind(this)),
             orientationValue: new BearingDisplay(this.getOrientationValue()),
-            orientation: new SelectField(this.getOrientationValueset(props.planeSettings), effectiveMapOrientation(this.orientationSetting.get(), props.planeSettings.input.headingInput), this.saveMapOrientation.bind(this)),
+            orientation: new SelectField(this.getOrientationValueset(props.sensors.in.isHeadingAvailable()), effectiveMapOrientation(this.orientationSetting.get(), props.sensors.in.isHeadingAvailable()), this.saveMapOrientation.bind(this)),
 
         });
     }
@@ -55,7 +55,7 @@ export class SuperNav5Right implements UiElement {
     }
 
     private getOrientationValue(): Degrees | null {
-        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.sensors.in.isHeadingAvailable())) {
             case Nav5Orientation.NORTH_UP:
                 return 0;
             case Nav5Orientation.DTK_UP:
@@ -67,8 +67,8 @@ export class SuperNav5Right implements UiElement {
         }
     }
 
-    private getOrientationValueset(options: KLN90PlaneSettings): string[] {
-        return options.input.headingInput ? [" N^", "Ó^", "Ö^", "Ú^"] : [" N^", "Ó^", "Ö^"];
+    private getOrientationValueset(headingAvailable: boolean): string[] {
+        return headingAvailable ? [" N^", "Ó^", "Ö^", "Ú^"] : [" N^", "Ó^", "Ö^"];
     }
 
     private saveVor(vor: SuperNav5VOR): void {

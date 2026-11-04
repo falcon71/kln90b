@@ -1573,3 +1573,38 @@ describe('EFB route import of procedures (#378)', () => {
         expect(types(unit)).toEqual([USER, USER, USER]);
     });
 });
+
+// #458, design "The ports": a failed port that carries the nav data is ignored by the EFB route sync in both directions
+describe('EFB route sync while the nav data port is failed (#458)', () => {
+    it('a synced route is ignored while the data port is failed, and answered after the repair', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, storage: savedFlightplan(0, [kaaa])});
+        await settle(unit);
+        expect(fplIdents(unit)).toEqual(['KAAA']); // Precondition
+        unit.props.failures.fail('arinc429Out');
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA']);
+        expect(messages(unit).filter(m => m.includes('DELETED'))).toEqual([]);
+        unit.efb!.request();
+        expect(unit.efb!.replies).toEqual([]);
+
+        unit.props.failures.repair('arinc429Out');
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+    });
+
+    it('a failure of the other port does not stop the route', async () => {
+        const unit = await bootUnit({facilities: [kaaa, kbbb], efb: true, storage: savedFlightplan(0, [kaaa])});
+        await settle(unit);
+        unit.props.failures.fail('rs232Out');
+
+        unit.efb!.sync(efbRoute({departure: kaaa, destination: kbbb}));
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'KBBB']);
+    });
+});

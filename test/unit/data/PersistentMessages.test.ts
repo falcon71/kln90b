@@ -124,6 +124,7 @@ function harness(w: World) {
                 },
             },
         },
+        failureDetector: {isDetected: () => false},
         memory: {navPage},
         database: {isAiracCurrent: () => w.dbCurrent},
         modeController: {isObsModeActive: () => w.obsMode, getDtkOrObsMagnetic: () => w.dtkMag},

@@ -3,6 +3,7 @@ import {KLN90BUserSettings} from "./KLN90BUserSettings";
 import {KLN90BUserWaypointsSettings} from "./KLN90BUserWaypoints";
 import {KLN90BUserFlightplansSettings} from "./KLN90BUserFlightplans";
 import {KLN90BUserRemarkSettings} from "./KLN90BUserRemarkSettings";
+import {KLN90BFailureSettings} from "./KLN90BFailureSettings";
 
 
 export class KLN90BSettingSaveManager extends UserSettingSaveManager {
@@ -11,7 +12,8 @@ export class KLN90BSettingSaveManager extends UserSettingSaveManager {
         const klnUserWaypoints = KLN90BUserWaypointsSettings.getManager(bus);
         const klnUserFlightplans = KLN90BUserFlightplansSettings.getManager(bus);
         const klnUserRemarks = KLN90BUserRemarkSettings.getManager(bus);
-        const settings = userSettings.getAllSettings().concat(klnUserWaypoints.getAllSettings(), klnUserFlightplans.getAllSettings(), klnUserRemarks.getAllSettings());
+        const klnFailures = KLN90BFailureSettings.getManager(bus);
+        const settings = userSettings.getAllSettings().concat(klnUserWaypoints.getAllSettings(), klnUserFlightplans.getAllSettings(), klnUserRemarks.getAllSettings(), klnFailures.getAllSettings());
 
         super(settings, bus);
     }

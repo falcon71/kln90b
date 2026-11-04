@@ -79,7 +79,7 @@ export class FuelFlowDisplay implements UiElement {
     readonly children = NO_CHILDREN;
     private readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    constructor(public fuelFlow: number) {
+    constructor(public fuelFlow: number | null) {
     }
 
     render(): VNode {
@@ -94,6 +94,9 @@ export class FuelFlowDisplay implements UiElement {
     }
 
     private formatFuelFlow(): string {
+        if (this.fuelFlow === null) {
+            return "----"; //#458: a failed input leaves it missing
+        }
         const actFuel = Math.min(this.fuelFlow, 9999);
 
         return padInt(actFuel, 1).padEnd(4, " ");

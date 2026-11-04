@@ -61,12 +61,12 @@ export class Oth6Page extends SixLineHalfPage {
 
     protected redraw(): void {
         const fob = this.props.sensors.in.fuelComputer.fob;
-        const ff = this.props.sensors.in.fuelComputer.fuelFlow1 + this.props.sensors.in.fuelComputer.fuelFlow2;
+        const ff = this.props.sensors.in.fuelComputer.getTotalFuelFlow(); //Null while a failed input leaves a value missing (#458)
 
         let endurance = null;
         let range = null;
         let efficiencyString = "---";
-        if (ff > 0) {
+        if (fob !== null && ff !== null && ff > 0) {
             endurance = (fob - this.props.userSettings.getSetting('othReserve').get()) / ff * HOURS_TO_SECONDS;
             if (endurance < 0) {
                 endurance = null;

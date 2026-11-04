@@ -100,6 +100,9 @@ describe('persisted user setting keys', () => {
         for (let i = 0; i < 250; i++) expected[`${PREFIX}wpt${i}`] = '""';
         for (let i = 0; i <= 25; i++) expected[`${PREFIX}fpl${i}`] = '""';
         for (let i = 0; i < 100; i++) expected[`${PREFIX}rmk${i}`] = '""';
+        // The failure simulation (#458): the MTBF in hours, off, and one text for each failure, empty = working
+        expected[`${PREFIX}failureMtbf`] = '0';
+        for (const key of ['arinc429Out', 'rs232Out', 'rmiOutput', 'obsResolver', 'rs232In', 'rs232Data', 'airdata429', 'altitude']) expected[`${PREFIX}failure_${key}`] = '""';
 
         expect(Object.fromEntries(data)).toEqual(expected);
     });

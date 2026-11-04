@@ -159,7 +159,7 @@ export class SuperNav5Page extends SevenLinePage {
         let ctx: CoordinateCanvasDrawContext;
 
 
-        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.sensors.in.isHeadingAvailable())) {
             case Nav5Orientation.NORTH_UP:
                 ctx = this.children.get("canvas").getDrawingContextWithCenterRange(this.props.sensors.in.gps.coords, range);
                 break;
@@ -176,7 +176,7 @@ export class SuperNav5Page extends SevenLinePage {
                 ctx = this.children.get("canvas").getDrawingContextWithOffsetCenterRangeRotation(this.props.sensors.in.gps.coords, range, tk);
                 break;
             case Nav5Orientation.HDG_UP:
-                const hdg = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro ?? 0);
+                const hdg = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro!);
                 ctx = this.children.get("canvas").getDrawingContextWithOffsetCenterRangeRotation(this.props.sensors.in.gps.coords, range, hdg);
                 break;
             default:
@@ -406,7 +406,7 @@ export class SuperNav5Page extends SevenLinePage {
     }
 
     private drawPlaneIcon(ctx: CoordinateCanvasDrawContext) {
-        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.planeSettings.input.headingInput)) {
+        switch (effectiveMapOrientation(this.orientationSetting.get(), this.props.sensors.in.isHeadingAvailable())) {
             case Nav5Orientation.NORTH_UP:
             case Nav5Orientation.DTK_UP:
                 ctx.drawIcon(this.props.sensors.in.gps.coords, "$");

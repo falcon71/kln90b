@@ -39,6 +39,7 @@ const CASES: Record<PanelKey, [string | number | boolean, (s: KLN90PlaneSettings
     'Input.ObsInterface': ['ARINC429', s => s.input.obsInterface],
     'Input.HeadingInterface': ['RS232', s => s.input.headingInterface],
     'Output.RmiInterface': ['ARINC429', s => s.output.rmiInterface],
+    'Output.RmiInstalled': [true, s => s.output.rmiInstalled],
     'Output.DataInterface': ['RS232', s => s.output.dataInterface],
     'Output.ExternalAnnunciators.MsgInstalled': [true, s => s.output.externalAnnunciators.msgInstalled],
     'Output.ExternalAnnunciators.WptInstalled': [true, s => s.output.externalAnnunciators.wptInstalled],

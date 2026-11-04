@@ -3,6 +3,7 @@ import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityReposi
 import {KLN90BUserWaypointsSettings} from '../../kln90b/settings/KLN90BUserWaypoints';
 import {KLN90BUserFlightplansSettings} from '../../kln90b/settings/KLN90BUserFlightplans';
 import {KLN90BUserRemarkSettings} from '../../kln90b/settings/KLN90BUserRemarkSettings';
+import {KLN90BFailureSettings} from '../../kln90b/settings/KLN90BFailureSettings';
 
 /**
  * Sets a private static singleton field back to undefined. A required field that does not exist throws, so a renamed
@@ -26,6 +27,7 @@ export function resetSingletons(required: boolean): void {
     clearStatic(KLN90BUserWaypointsSettings, 'INSTANCE', required);
     clearStatic(KLN90BUserFlightplansSettings, 'INSTANCE', required);
     clearStatic(KLN90BUserRemarkSettings, 'INSTANCE', required);
+    clearStatic(KLN90BFailureSettings, 'INSTANCE', required);
     // Keyed by airspace id: the next unit would get the old boundary for a reused id. Created on the first airspace search
     clearStatic(DefaultLodBoundaryCache, 'INSTANCE', false);
     const planners = (FlightPlanner as any).instances;

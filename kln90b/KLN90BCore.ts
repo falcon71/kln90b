@@ -39,6 +39,12 @@ import {TickController} from "./TickController";
 import {KLN90BPlaneSettingsParser, KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {Sensors} from "./Sensors";
 import {Interconnect} from "./Interconnect";
+import {Failures} from "./failures/Failures";
+import {FailureDetector} from "./failures/FailureDetector";
+import {FailureTrigger} from "./failures/FailureTrigger";
+import {FailureOutputs} from "./failures/FailureOutputs";
+import {TransmitterStatus} from "./services/TransmitterStatus";
+import {KLN90BFailureSettings} from "./settings/KLN90BFailureSettings";
 import {VolatileMemory} from "./data/VolatileMemory";
 import {NearestUtils} from "./data/navdata/NearestUtils";
 import {RemarksManager} from "./settings/RemarksManager";
@@ -131,6 +137,9 @@ export class KLN90BCore {
     public readonly pageManager: PageManager;
 
     private tickManager: TickController | undefined;
+    /** Public for the tests, which replace its random source */
+    public failureTrigger: FailureTrigger | undefined;
+    public failureDetector: FailureDetector | undefined;
     private userWaypointPersistor: UserWaypointPersistor | undefined;
     private userFlightplanPersistor: UserFlightplanPersistor | undefined;
     private hardware: Hardware = new Hardware();
@@ -252,8 +261,9 @@ export class KLN90BCore {
         //The xml is not available before init!
         const planeSettingsParser = new KLN90BPlaneSettingsParser();
         this.planeSettings = planeSettingsParser.parsePlaneSettings(xmlConfig);
+        const failures = new Failures(this.bus, KLN90BFailureSettings.getManager(this.bus), this.planeSettings);
         //One wiring for the whole unit: every interface SimVar goes through its ports (#451)
-        const interconnect = new Interconnect(this.planeSettings);
+        const interconnect = new Interconnect(this.planeSettings, failures);
 
         const forceReadyToUse = this.isForceReadyToUse();
 
@@ -281,6 +291,8 @@ export class KLN90BCore {
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
         const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, interconnect, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement());
+        const failureOutputs = new FailureOutputs(this.bus, failures, interconnect, sensors.out);
+        const transmitterStatus = new TransmitterStatus(this.bus, failures, interconnect, () => this.powerSupply!.isPoweredOn());
 
         //The display ticks run from the start of the boot, so that the Turn-On page shows and checks the boot while it is
         //still under way (#416). The calculations are added once their services exist
@@ -360,7 +372,9 @@ export class KLN90BCore {
 
         const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
 
-        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, interconnect, memory.navPage.activeWaypoint, this.hardware);
+        this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, interconnect, memory.navPage.activeWaypoint, this.hardware, () => this.powerSupply!.isPoweredOn());
+        failureOutputs.setPlannerSync(this.wtFlightplanSync);
+        transmitterStatus.setStarted(() => memory.transmittersStarted);
 
         const airspaceAlert = new AirspaceAlert(this.userSettings, sensors, this.messageHandler, facilityLoader, memory.navPage);
         const vnav = new Vnav(memory.navPage, sensors, flightplans[0]);
@@ -370,9 +384,15 @@ export class KLN90BCore {
         const modeController = new ModeController(this.bus, memory.navPage, flightplans[0], this.planeSettings, sensors, magvar);
 
 
+        this.failureTrigger = new FailureTrigger(this.bus, failures, () => sensors.in.gps.simTimeUnix / 1000); //simTimeUnix is in ms
+
+        const failureDetector = this.failureDetector = new FailureDetector(failures, () => memory.failureDetection, () => sensors.in.gps.simTimeUnix / 1000);
+
         this.tickManager.addCalculations(
             [
                 sensors,
+                this.failureTrigger,
+                failureDetector,
                 magvar,
                 nearestLists.ndbNearestList,
                 nearestLists.aptNearestList,
@@ -390,7 +410,7 @@ export class KLN90BCore {
                 new SignalOutputFillterTick(sensors),
             ]);
 
-        this.simvarSync = new SimVarSync(this.powerSupply, this.planeSettings, interconnect, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware);
+        this.simvarSync = new SimVarSync(this.powerSupply, this.planeSettings, interconnect, this.tickManager, modeController, this.pageManager, brightnessManager, this.wtFlightplanSync, this.hardware, failureOutputs);
 
         const msa = new MSA();
 
@@ -405,7 +425,7 @@ export class KLN90BCore {
 
         this.platform.getRouteManager().then(manager => {
             this.efbSaver = new KlnEfbSaver(interconnect, manager, flightplans[0], this.hardware);
-            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans, this.pageManager, facilityRepository, this.hardware, sidstar);
+            this.efbLoader = new KlnEfbLoader(this.bus, facilityLoader, this.messageHandler, manager, flightplans, this.pageManager, facilityRepository, this.hardware, sidstar, interconnect);
         });
 
         Promise.all([nearestUtils.init(), nearestLists.init(), airspaceAlert.init(), this.pendingCalls.track("msa.json", msa.init(this.planeSettings.basePath))]).then(() => {
@@ -414,6 +434,8 @@ export class KLN90BCore {
                 bus: this.bus,
                 userSettings: this.userSettings,
                 planeSettings: this.planeSettings!,
+                failures: failures,
+                failureDetector: failureDetector,
                 sensors: sensors,
                 pageManager: this.pageManager,
                 messageHandler: this.messageHandler,

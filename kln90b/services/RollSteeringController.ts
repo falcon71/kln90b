@@ -44,7 +44,7 @@ export class RollSteeringController implements CalcTickable {
         //also during the self-test (#143). GPS COURSE TO STEER is 0 then too (the maintainer's decision, 2026-10-19, see
         //Sensors.setRollCommand). Nothing is calculated, so no latch or self-test state is left over for the moment the input
         //is switched on (L:KLN90B_HeadingInput, #368)
-        if (!this.planeSettings.input.headingInput) {
+        if (!this.sensors.in.isHeadingAvailable()) {
             this.resetSelfTest();
             nav.rollSteeringLatch = null;
             this.sensors.out.setRollCommand(null, null);

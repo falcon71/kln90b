@@ -6,6 +6,13 @@ receiver model of #453
 ([superpowers/specs/2026-11-01-gps-signal-loss-design.md](superpowers/specs/2026-11-01-gps-signal-loss-design.md)).
 A behavior or value marked "guess" is not in the manuals; change it when a source turns up.
 
+**Status.** The framework (the failure state, the MTBF trigger, the detection, the FLR pages and the persistence) and
+the interface failures (`arinc429Out`, `rs232Out`, `rmiOutput`, `obsResolver`, `rs232In`, `rs232Data`, `airdata429`,
+`altitude`) are built (#458, design
+[superpowers/specs/2026-11-04-failures-framework-design.md](superpowers/specs/2026-11-04-failures-framework-design.md)).
+The other failures of the catalog are specified here and built by the later parts of #366 (#459 to #461). The source of
+truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
+
 Page numbers without a prefix are the KLN 90B Pilot's Guide (006-08773-0000). "IM" is the Installation Manual
 (006-10521-0005 Rev 5), "CMM" the Component Maintenance Manual (006-15521-0003 Rev 3) by its printed page numbers.
 
@@ -41,7 +48,10 @@ manuals stop, the behavior is an informed guess, and this document says so.
 - Not possible: jamming or spoofing the sim's GPS itself, so that the other GPS units of the aircraft degrade with the
   KLN. Ruled out in "Other GPS units".
 - **Anti-goal: a failure that changes how the unit behaves while failures are off.** With MTBF off and nothing failed,
-  every existing test stays green and every output is written exactly as today.
+  every existing test stays green and every output is written exactly as today, with one exception decided by the
+  maintainer: with `Output.WriteGPSSimVars` set, a power-off empties the SDK planner `"kln90b"` (see "A failed port in
+  general"), so the tests that pin the planner across a power-off change with it. With the option off the planner is
+  left alone, as before.
 - Anti-goal: `DATA BASE CHECKSUM ERR` from a simulated failure. That message stays reserved for the real start-up
   self-test failure of #416, so that a pilot's report of it always means a bug.
 
@@ -110,18 +120,22 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
     power-on the RS-232 input is checked when the first navigation page shows and the ARINC 429 receivers 5 s later;
     in operation, a loss shows after a delay drawn from 2 to 10 s (guess).
   - Unit-internal failures (`gpsAntenna`, `gpsReceiver`, `eeprom`, `arinc429Out`, `rs232Out`): in the next calculation
-    tick.
+    tick, but at a power-on not before the first navigation page. Detection starts with that page for every failure
+    (the design's choice), so the Self Test page shows `TEST FAIL` and no failure message yet.
   - `superflag`: while the flag is supposed to be valid (navigation valid or the self-test pattern).
   - `…Wiring`: while the unit commands that lamp on. The driver senses overcurrent only then (CMM 25-26).
   - `…Driver`: while the unit commands that lamp off (see the annunciators).
   - After every power-on the detection starts again, with the same rules. The self-test lights every lamp, so a wiring
     fault is found at every self-test.
+  - The delays count sim time as the MTBF trigger counts it: a step back of the sim clock, a jump of more than a minute
+    and the time the unit was off or disabled count nothing. A detected failure stays detected until it is repaired, so
+    setting the sim clock back does not hide its message.
 - **TEST FAIL** (3-4): while a failure marked "TEST FAIL" in the catalog is active, the Self Test page shows the
   flashing `TEST FAIL` in place of `ANNUN ON`. This path is separate from the start-up failure of #416:
   it posts no `DATA BASE CHECKSUM ERR` and does not touch `memory.selfTestFailure`. The pilot can still approve the
   page, and the failure's own message is on the MSG page.
-- **`ALTITUDE FAIL`** today is a static check of the configuration (`AltitudeFailMessage`: an IFR unit with no
-  altitude input). It becomes: the existing configuration case, **or** a configured altitude input that delivers no
+- **`ALTITUDE FAIL`** was a static check of the configuration (`AltitudeFailMessage`: an IFR unit with no
+  altitude input). It is now: the existing configuration case, **or** a configured altitude input that delivers no
   altitude, on any unit (guess). An air data failure (`rs232In`, `rs232Data`, `airdata429`) that takes the altitude
   away therefore shows `ALTITUDE FAIL` as well as its own message (B-1).
 - While `gpsAntenna` or `gpsReceiver` is active, the signal and RAIM messages of #453 are not posted; the hardware
@@ -133,15 +147,32 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
 
 A failed output port sends nothing, so the receiving equipment loses its data, for that port only:
 
-- At the moment of the failure, and at a power-on while failed, the port writes its null state once, then nothing
-  until repaired:
+- At the moment of the failure, at a power-on while failed, at the resume of a hot swap and when
+  `L:KLN90B_WriteGpsSimvars` switches the option on at runtime, the port writes its null state once, then nothing until
+  repaired. The power-on and the resume are the unit's own null-state writes, which write the failed ports as every
+  other port; the failure and the runtime switch-on write only the failed ports. The ports of the null-state pass
+  (`Interconnect.writeNullState`) are the only ones that write during it:
   - the `L:KLN90B_*` outputs on it get what `SensorsOut.setPoweredOff` writes: `L:KLN90B_RollCommand` 0,
     `L:KLN90B_XTK` 0, `L:KLN90B_IntegrityWarn` false, `L:KLN90B_GPS_WP_BEARING` 0, and so on;
   - **the GPS SimVars on it are zeroed too**: the null state `SensorsOut.reset` writes at every power change (#462),
     limited to the SimVars of the failed port. It has no `K:GPS_OBS_ON`/`OFF` event (the LEG/OBS switch belongs to the
     aircraft), writes `GPS WP CROSS TRK` 0 itself (only the signal tick writes it otherwise), and `setWPIndex` keeps the
     index within the count. A GPS-coupled autopilot then loses its guidance instead of following a frozen DTK.
-- The power-off write of a failed port is dropped, which is fine: the port already holds its null state.
+- The power-off write of a failed port goes out with the same values as that of every other port: the port holds its
+  null state either way, and the power-off pass writes all ports.
+- **The planner follows the nav data port.** The SDK planner `"kln90b"` (FPL 0 and the direct-to plan) holds the plans
+  only while the unit is powered **and** the port that carries the nav data transmits; otherwise both are empty, as the
+  receiving side has no route when the unit sends nothing. A power-off empties it (this is the one change of behavior
+  that is also there with failures off), a power-on and the repair sync it once. All of this holds only with
+  `Output.WriteGPSSimVars` set: with the option off the unit writes nothing to the planner, as before. The EFB route answer stops with the
+  port, and a route synced from the EFB is ignored while the port is failed. Of the EFIS displays the maintainer
+  checked, the Aspen Evolution E5 and the Garmin G5 take no route at all (only live navigation values), so they have
+  none to keep when the data stop. The EFD1000 Pro Max keeps the last route drawn, inactive, only while another
+  position source remains (its own behavior, not the KLN's).
+  The evidence is in the design section "The planner at a failure and a power-off" of
+  [the design](superpowers/specs/2026-11-04-failures-framework-design.md).
+  That is about what those displays do with the KLN's output, not about the KLN's ARINC 429 EFIS input port, which
+  never fails (whether an EFIS reads those values is unknown, see "The ports").
 - **The hot-swap crash (#462).** `GPS FLIGHT PLAN WP INDEX` above 0 with `GPS FLIGHT PLAN WP COUNT` 0 crashes MSFS 2024
   to desktop when another GPS unit takes over in a hot swap. The old null state wrote that pair, which is why it was
   disabled after a crash in FS2020. `setWPIndex` now keeps the index within the count for every caller, the failed
@@ -495,49 +526,46 @@ gate and the port let it through.
 
 ## What the code needs first
 
-This section describes the code before #366 and is removed once #366 is implemented. These changes come before the
-failures that need them.
+This section describes the code that #458 did not change and the later parts of #366 need. It is removed once #366 is
+implemented. These changes come before the failures that need them. The ports, the nullable values, `ALTITUDE FAIL`
+as a detected failure, TEST FAIL for an active failure and the injectable randomness are settled by #458.
 
-1. **The ports ask nobody.** `SimVarOutput.isTransmitting` and `SimVarInput.isReceiving` return true, and
-   `InputPort.read` ignores `isReceiving`. `Interconnect` needs the failure state, and the null-state write (including the GPS SimVars of the port) at the
-   moment a port fails.
-2. **The air data values cannot be missing.** `Airdata.tas`, `mach`, `sat` and `tat` are plain numbers, and OTH 9 and
-   10 assume valid values (`pressureAltitude!` in `Oth10Page`). They become nullable and the pages show dashes. The
-   fuel computer values need the same check.
-3. **`ALTITUDE FAIL` is static** (`AltitudeFailMessage`, see above).
-4. **No runtime wipe of the user memory.** User data is restored only in `KLN90BCore.asyncInit`. A dead battery at a
+1. **No runtime wipe of the user memory.** User data is restored only in `KLN90BCore.asyncInit`. A dead battery at a
    power-on within a session needs a path that resets the flight plans, the user waypoints in the facility
    repository, the remarks, the user settings and the clock in memory, and through them in storage. The restore error
    path (empty plans and `USER DATA LOST`) is the closest existing code. The receiver's memory is private SDK state:
    the almanac time (`lastAlamanacTime`) and each satellite's `data.lastEphemerisTime`, which `GPS` sets only at
    construction from the stored settings (`Gps.ts`). The clock has no stored value at all: `GPS` takes it from
    `E:ABSOLUTE TIME` at construction. The wipe needs a way to erase the first and to set the second at a power-on.
-5. **Satellite inhibits have one owner.** `GpsSearch` sets the inhibits when its search changes mode, and `end()`
+2. **Satellite inhibits have one owner.** `GpsSearch` sets the inhibits when its search changes mode, and `end()`
    lifts them all: at every power-on through `start()`, and through `acquireAndUseSatellites` (SET 10 FAST, an
    engine-running start, `WelcomePage.leaveFailed`). With FAST it never inhibits anything. The receiver failures and
    jamming need an "inhibit all" that survives all of these, merged with the search's own choice.
-6. **RAIM has no fault model.** `GpsSolution` judges the geometry only. The faulty satellite uses its availability as
+3. **RAIM has no fault model.** `GpsSolution` judges the geometry only. The faulty satellite uses its availability as
    "a fault would be detected" (see above), so no residual model is needed, but the satellite's bias must be mapped
    into a position error through the solution's coefficients and added to the measurement (`GpsMeasurement`), as
    spoofing's false position is. The detected fault also feeds the integrity output and the approach gate, which
    today read only the RAIM availability.
-7. **`SYSTEM TIME UPDATED` is checked only at acquisition** (`GPS.gpsAcquired`); spoofing needs the check while a fix
+4. **`SYSTEM TIME UPDATED` is checked only at acquisition** (`GPS.gpsAcquired`); spoofing needs the check while a fix
    is held (see spoofing).
-8. **TEST FAIL belongs to #416 today.** `SelfTestLeftPage` shows it for `memory.selfTestFailure`, and
-   `WelcomePage.leaveFailed` posts `DATA BASE CHECKSUM ERR`. The failure path is separate.
-9. **No injectable randomness.** The trigger and every drawn value need a random source and clock the tests control.
-10. **`ApproachLampGroup`** passes values through; it gets the bit changes above.
+5. **`ApproachLampGroup`** passes values through; it gets the bit changes above.
 
-Already possible without new structure: the FLR pages (pushed left page with its own tree, `Button`, the list pattern
-of APT 7/8 and the OTH pages), the screen shift (a style change in a display tick), spoofing (the measurement
-strategy).
+Already possible without new structure: the screen shift (a style change in a display tick) and spoofing (the
+measurement strategy). The FLR pages exist (#458).
 
 ## Public contract
 
 - New: the panel.xml key `Output.RmiInstalled` (default false), parsed like the annunciator keys.
 - New persisted keys, in their own settings manager. No existing key changes meaning.
-- No H event or LVar changes. The outputs keep their meaning; a failure only changes their values as a real failure
-  would.
+- No H event changes, and no existing LVar changes meaning. The outputs keep their meaning; a failure only changes their
+  values as a real failure would.
+- New read-only LVars `L:KLN90B_Arinc429OutputTransmitted` and `L:KLN90B_Rs232OutputTransmitted` (fictional, written
+  by `TransmitterStatus`): 1 while the unit transmits on its ARINC 429 output, or on its RS-232 output with the nav data
+  (`Output.DataInterface` RS232). 0 while the unit is off, while it boots until the Self Test page shows (the main page at
+  an engine-running start), and while the output is failed. Agreed with an EFIS developer (2026-11-04): an EFIS that
+  takes the nav data and the MSG annunciation over the bus cannot see when the data stop, so it shows its reversion mode
+  on these, and hides the MSG annunciation it takes from `L:KLN90B_MsgLight` (an external lamp, which keeps working when
+  the bus fails).
 - Wiki (the maintainer updates it): a new page for the failures and the FLR pages, with the limit that they affect the
   KLN only (see "Other GPS units"); panel.xml
   customization (`Output.RmiInstalled`); External Annunciators (dark and stuck lamps); RMI (the new key).
@@ -554,7 +582,8 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
 - Flight: each failure's effect on the outputs (`test/render/Interconnect.test.ts` holds the SimVar-to-port table; a
   failed port must drop exactly its SimVars), the receiver failures, jamming, spoofing and the faulty satellite
   against the receiver model, the battery wipe at a power-on.
-- With MTBF off and nothing failed, the whole existing suite stays green unchanged.
+- With MTBF off and nothing failed, the whole existing suite stays green unchanged, except the tests that pin the
+  planner across a power-off with `Output.WriteGPSSimVars` set (the exception of the anti-goals).
 - Sim, before release: the failed ports with a hot swap to another GPS unit (the zeroing itself was tested on
   2026-11-03, #462), and jamming and an antenna failure with a Working Title GNS beside the KLN, which must keep its
   position.
@@ -573,9 +602,6 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
 
 Like "What the code needs first", this section is removed once #366 is implemented.
 
-- The order of the work and how it is split into commits (CLAUDE.md wants one commit per issue: either one
-  `fixes #366` commit, or sub-issues the maintainer opens).
-- The names of the persisted keys and of the new classes.
+- The order of the work of the later parts and how it is split into commits (CLAUDE.md wants one commit per issue).
 - How jamming's loss looks over the first seconds (all at once, or the satellites dropping over a few seconds).
 - The default clock date after a battery wipe.
-- Whether `TEST FAIL` also flashes when a failure starts while the Self Test page is shown.

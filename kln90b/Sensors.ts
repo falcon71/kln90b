@@ -56,9 +56,18 @@ import {Interconnect} from "./Interconnect";
 export class FuelComputer implements CalcTickable {
 
     public readonly numberOfEngines: null | 1 | 2 = null; //The KLN only knows 1 or 2
-    public fob: number = 0;
-    public fuelFlow1: number = 0;
-    public fuelFlow2: number = 0;
+    /**
+     * Null while a failed RS-232 input leaves the transmitted value missing (#458). A FOB the pilot entered stays a number
+     */
+    public fob: number | null = 0;
+    /**
+     * Null while a failed RS-232 input leaves it missing (#458)
+     */
+    public fuelFlow1: number | null = 0;
+    /**
+     * Null while a failed RS-232 input leaves it missing (#458). A single engine has none and keeps 0
+     */
+    public fuelFlow2: number | null = 0;
     public fuelUsed1: number | null = null;
     public fuelUsed2: number | null = null;
     private readonly realNumberOfEngines: number = 0;
@@ -82,6 +91,8 @@ export class FuelComputer implements CalcTickable {
             return;
         }
 
+        //Once per tick, not per SimVar (#458)
+        const isReceiving = this.interconnect.rs232In.isReceiving;
         let targetUnit: Unit<UnitFamily.Weight>;
 
         switch (this.options.input.fuelComputer.unit) {
@@ -134,8 +145,19 @@ export class FuelComputer implements CalcTickable {
 
         //Real unit: RS-232 IN, fuel remaining: format A bytes 3-6, formats B, C and D bytes 3-8 (Installation manual A-10).
         //No ARINC 429 label carries fuel
+        //A failed input leaves it missing, and a FOB the pilot entered is not a received value (#458)
         if (this.options.input.fuelComputer.fobTransmitted) {
-            this.fob = UnitType.POUND.convertTo(this.interconnect.rs232In.read('FUEL TOTAL QUANTITY WEIGHT EX1', SimVarValueType.Pounds), targetUnit);
+            this.fob = isReceiving ? UnitType.POUND.convertTo(this.interconnect.rs232In.read('FUEL TOTAL QUANTITY WEIGHT EX1', SimVarValueType.Pounds), targetUnit) : null;
+        }
+
+        if (!isReceiving) {
+            this.fuelFlow1 = null;
+            this.fuelFlow2 = this.realNumberOfEngines === 2 ? null : 0;
+            if (this.options.input.fuelComputer.fuelUsedTransmitted) {
+                this.fuelUsed1 = null;
+                this.fuelUsed2 = null;
+            }
+            return;
         }
 
         if (this.realNumberOfEngines === 2) {
@@ -169,6 +191,26 @@ export class FuelComputer implements CalcTickable {
     }
 
 
+    /**
+     * The fuel flow of all engines, null while a value is missing (#458)
+     */
+    public getTotalFuelFlow(): number | null {
+        if (this.fuelFlow1 === null || this.fuelFlow2 === null) {
+            return null;
+        }
+        return this.fuelFlow1 + this.fuelFlow2;
+    }
+
+    /**
+     * The fuel used by all engines, null while a value is missing (#458)
+     */
+    public getTotalFuelUsed(): number | null {
+        if (this.fuelUsed1 === null || (this.numberOfEngines === 2 && this.fuelUsed2 === null)) {
+            return null;
+        }
+        return this.fuelUsed1 + (this.numberOfEngines === 2 ? this.fuelUsed2! : 0);
+    }
+
     public reset() {
         this.fob = 0;
     }
@@ -177,10 +219,11 @@ export class FuelComputer implements CalcTickable {
 
 export class Airdata implements CalcTickable {
     public barometer: Inhg = 29.92;
-    public tas: Knots = 0;
-    public mach: number = 0;
-    public sat: Celsius = 0;
-    public tat: Celsius = 0;
+    //Null while a failed input leaves the value missing (#458)
+    public tas: Knots | null = 0;
+    public mach: number | null = 0;
+    public sat: Celsius | null = 0;
+    public tat: Celsius | null = 0;
     public pressureAltitude: Feet | null = null;
 
     private barometersetting: UserSetting<number>;
@@ -199,19 +242,34 @@ export class Airdata implements CalcTickable {
                 //Gray Code. Not very precise
                 //Real unit: gray code pressure altitude in 100 ft steps on P901 pins 41-50 = D4, A1, A2, A4, B1, B2, B4,
                 //C1, C2, C4 (Installation manual 1-6, 2-7, figure 2-17 sheet 3 on 2-47)
-                this.pressureAltitude = Math.round(this.interconnect.grayCode.read('PRESSURE ALTITUDE', SimVarValueType.Feet) / 100) * 100;
+                //A failed encoder leaves the altitude missing, and the receiver without its aiding (#458)
+                this.pressureAltitude = this.interconnect.grayCode.isReceiving ?
+                    Math.round(this.interconnect.grayCode.read('PRESSURE ALTITUDE', SimVarValueType.Feet) / 100) * 100 : null;
             }
             return;
         }
         //Real unit: RS-232 IN, format D, bytes 108-112 barometric setting in hundredths of inHg (Installation manual A-13).
         //No ARINC 429 input: the air data receiver takes no baro label (Installation manual 1-2), and GAMA 11 defines none
-        switch (this.options.input.airdata.baroSource) {
-            case 1:
-                this.barometer = this.interconnect.rs232In.read('KOHLSMAN SETTING HG:1', SimVarValueType.InHG);
-                break;
-            case 2:
-                this.barometer = this.interconnect.rs232In.read('KOHLSMAN SETTING HG:2', SimVarValueType.InHG);
-                break;
+        //A failed RS-232 input is as if no baro were transmitted: the barometer keeps its value (#458)
+        if (this.interconnect.rs232In.isReceiving) {
+            switch (this.options.input.airdata.baroSource) {
+                case 1:
+                    this.barometer = this.interconnect.rs232In.read('KOHLSMAN SETTING HG:1', SimVarValueType.InHG);
+                    break;
+                case 2:
+                    this.barometer = this.interconnect.rs232In.read('KOHLSMAN SETTING HG:2', SimVarValueType.InHG);
+                    break;
+            }
+        }
+
+        //A failed air data input leaves every value missing (#458)
+        if (!this.interconnect.airdata.isReceiving) {
+            this.pressureAltitude = null;
+            this.tas = null;
+            this.mach = null;
+            this.sat = null;
+            this.tat = null;
+            return;
         }
 
 
@@ -260,6 +318,7 @@ export class SensorsIn implements CalcTickable {
 
     public obsMag: number | null = null;
     public readonly gps: GPS;
+    private headingAvailable: boolean;
     public headingGyro: Degrees | null = null; //Depends on how the user sets the gyro, but likely magnetic
     public gpsIsNavSource: boolean = false;
     public fuelComputer: FuelComputer;
@@ -272,6 +331,8 @@ export class SensorsIn implements CalcTickable {
         //5-29: the altitude input is a measurement of the GPS solution. Airdata reports none until its first tick
         this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.getIndicatedAlt(), gpsMeasurement);
         this.fuelComputer = new FuelComputer(options, interconnect);
+        //Pages and selectors built before the first tick (a force-ready start) see the heading input already (#458)
+        this.headingAvailable = this.readHeading();
     }
 
     tick() {
@@ -285,13 +346,15 @@ export class SensorsIn implements CalcTickable {
         //  RESOLVER OUT (Installation manual 1-6, 1-7, 2-6)
         //- ARINC 429 EFIS receiver, label 100 selected course, from an EFIS or a KA 90 (Installation manual 1-2): BNR,
         //  bits 17-28 with a 180/4096 deg LSB, bit 29 = 1 for 180-360 deg (GAMA 11 page 10)
+        //A failed resolver leaves the course missing: it is set on the unit, as with ObsSource 0 (#458)
         if (this.gpsIsNavSource) {
+            const obsReceiving = this.interconnect.obs.isReceiving;
             switch (this.options.input.obsSource) {
                 case 1:
-                    this.obsMag = this.interconnect.obs.read('Nav OBS:1', SimVarValueType.Degree);
+                    this.obsMag = obsReceiving ? this.interconnect.obs.read('Nav OBS:1', SimVarValueType.Degree) : null;
                     break;
                 case 2:
-                    this.obsMag = this.interconnect.obs.read('Nav OBS:2', SimVarValueType.Degree);
+                    this.obsMag = obsReceiving ? this.interconnect.obs.read('Nav OBS:2', SimVarValueType.Degree) : null;
                     break;
                 default: //0 ignores the external course, also after L:KLN90B_ObsSource switched to it at runtime
                     this.obsMag = null;
@@ -307,15 +370,33 @@ export class SensorsIn implements CalcTickable {
         //  an EFIS 40/50 or a KA 90: BNR, bits 14-28 with a 180/32768 deg LSB, bit 29 = 1 for 180-360 deg (GAMA 11 pages 23,
         //  24)
         //- RS-232 IN, format C or D, bytes 100-102 magnetic heading (Installation manual A-13)
-        if (this.options.input.headingInput) {
-            this.headingGyro = this.interconnect.heading.read(this.options.input.headingSimVar, SimVarValueType.Degree); //PLANE HEADING DEGREES GYRO unless the aircraft names its own (#405)
-        } else {
-            this.headingGyro = null; //The input can be switched off at runtime (#368)
-        }
+        //A failed RS-232 input leaves the heading missing, as without a heading input (#458)
+        this.headingAvailable = this.readHeading();
 
         this.gps.tick();
         this.fuelComputer.tick();
         this.airdata.tick();
+    }
+
+    /**
+     * Reads the heading into headingGyro, null without one, and returns whether one arrives
+     */
+    private readHeading(): boolean {
+        if (this.options.input.headingInput && this.interconnect.heading.isReceiving) {
+            this.headingGyro = this.interconnect.heading.read(this.options.input.headingSimVar, SimVarValueType.Degree); //PLANE HEADING DEGREES GYRO unless the aircraft names its own (#405)
+            return true;
+        }
+        this.headingGyro = null; //The input can be switched off at runtime (#368)
+        return false;
+    }
+
+    /**
+     * Whether a heading arrives: the input is installed and its port receives, as of the last tick (or of the construction
+     * before the first one). A failed RS-232 heading (#458) behaves as without a heading input (docs/failures.md, "RS-232
+     * input"), so every consumer that keys on the presence of the heading asks this, not Input.HeadingInput
+     */
+    public isHeadingAvailable(): boolean {
+        return this.headingAvailable;
     }
 
     public reset() {
@@ -332,11 +413,12 @@ export class SensorsOut {
     private xtkFilter = new SignalOutputFilter();
 
     constructor(private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect, public readonly audioGenerator: AudioGenerator, private readonly hardware: Hardware) {
-        this.reset();
+        //The boot claims the GPS SimVars, so a port failed in an earlier session writes its null state, as at a power
+        //change (#458)
+        this.interconnect.writeNullState('all', () => this.reset());
     }
 
     public setObs(obsMag: number | null) {
-        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         this.obsOut = obsMag;
         if (obsMag !== null) {
             //Real unit: P901 pin 1 GPS DISPLAYED (see SensorsIn.tick)
@@ -358,8 +440,13 @@ export class SensorsOut {
             }
         }
 
+        this.writeGpsObs(obsMag);
+    }
+
+    private writeGpsObs(obsMag: number | null) {
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the OBS course, either
-        //- ARINC 429 transmitter, label 100 selected course #1 (see above)
+        //- ARINC 429 transmitter, label 100 selected course #1 (see setObs)
         //- RS-232 OUT, item I desired track, which in OBS mode is the course at the active waypoint, magnetic with its
         //  variation, in tenths of a degree (Installation manual A-5, A-6)
         if (obsMag === null) {
@@ -370,8 +457,6 @@ export class SensorsOut {
     }
 
     public setXTK(xtk: number | null, scaling: number) {
-        const gpsAnalogNav = this.interconnect.gps(this.interconnect.analogNav);
-        const gpsSim = this.interconnect.gps(this.interconnect.sim);
         //The LVar is an output of the unit (ARINC 429 label 116), independent of the GPS SimVars
         //Real unit: the cross track, either
         //- ARINC 429 transmitter, label 116 cross track distance: BNR, bits 14-28 nm with a 128/32768 nm LSB (bits 11-13 an
@@ -380,7 +465,13 @@ export class SensorsOut {
         //- RS-232 OUT, item G cross track error: R or L for the aircraft right or left of course, then nm x 100
         //  (Installation manual A-5)
         this.interconnect.arinc429Tx.write(LVAR_XTK, SimVarValueType.NM, xtk ?? 0);
+        this.xtkFilter.setValue(xtk === null ? 0 : -xtk, scaling);
+        this.writeGpsXtk(xtk, scaling);
+    }
 
+    private writeGpsXtk(xtk: number | null, scaling: number) {
+        const gpsAnalogNav = this.interconnect.gps(this.interconnect.analogNav);
+        const gpsSim = this.interconnect.gps(this.interconnect.sim);
         //Real unit: the CDI scale, either
         //- analog: the deviation voltage of P901 pin 22 against pin 25 is 30, 150 or 500 mV per nm for a full scale of 5,
         //  1 or 0.3 nm (Installation manual 1-7)
@@ -391,11 +482,9 @@ export class SensorsOut {
         //19 against pin 25, flag in view below 50 mV), the NAV superflag (P901 pin 18, invalid below 3.5 V) (Installation
         //manual 1-7, 2-5) and ARINC 429 label 275 bit 29 HSI valid, 0 = nav warning (GAMA 11 page 19)
         if (xtk === null) {
-            this.xtkFilter.setValue(0, scaling);
             gpsAnalogNav.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
             gpsAnalogNav.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
         } else {
-            this.xtkFilter.setValue(-xtk, scaling);
             gpsAnalogNav.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
             gpsAnalogNav.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
         }
@@ -466,7 +555,6 @@ export class SensorsOut {
     }
 
     public setWpBearing(bearingForAP: number | null, bearingToActive: number | null, magvar: number) {
-        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //The LVar is an output of the unit, independent of the GPS SimVars
         //Real unit: the bearing to the active waypoint for an RMI, any of
         //- P901 pins 10, 11 and 12 OBI DATA, CLOCK and SYNC, a Honeywell serial bus that drives some Honeywell RMIs
@@ -481,7 +569,11 @@ export class SensorsOut {
         } else {
             this.interconnect.rmi.write(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, UnitType.DEGREE.convertTo(MagVar.trueToMagnetic(bearingToActive, magvar), UnitType.RADIAN));
         }
+        this.writeGpsWpBearing(bearingForAP, magvar);
+    }
 
+    private writeGpsWpBearing(bearingForAP: number | null, magvar: number) {
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: GPS WP TRUE BEARING is ARINC 429 transmitter label 115 waypoint bearing, true: BNR, bits 17-28 with a
         //180/4096 deg LSB, bit 29 = 1 for 180-360 deg, measured from the aircraft to the waypoint (GAMA 11 page 12). GPS
         //WP BEARING is its magnetic form, which the unit sends only as RS-232 item L and on the OBI bus (see above). The
@@ -512,13 +604,16 @@ export class SensorsOut {
     }
 
     public setPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number, integretyWarning: boolean) {
-        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //The LVar is an output of the unit, independent of the GPS SimVars
         //Real unit: ARINC 429 transmitter, label 261 GPS discrete word bit 24 GPS integrity, 1 = fail (GAMA 11 page 18).
         //The caller passes true when the position has no fix, or RAIM is unavailable at the alert limit of the current
         //flight phase (#453). No analog or RS-232 output carries it
         this.interconnect.arinc429Tx.write(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, integretyWarning);
+        this.writeGpsPos(pos, speed, track, magvar);
+    }
 
+    private writeGpsPos(pos: LatLonInterface | null, speed: Knots | null, track: Degrees | null, magvar: number) {
+        const gpsNavData = this.interconnect.gps(this.interconnect.navData);
         //Real unit: the magnetic variation, either
         //- ARINC 429 transmitter, label 147 magnetic variation: BNR, bits 17-28 with a 180/4096 deg LSB, bit 29 = 1 West,
         //  bit 11 = 1 pilot entered, 0 computed (GAMA 11 page 14)
@@ -773,7 +868,10 @@ export class SensorsOut {
         } else {
             this.interconnect.arinc429Tx.write(LVAR_ROLL_COMMAND, SimVarValueType.Degree, bankAngle);
         }
+        this.writeGpsCourseToSteer(courseToSteer);
+    }
 
+    private writeGpsCourseToSteer(courseToSteer: number | null) {
         //The real KLN does not have this, but we do and there is a SimVar for this...
         //Real unit: GPS COURSE TO STEER is fictional, no output carries it. It goes with the roll command it is derived
         //from, on the transmitter (#451)
@@ -794,17 +892,41 @@ export class SensorsOut {
      * The GPS SimVars get their null state in reset() (#462).
      */
     public setPoweredOff(): void {
+        this.writeLVarNullState();
+        this.xtkFilter.reset();
+    }
+
+    /**
+     * The null state of every output, with no change of state: what a switched-off unit leaves on its outputs. A failed
+     * port writes it once in a null-state pass (#458, FailureOutputs)
+     */
+    public writeNullState(): void {
+        this.writeLVarNullState();
+        this.writeGpsNullState();
+    }
+
+    /**
+     * The zero state of the L:KLN90B_* outputs that setPoweredOff writes, and nothing else
+     */
+    public writeLVarNullState(): void {
         //Real unit: without power the annunciator pins are open, the 429 transmitter is silent and the analog outputs
         //are flagged; each output's interface is on its setter above
-        this.interconnect.arinc429Tx.write(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
+        this.writeDigitalLVarNullState();
         this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
         this.interconnect.msgAnnunciator.write(LVAR_MSG_LIGHT, SimVarValueType.Bool, false);
         this.interconnect.wptAnnunciator.write(LVAR_WPT_LIGHT, SimVarValueType.Bool, false);
         this.interconnect.sim.write(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
+    }
+
+    /**
+     * The L:KLN90B_* outputs of the navigation data: the roll command, the integrity warning, the RMI bearing and the
+     * digital cross track. reset() zeroes them with the GPS SimVars
+     */
+    private writeDigitalLVarNullState(): void {
+        this.interconnect.arinc429Tx.write(LVAR_ROLL_COMMAND, SimVarValueType.Degree, 0);
         this.interconnect.arinc429Tx.write(LVAR_INTEGRITY_WARNING, SimVarValueType.Bool, false);
         this.interconnect.rmi.write(LVAR_GPS_WP_BEARING, SimVarValueType.Radians, 0);
         this.interconnect.arinc429Tx.write(LVAR_XTK, SimVarValueType.NM, 0);
-        this.xtkFilter.reset();
     }
 
     public setGpsOverriden(): void {
@@ -812,14 +934,40 @@ export class SensorsOut {
         this.interconnect.gps(this.interconnect.sim).write('GPS OVERRIDDEN', SimVarValueType.Bool, true);
     }
 
-    public reset() {
+    /**
+     * The GPS SimVars are not written: without Output.WriteGPSSimVars, or while disabled for hot swapping
+     */
+    private isGpsReleased(): boolean {
         //#350: a unit disabled for hot swapping has released the GPS to the unit that replaced it, so a power change does
         //not claim it. SimVarSync.setDisabled claims it again on the resume
-        if (!this.options.output.writeGPSSimVars || this.hardware.isDisabled) {
+        return !this.options.output.writeGPSSimVars || this.hardware.isDisabled;
+    }
+
+    /**
+     * At every power change: claims the GPS, sets the state the null outputs stand for and writes the null state of the
+     * GPS SimVars and of the L:KLN90B_* outputs of the navigation data. Sensors runs it in a null-state pass over every
+     * port, so that a failed port writes it too (#458)
+     */
+    public reset() {
+        if (this.isGpsReleased()) {
             return;
         }
 
         this.setGpsOverriden();
+        //No deviation for the D-bar filter to settle to, and no OBS course
+        this.xtkFilter.setValue(0, 5);
+        this.obsOut = null;
+        this.writeGpsNullState();
+        this.writeDigitalLVarNullState();
+    }
+
+    /**
+     * The GPS SimVar writes of reset() after the claim, and nothing else: no claim, no change of state
+     */
+    public writeGpsNullState(): void {
+        if (this.isGpsReleased()) {
+            return;
+        }
 
         //The null state of the GPS SimVars, at every power change, so that a switched-off unit does not leave a
         //GPS-coupled autopilot a frozen DTK and deviation (#462). The ticks write the real values from the next one on.
@@ -828,22 +976,22 @@ export class SensorsOut {
         //with GPS FLIGHT PLAN WP COUNT 0 crashes the sim when another GPS unit takes over in a hot swap. The same null
         //state with index 0 does not, and that pair alone among live values does. The old guesses (a start on the runway,
         //L:KLN90B_Disabled set at once, no calculation tick yet) were wrong. setWPIndex keeps the index within the count
-        this.setXTK(null, 5);
+        this.writeGpsXtk(null, 5);
         //Real unit: the D-bar driver holds its pin through op-amp stages behind the RC filter (CMM 64-65,
         //SignalOutputFilter), so without power the pin drops to 0 V at once (guess: the manuals do not describe the
         //unpowered output). Only the signal tick writes the deviation, and it stops with the power
         this.interconnect.gps(this.interconnect.analogNav).write('GPS WP CROSS TRK', SimVarValueType.Meters, 0);
-        this.setObs(null);
+        this.writeGpsObs(null);
         this.setDesiredTrack(null, null, 0);
-        this.setWpBearing(null, null, 0);
+        this.writeGpsWpBearing(null, 0);
         this.setDistance(null);
         this.setWPTETE(null, null);
         this.setDestETE(null, null);
-        this.setPos(null, null, null, 0, false);
+        this.writeGpsPos(null, null, null, 0);
         this.setWPIndex(-1, 0);
         this.setPrevWpt(null);
         this.setNextWpt(null);
-        this.setRollCommand(null, null);
+        this.writeGpsCourseToSteer(null);
         //Not setMode: K:GPS_OBS_ON/OFF is the position of the aircraft's LEG/OBS switch (GPS OBS ACTIVE), which a power
         //change must not flip. The next calculation tick writes the real mode
         this.interconnect.gps(this.interconnect.navData).write('GPS IS APPROACH ACTIVE', SimVarValueType.Bool, false);
@@ -873,10 +1021,14 @@ export class Sensors implements CalcTickable {
 
     private reset(evt: PowerEventData) {
         this.in.reset();
-        this.out.reset();
-        if (!evt.isPowered) {
-            this.out.setPoweredOff();
-        }
+        //A power change writes the null state of every port, a failed one too (#458): a power-on while failed leaves the
+        //null state on the failed port, which writes nothing from then on
+        this.interconnect.writeNullState('all', () => {
+            this.out.reset();
+            if (!evt.isPowered) {
+                this.out.setPoweredOff();
+            }
+        });
     }
 
 }

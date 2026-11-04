@@ -69,3 +69,25 @@ describe('OTH 7 page, fuel flow (5-41)', () => {
         expect([rows[3].trim(), rows[4].trim(), rows[5].trim()]).toEqual(['', '', '75']);
     });
 });
+
+// #458: a failed RS-232 input leaves the transmitted fuel values missing (docs/failures.md, "RS-232 input")
+describe('OTH 7 page with a failed RS-232 input (#458)', () => {
+    it('shows the fuel flows of a twin and the total dashed', async () => {
+        const unit = await oth7(2, [90, 84]);
+
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        const rows = Screen.read().rows('L');
+        expect([rows[3], rows[4], rows[5]]).toEqual(['ENG 1  ----', 'ENG 2  ----', 'TOTAL  ----'].map(r => r.padEnd(11, ' ')));
+    });
+
+    it('shows the total of a single dashed', async () => {
+        const unit = await oth7(1, [60]);
+
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L')[5]).toBe('       ----');
+    });
+});

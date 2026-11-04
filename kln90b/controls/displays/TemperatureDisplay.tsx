@@ -9,7 +9,7 @@ export class TemperatureDisplay implements UiElement {
     readonly children = NO_CHILDREN;
     private readonly ref: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
-    constructor(public temperature: Celsius) {
+    constructor(public temperature: Celsius | null) {
     }
 
     render(): VNode {
@@ -25,6 +25,9 @@ export class TemperatureDisplay implements UiElement {
     }
 
     private formatTemperature(): string {
+        if (this.temperature === null) {
+            return "---°C"; //#458: a failed input leaves it missing. The cells of the digits and the sign
+        }
         return `${padInt(this.temperature, 2).padStart(3, " ")}°C`;
     }
 }

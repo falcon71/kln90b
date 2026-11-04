@@ -18,6 +18,8 @@ import {KLNMagvar} from "../data/navdata/KLNMagvar";
 import {SidStar} from "../data/navdata/SidStar";
 import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 import {PendingCalls} from "../services/PendingCalls";
+import {FailureDetector} from "../failures/FailureDetector";
+import {Failures} from "../failures/Failures";
 
 export enum PageSide {
     LeftPage,
@@ -32,6 +34,8 @@ export interface PageProps extends ComponentProps {
     bus: EventBus;
     userSettings: KLN90BUserSettings,
     planeSettings: KLN90PlaneSettings;
+    failures: Failures;
+    failureDetector: FailureDetector;
     sensors: Sensors;
     pageManager: PageManager;
     messageHandler: MessageHandler;

@@ -60,3 +60,21 @@ describe('OTH 10 page, air data (5-43)', () => {
         expect(Screen.read().rows('L')[5].replace(/\s+/g, ' ')).toBe('DEN 9900ft');
     });
 });
+
+// #458: a failed ARINC 429 air data receiver leaves every air data value missing, and the density altitude with them
+describe('OTH 10 page with a failed ARINC 429 air data receiver (#458)', () => {
+    it('shows every value dashed and no error', async () => {
+        const unit = await bootUnit({panelXml: panelXml({...AIRDATA, ...fuelComputer(), 'Input.Airdata.Interface': 'ARINC429'})});
+        unit.env.sim.set('AMBIENT TEMPERATURE', 'celsius', 8);
+        unit.env.sim.set('PRESSURE ALTITUDE', 'feet', 12340);
+        await unit.panel.selectPage('L', 'OTH10');
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(Screen.read().rows('L')[4]).toBe('PRS 12300ft'); // Precondition
+
+        unit.props.failures.fail('airdata429');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L').slice(2)).toEqual(['SAT   ---°C', 'TAT   ---°C', 'PRS -----ft', 'DEN -----ft']);
+        expect(Screen.read().status().left).not.toMatch(/ERR/);
+    });
+});

@@ -66,6 +66,6 @@ export class Oth7Page extends SixLineHalfPage {
 
         this.children.get("ff1").fuelFlow = this.props.sensors.in.fuelComputer.fuelFlow1;
         this.children.get("ff2").fuelFlow = this.props.sensors.in.fuelComputer.fuelFlow2;
-        this.children.get("fftotal").fuelFlow = this.props.sensors.in.fuelComputer.fuelFlow1 + this.props.sensors.in.fuelComputer.fuelFlow2;
+        this.children.get("fftotal").fuelFlow = this.props.sensors.in.fuelComputer.getTotalFuelFlow();
     }
 }

@@ -58,6 +58,8 @@ export class Oth10Page extends SixLineHalfPage {
         this.children.get("sat").temperature = this.props.sensors.in.airdata.sat;
         this.children.get("tat").temperature = this.props.sensors.in.airdata.tat;
         this.children.get("pressureAlt").altitude = this.props.sensors.in.airdata.pressureAltitude;
-        this.children.get("densityAlt").altitude = pressureAlt2DensityAlt(this.props.sensors.in.airdata.pressureAltitude!, this.props.sensors.in.airdata.sat); //normally transmitted directly by the airdata system...
+        //normally transmitted directly by the airdata system... Dashed when the pressure altitude or the SAT is missing (#458)
+        const {pressureAltitude, sat} = this.props.sensors.in.airdata;
+        this.children.get("densityAlt").altitude = pressureAltitude === null || sat === null ? null : pressureAlt2DensityAlt(pressureAltitude, sat);
     }
 }

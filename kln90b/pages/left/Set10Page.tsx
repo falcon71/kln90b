@@ -3,6 +3,8 @@ import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
 import {SelectField} from "../../controls/selects/SelectField";
+import {Button} from "../../controls/Button";
+import type {MainPage} from "../MainPage";
 
 
 /**
@@ -12,6 +14,7 @@ import {SelectField} from "../../controls/selects/SelectField";
 
 type Set10PageTypes = {
     fastGps: SelectField;
+    failures: Button;
 }
 
 export class Set10Page extends SixLineHalfPage {
@@ -28,6 +31,7 @@ export class Set10Page extends SixLineHalfPage {
 
         this.children = new UIElementChildren<Set10PageTypes>({
             fastGps: new SelectField(['REAL', 'FAST'], fastGpsAcquisition ? 1 : 0, this.saveFastGpsAcquisition.bind(this)),
+            failures: new Button("FAILURES", () => this.openFailures()), //#458: the FLR pages
         });
 
         this.cursorController = new CursorController(this.children);
@@ -36,7 +40,13 @@ export class Set10Page extends SixLineHalfPage {
     public render(): VNode {
         return (<pre>
                 GPS:&nbsp&nbsp&nbsp{this.children.get("fastGps").render()}<br/>
+                {this.children.get("failures").render()}<br/>
             </pre>);
+    }
+
+    private openFailures(): void {
+        this.cursorController.setCursorActive(false); //The outer knob must turn the pages again once the FLR pages are closed
+        (this.props.pageManager.getCurrentPage() as MainPage).openFailurePages();
     }
 
     private saveFastGpsAcquisition(fastGpsAcquisition: number): void {

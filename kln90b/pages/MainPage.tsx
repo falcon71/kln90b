@@ -38,6 +38,7 @@ import {isCustomPageTreeController, LEFT_PAGE_TREE, PageTreeController, RIGHT_PA
 import {Nav4RightPage} from "./left/Nav4Page";
 import {Set0DummyPage, Set0Page} from "./left/Set0Page";
 import {KeyboardService} from "../services/KeyboardService";
+import {FlrPage} from "./left/Flr1Page";
 
 
 class PageStack {
@@ -285,6 +286,14 @@ export class MainPage extends DisplayComponent<FivePageProps> implements Page {
         this.leftPageStack.push(page, parent);
         this.rerenderLeftPage = true;
         this.checkIfSuperPageIsShown();
+    }
+
+    /**
+     * The FLR pages over the left page, opened by the FAILURES button of SET 10 (#458). Built here and not in Set10Page,
+     * which is in LEFT_PAGE_TREE: FlrPage needs PageTreeController, and the import would close a cycle through the tree
+     */
+    public openFailurePages(): void {
+        this.pushLeftPage(new FlrPage(this.props), null);
     }
 
     /**

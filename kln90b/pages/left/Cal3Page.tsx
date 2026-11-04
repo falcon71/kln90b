@@ -1,4 +1,4 @@
-import {FSComponent, VNode} from '@microsoft/msfs-sdk';
+import {FSComponent, NodeReference, VNode} from '@microsoft/msfs-sdk';
 import {SixLineHalfPage} from "../FiveSegmentPage";
 import {PageProps, UIElementChildren} from "../Page";
 import {CursorController} from "../CursorController";
@@ -30,6 +30,10 @@ export class Cal3Page extends SixLineHalfPage {
 
     readonly name: string = "CAL 3";
 
+    private readonly hdgRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
+    /** Whether the page shows the variant with a heading input: line three blank and HDG read-only */
+    private headingShown: boolean;
+
     constructor(props: PageProps) {
         super(props);
 
@@ -42,33 +46,26 @@ export class Cal3Page extends SixLineHalfPage {
             windSpeed: new SpeedDisplay(null),
         });
 
-        this.children.get("hdg").setReadonly(this.props.planeSettings.input.headingInput);
+        this.headingShown = this.props.sensors.in.isHeadingAvailable();
+        this.children.get("hdg").setReadonly(this.headingShown);
         this.cursorController = new CursorController(this.children);
     }
 
 
+    /**
+     * 5-12: with a heading input line three is blank and the heading comes from the input, without one the pilot enters
+     * it there. The heading can come and go while the page is shown (a failed RS-232 input and its repair, #458), so the
+     * line is hidden and shown in the redraw
+     */
     public render(): VNode {
-        if (this.props.planeSettings.input.headingInput) {
-            return (<pre>
+        return (<pre>
             &nbsp&nbsp&nbspWIND<br/>
             TAS&nbsp&nbsp&nbsp{this.children.get("tas").render()}kt<br/>
-            <br/>
+            <span ref={this.hdgRef} class={this.headingShown ? "d-none" : ""}>HDG&nbsp&nbsp&nbsp&nbsp{this.children.get("hdg").render()}°</span><br/>
                 {this.children.get("windLabel").render()} {this.children.get("windComponent").render()}kt<br/>
             WIND&nbsp&nbsp{this.children.get("windDir").render()}¥<br/>
             &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp{this.children.get("windSpeed").render()}kt
         </pre>);
-        } else {
-            return (<pre>
-            &nbsp&nbsp&nbspWIND<br/>
-            TAS&nbsp&nbsp&nbsp{this.children.get("tas").render()}kt<br/>
-            HDG&nbsp&nbsp&nbsp&nbsp{this.children.get("hdg").render()}°<br/>
-                {this.children.get("windLabel").render()} {this.children.get("windComponent").render()}kt<br/>
-            WIND&nbsp&nbsp{this.children.get("windDir").render()}¥<br/>
-            &nbsp&nbsp&nbsp&nbsp&nbsp&nbsp{this.children.get("windSpeed").render()}kt
-        </pre>);
-        }
-
-
     }
 
     tick(blink: boolean) {
@@ -77,8 +74,20 @@ export class Cal3Page extends SixLineHalfPage {
     }
 
     protected redraw() {
+        const headingAvailable = this.props.sensors.in.isHeadingAvailable();
+        if (headingAvailable !== this.headingShown) {
+            this.headingShown = headingAvailable;
+            //CursorController moves a cursor off a field that turned read-only (#217)
+            this.children.get("hdg").setReadonly(headingAvailable);
+            if (headingAvailable) {
+                this.hdgRef.instance.classList.add("d-none");
+            } else {
+                this.hdgRef.instance.classList.remove("d-none");
+            }
+        }
+
         let hdgTrue: number;
-        if (this.props.planeSettings.input.headingInput) {
+        if (headingAvailable) {
             hdgTrue = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro!);
         } else {
             hdgTrue = this.props.magvar.magToTrue(this.props.userSettings.getSetting('cal3HeadingMag').get());

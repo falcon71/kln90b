@@ -1,3 +1,5 @@
+import {FailureTrigger} from '../../kln90b/failures/FailureTrigger';
+import {FailureDetector} from '../../kln90b/failures/FailureDetector';
 import {readFileSync} from 'node:fs';
 import {ICAO, IcaoValue} from '@microsoft/msfs-sdk';
 import {describe, expect, it, onTestFinished, vi} from 'vitest';
@@ -20,7 +22,7 @@ const SAMPLE_PANEL_XML = readFileSync('cfg/panel.xml', 'utf8');
  * The members of PageProps, the services bag every page and control receives, as docs/architecture.md (Core 1) lists
  * them, in that order. Sorted for the comparison
  */
-const PAGE_PROPS = ['ref', 'bus', 'userSettings', 'planeSettings', 'sensors', 'pageManager', 'messageHandler',
+const PAGE_PROPS = ['ref', 'bus', 'userSettings', 'planeSettings', 'failures', 'failureDetector', 'sensors', 'pageManager', 'messageHandler',
     'hardware', 'memory', 'facilityLoader', 'facilityRepository', 'nearestLists', 'nearestUtils', 'remarksManager',
     'scanLists', 'msa', 'vnav', 'modeController', 'database', 'magvar', 'sidstar', 'pendingCalls'];
 
@@ -83,7 +85,7 @@ describe('the order of the calculation tickables (spec, docs/architecture.md Cor
             if (known !== undefined) return known[1];
             const byClass: [Function, string][] = [
                 [NavCalculator, 'NavCalculator'], [AirspaceAlert, 'airspaceAlert'],
-                [HtAboveAirportAlert, 'HtAboveAirportAlert'], [AltAlert, 'AltAlert'], [Timers, 'Timers'],
+                [HtAboveAirportAlert, 'HtAboveAirportAlert'], [AltAlert, 'AltAlert'], [FailureTrigger, 'FailureTrigger'], [FailureDetector, 'FailureDetector'], [Timers, 'Timers'],
                 [RollSteeringController, 'RollSteeringController'],
                 [SignalOutputFillterTick, 'SignalOutputFillterTick'],
             ];
@@ -91,7 +93,7 @@ describe('the order of the calculation tickables (spec, docs/architecture.md Cor
         };
 
         expect(tickController.calcTickables.map(name)).toEqual([
-            'sensors', 'magvar', 'ndbNearestList', 'aptNearestList', 'vorNearestList', 'modeController',
+            'sensors', 'FailureTrigger', 'FailureDetector', 'magvar', 'ndbNearestList', 'aptNearestList', 'vorNearestList', 'modeController',
             'NavCalculator', 'airspaceAlert', 'HtAboveAirportAlert', 'AltAlert', 'Timers', 'vnav', 'messageHandler',
             'RollSteeringController',
         ]);
