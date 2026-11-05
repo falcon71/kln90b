@@ -82,6 +82,10 @@ export class Sta1Page extends SixLineHalfPage {
         this.requiresRedraw = true;
 
         this.numPages = this.getRows().length <= 4 ? 1 : 2;
+        //5-29: the second page goes with the fifth satellite; a unit on it falls back to the first page (#466)
+        if (this.currentPage >= this.numPages) {
+            this.currentPage = this.numPages - 1;
+        }
 
         super.tick(blink);
     }

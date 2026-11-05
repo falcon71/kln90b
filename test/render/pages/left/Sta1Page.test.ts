@@ -346,3 +346,23 @@ describe('STA 1 states from the receiver solution (5-29, #453)', () => {
         }, 60_000);
     });
 });
+
+// 5-29: the second page exists only while more than four satellites are listed. A unit on STA+1 whose satellites drop to
+// four or fewer goes back to the first page, with the state on it (#466)
+describe('STA 1 page count follows the satellites (5-29, #466)', () => {
+    it('falls back to the first page when the satellites drop to four', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        await unit.panel.selectPage('L', 'STA 1');
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[0]).not.toMatch(/^STATE /); // Precondition: on the second page
+        expect(Screen.read().status().left).toBe('STA+1');
+
+        inhibitAllBut(unit, 4);
+        await vi.advanceTimersByTimeAsync(7000); // Past the SDK's next position update (every 5 s)
+
+        expect(Screen.read().rows('L')[0]).toMatch(/^STATE /);
+        expect(Screen.read().rows('L')[1]).toBe(' SV SNR ELE');
+        expect(Screen.read().status().left).toBe('STA 1');
+    }, 60_000);
+});
