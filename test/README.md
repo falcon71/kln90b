@@ -549,6 +549,12 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   default) stored as FPL 0, settles, and flies due north at 120 kt unless `moving` is false. It also stores the legs
   as FPL 3, because the D/T tests show the D/T page beside FPL 0 and beside FPL 3, unless `fpl3` is false, so the
   choice is a named option and not an accident of a copy. A `facilities` option replaces the legs as the navdata, so it must contain them.
+- **The SimVar-to-port tables** (`interconnect.ts`) are the design table of #451, written out and not computed from the
+  `Interconnect`: `FIXED_OUTPUTS`, `FIXED_INPUTS` and `routed(...)` name the port of each SimVar, and `BASE` and
+  `FLIPPED` are the panel.xml options that use every interface. `record()` records every port use and SimVar access
+  from the call on, and `flyWith(options)` boots on the standard route and flies a few seconds with it.
+  `test/render/Interconnect.test.ts` checks the routing with them, and `test/render/failures/FailedOutputs.test.ts`
+  takes the SimVars of a failed port from them (#458).
 - **Use these helpers; do not hand-roll them.** A wait-for-GPS loop, a `KLN90B_Internal_Key` loop, a
   `persistent-setting.<model>.profile_1.` key and a `gps.reset()` right after the boot are what `settle`,
   `unit.panel.type`, `storedSetting` and `bootUnit({coldGps: true})` do. A hand-rolled form stays only where it is the

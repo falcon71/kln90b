@@ -10,6 +10,7 @@ import {SelfTestLeftPage} from "./left/SelfTestLeftPage";
 import {FreetextEditor} from "../controls/editors/FreetextEditor";
 import {ErrorEvent, reportErrors} from "../controls/ErrorPage";
 import {SelfTestRightPage} from "./right/SelfTestRightPage";
+import {startTransmitters} from "../services/TransmitterStatus";
 import {
     EVT_ENT,
     EVT_L_CURSOR,
@@ -238,6 +239,7 @@ export class WelcomePage extends DisplayComponent<WelcomePageProps | PageProps> 
 
     /** The Self Test page, after the Take-Home warning in take-home mode */
     private showSelfTestPage(props: PageProps): void {
+        startTransmitters(props); //#458: the boot is over, the outputs transmit from here on (TransmitterStatus)
         if (props.planeSettings.takeHomeMode) {
             props.pageManager.setCurrentPage(FourSegmentPage, {
                 ...props,

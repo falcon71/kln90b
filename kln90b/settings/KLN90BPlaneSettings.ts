@@ -82,6 +82,7 @@ export interface KLN90PlaneSettings {
         altitudeAlertEnabled: boolean;
         writeGPSSimVars: boolean;
         rmiInterface: RmiInterface,
+        rmiInstalled: boolean,
         dataInterface: DataInterface,
         externalAnnunciators: {
             msgInstalled: boolean,
@@ -235,6 +236,9 @@ export class KLN90BPlaneSettingsParser {
                 //11 and 12 (Installation manual 1-7, 2-4). ARINC429 = the transmitter, pins 23/24, label 115, through a
                 //KA 90 -0201/-0202 (KA 90 manual 1-2)
                 rmiInterface: this.getChoice(instrumentsTag, "Output.RmiInterface", RMI_INTERFACES, RmiInterface.OBI),
+                //Real unit: whether an RMI is wired to the bearing output. Only an installed RMI can fail in the failure
+                //simulation (#458); the bearing LVar is written either way
+                rmiInstalled: this.getBoolean(instrumentsTag, "Output.RmiInstalled", false),
                 //Real unit: the interface of the digital navigation data an EFIS, a distance indicator or a moving map
                 //shows: position, ground speed, track, distance, waypoints, flight plan (#451). ARINC429 = the transmitter,
                 //pins 23/24, which both the Aspen EFD1000 (install manual 900-00041-001 Rev F, 5.4.2, figure 9-13) and

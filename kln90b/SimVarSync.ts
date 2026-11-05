@@ -17,6 +17,7 @@ import {BrightnessManager} from "./BrightnessManager";
 import {WTFlightplanSync} from "./services/WTFlightplanSync";
 import {Hardware} from "./Hardware";
 import {Interconnect} from "./Interconnect";
+import {FailureOutputs} from "./failures/FailureOutputs";
 
 const SYNC_TICK = 100;
 
@@ -25,7 +26,7 @@ const SYNC_TICK = 100;
  */
 export class SimVarSync {
 
-    constructor(private readonly powerSupply: PowerSupply, private readonly settings: KLN90PlaneSettings, private readonly interconnect: Interconnect, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware) {
+    constructor(private readonly powerSupply: PowerSupply, private readonly settings: KLN90PlaneSettings, private readonly interconnect: Interconnect, private readonly tickController: TickController, private readonly modeController: ModeController, private readonly pageManager: PageManager, private readonly brightnessManager: BrightnessManager, private readonly wtFlightplanSync: WTFlightplanSync, private readonly hardware: Hardware, private readonly failureOutputs: FailureOutputs) {
         window.setInterval(this.tick.bind(this), SYNC_TICK);
     }
 
@@ -70,6 +71,10 @@ export class SimVarSync {
             }
             if (writeGpsSimvars) {
                 this.wtFlightplanSync.sync(); //The planner has not been written while the option was off
+                if (!this.hardware.isDisabled) { //The resume does it for a disabled unit
+                    //#458: the failed ports' GPS SimVars hold what the sim's own GPS wrote while the option was off
+                    this.failureOutputs.writeFailedNullStates();
+                }
             }
         }
         //Real unit: fictional, the front-panel brightness knob's position (see BrightnessManager)
@@ -91,6 +96,8 @@ export class SimVarSync {
             //Real unit: fictional, the sim's claim that this gauge writes the GPS SimVars
             this.interconnect.sim.write('GPS OVERRIDDEN', SimVarValueType.Bool, !disabled); //Allows other devices to write GPS vars
             if (!disabled) {
+                //#458: the failed ports' GPS SimVars hold what the unit that replaced this one wrote
+                this.failureOutputs.writeFailedNullStates();
                 this.wtFlightplanSync.sync(); //#398: the planner was not written while the unit was disabled
             }
         }

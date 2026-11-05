@@ -1,4 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
+import {EventBus} from '@microsoft/msfs-sdk';
 import {bootUnit, moveAircraft, settle} from '../harness/boot';
 import {storedSetting} from '../harness/storage';
 import {Screen} from '../harness/render/screen';
@@ -7,7 +8,13 @@ import {showSuperNav5, SuperNav5} from '../harness/render/superNav5';
 import {bootOnStandardRoute} from '../harness/worldBoot';
 import {standardRoute} from '../harness/fixtures';
 import {courseDeg, pointBefore, pointFrom} from '../harness/flight/geo';
-import {panelXml} from '../harness/panelXml';
+import {HEADING_INPUT, panelXml} from '../harness/panelXml';
+import {mount} from '../harness/render/mount';
+import {SensorsIn} from '../../kln90b/Sensors';
+import {Interconnect} from '../../kln90b/Interconnect';
+import {MessageHandler} from '../../kln90b/data/MessageHandler';
+import {ExactMeasurement} from '../../kln90b/GpsMeasurement';
+import {Cal3Page} from '../../kln90b/pages/left/Cal3Page';
 
 // Public contract (LVars.ts, the wiki page panel.xml customization): L:KLN90B_HeadingInput is the runtime override of
 // Input.HeadingInput, synced like L:KLN90B_ObsSource (SimVarSync.test.ts)
@@ -136,5 +143,34 @@ describe('HDG up without a heading input (characterization)', () => {
 
         expect(SuperNav5.read().right![3].slice(-3)).toBe(' N^');
         expect(storedSetting(unit, 'superNav5MapOrientation')).toBe(3);
+    });
+});
+
+// A page or selector can be built before the first calculation tick: at a force-ready start the main page is. It must
+// see the heading input already, not "no heading" until the tick (#458)
+describe('the heading input before the first calculation tick', () => {
+    async function freshSensors() {
+        const unit = await bootUnit({panelXml: panelXml(HEADING_INPUT)});
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
+        const p = unit.props;
+        const sensorsIn = new SensorsIn(new EventBus(), p.userSettings, p.planeSettings, new Interconnect(p.planeSettings, p.failures),
+            new MessageHandler(), new ExactMeasurement());
+        return {unit, sensorsIn};
+    }
+
+    it('SensorsIn has the heading from its construction on', async () => {
+        const {sensorsIn} = await freshSensors();
+
+        expect(sensorsIn.isHeadingAvailable()).toBe(true);
+        expect(sensorsIn.headingGyro).toBe(123);
+    });
+
+    it('CAL 3 built then shows the variant with a heading input, line three blank', async () => {
+        const {unit, sensorsIn} = await freshSensors();
+        const page = new Cal3Page({...unit.props, sensors: {...unit.props.sensors, in: sensorsIn}} as typeof unit.props);
+
+        const rows = mount(page).text().split('\n');
+        expect(rows[1]).toMatch(/^TAS/); // Precondition: the rows are those of the page
+        expect(rows[2]).toBe(''); // Not "HDG    000°"
     });
 });

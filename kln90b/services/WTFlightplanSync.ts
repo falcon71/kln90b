@@ -13,6 +13,7 @@ import {
 import {Interconnect} from "../Interconnect";
 import {ActiveWaypoint, ActiveWaypointChangedEvents} from "../data/flightplan/ActiveWaypoint";
 import {Hardware} from "../Hardware";
+import {PowerEvent} from "../PowerSupply";
 
 
 const FLIGHTPLANNER_ID = "kln90b";
@@ -21,7 +22,7 @@ const DTO_PLAN_INDEX = 1;
 export class WTFlightplanSync {
     private readonly flightplanner: FlightPlanner;
 
-    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly interconnect: Interconnect, private readonly activeWaypoint: ActiveWaypoint, private readonly hardware: Hardware) {
+    constructor(bus: EventBus, facilityLoader: FacilityClient, private readonly interconnect: Interconnect, private readonly activeWaypoint: ActiveWaypoint, private readonly hardware: Hardware, private readonly isPowered: () => boolean) {
         bus.getSubscriber<FlightplanEvents>().on("flightplanChanged").handle(this.flightplanChanged.bind(this));
         bus.getSubscriber<ActiveWaypointChangedEvents>().on("activeWaypointChanged").handle(this.activeIdxChanged.bind(this));
 
@@ -48,10 +49,15 @@ export class WTFlightplanSync {
         this.flightplanner = FlightPlanner.getPlanner(FLIGHTPLANNER_ID, bus, {calculator: calculator});
         this.flightplanner.createFlightPlan(0);
         this.flightplanner.setActivePlanIndex(0);
+
+        //#458: a power-off empties the planner, a power-on syncs it once
+        //The bus replays the last power event to a new subscriber: a force-ready boot syncs once here, a cold one is
+        //still off and syncs empty (nothing to change)
+        bus.getSubscriber<PowerEvent>().on("powerEvent").handle(() => this.sync());
     }
 
     private flightplanChanged(klnPlan: Flightplan) {
-        if (klnPlan.idx !== 0 || !this.interconnect.gps(this.interconnect.navData).isTransmitting) {
+        if (klnPlan.idx !== 0 || !this.isSending()) {
             return;
         }
 
@@ -59,20 +65,52 @@ export class WTFlightplanSync {
     }
 
     /**
-     * Mirrors FPL 0 right away. L:KLN90B_WriteGpsSimvars switches the option on at runtime, and the planner would stay
+     * The planner stands for what the unit sends on the nav data port (#458, design "The planner at a failure and a
+     * power-off"): a switched-off unit and a failed port send nothing, and the receiving side has no route
+     */
+    private isSending(): boolean {
+        return this.isPowered() && this.interconnect.gps(this.interconnect.navData).isTransmitting;
+    }
+
+    /**
+     * Mirrors FPL 0 right away, or empties the planner while the unit is off or the nav data port is failed (#458).
+     * L:KLN90B_WriteGpsSimvars switches the option on at runtime, and the planner would stay
      * empty or stale until the next change otherwise. SimVarSync also calls it when the unit is put back after hot
-     * swapping (#398).
+     * swapping (#398), and FailureOutputs at a failure and a repair of the nav data port.
+     * With Output.WriteGPSSimVars off it writes nothing at all, not even the empty plans: the unit leaves the planner
+     * alone then (#142), and the rule above holds only while the option is set (#458)
      */
     public sync() {
+        if (!this.interconnect.writesGpsSimVars) {
+            return;
+        }
+        if (!this.isSending()) {
+            this.syncEmpty();
+            return;
+        }
         this.syncToWTFlightplan(this.activeWaypoint.fpl0, this.activeWaypoint.getActiveFplIdx());
     }
 
     private activeIdxChanged(activeIdx: number) {
-        if (!this.interconnect.gps(this.interconnect.navData).isTransmitting) {
+        if (!this.isSending()) {
             return;
         }
 
         this.syncToWTFlightplan(this.activeWaypoint.fpl0, activeIdx);
+    }
+
+    private syncEmpty() {
+        if (this.hardware.isDisabled) {
+            return; //#398
+        }
+        const wtPlan = this.flightplanner.getFlightPlan(0);
+        if (wtPlan.length > 0) {
+            const batchID = wtPlan.openBatch("KLN_sync");
+            this.emptyFlightplan(wtPlan);
+            wtPlan.closeBatch(batchID);
+        }
+        this.flightplanner.deleteFlightPlan(DTO_PLAN_INDEX);
+        this.flightplanner.setActivePlanIndex(0);
     }
 
     private syncToWTFlightplan(klnPlan: Flightplan, activeIdx: number) {
@@ -89,6 +127,9 @@ export class WTFlightplanSync {
 
     private writeFpl0(klnPlan: Flightplan, activeIdx: number) {
         const wtPlan = this.flightplanner.getFlightPlan(0);
+        if (wtPlan.length === 0 && klnPlan.getLegs().length === 0) {
+            return; //Nothing to change. A batch draws a UUID, which moves the seeded random of the tests
+        }
         const batchID = wtPlan.openBatch("KLN_sync");
 
         this.emptyFlightplan(wtPlan);

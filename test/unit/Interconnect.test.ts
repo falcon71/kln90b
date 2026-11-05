@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {beforeEach, describe, expect, it} from 'vitest';
-import {ApproachLampGroup, Interconnect, NULL_OUTPUT, SimVarOutput} from '../../kln90b/Interconnect';
+import {ApproachLampGroup, Interconnect, NULL_OUTPUT, PortFailureSource, SimVarOutput} from '../../kln90b/Interconnect';
 import {KLN90BPlaneSettingsParser, KLN90PlaneSettings} from '../../kln90b/settings/KLN90BPlaneSettings';
 import {panelXml, PanelOptions} from '../harness/panelXml';
 import {simEnv} from '../harness/sim/install';
@@ -124,5 +124,92 @@ describe('ports (#451)', () => {
 
         expect(simEnv().sim.lastWrite('GPS APPROACH MODE')?.value).toBe(3);
         expect(ic.approachLamps.isTransmitting).toBe(true);
+    });
+});
+
+// #458: a failed output port sends nothing. A null-state pass lets the ports it lists write once more, and drops the
+// writes of every other port (docs/superpowers/specs/2026-11-04-failures-framework-design.md, "The ports")
+describe('failed ports and the null-state pass (#458)', () => {
+    const failing429: PortFailureSource = {
+        isOutputFailed: port => port === 'arinc429Tx',
+        isInputFailed: () => false,
+    };
+    // The parser writes LVars, so the writes count from the Interconnect on
+    let mark = 0;
+    const interconnect = (failures?: PortFailureSource) => {
+        const ic = new Interconnect(settingsFor(), failures);
+        mark = simEnv().sim.writes.length;
+        return ic;
+    };
+    const writtenNames = () => simEnv().sim.writes.slice(mark).map(w => w.name);
+
+    it('a failed port drops writes and a pass lets it through', () => {
+        const ic = interconnect(failing429);
+        expect(ic.arinc429Tx.isTransmitting).toBe(false);
+        expect(ic.rs232Out.isTransmitting).toBe(true);
+
+        ic.arinc429Tx.write('GPS WP DISTANCE', 'meters', 5);
+        expect(writtenNames()).toEqual([]);
+
+        ic.writeNullState([ic.arinc429Tx], () => {
+            ic.arinc429Tx.write('GPS WP DISTANCE', 'meters', 0);
+            ic.analogNav.write('GPS WP CROSS TRK', 'meters', 0);
+        });
+        expect(writtenNames()).toEqual(['GPS WP DISTANCE']);
+        expect(simEnv().sim.lastWrite('GPS WP DISTANCE')?.value).toBe(0);
+
+        // After the pass, the failed port drops again and the working one writes
+        ic.arinc429Tx.write('GPS WP DISTANCE', 'meters', 7);
+        ic.analogNav.write('GPS WP CROSS TRK', 'meters', 3);
+        expect(writtenNames()).toEqual(['GPS WP DISTANCE', 'GPS WP CROSS TRK']);
+    });
+
+    it('a pass over all ports writes through failed ports', () => {
+        const ic = interconnect(failing429);
+
+        ic.writeNullState('all', () => {
+            ic.arinc429Tx.write('GPS WP DISTANCE', 'meters', 0);
+            ic.analogNav.write('GPS WP CROSS TRK', 'meters', 0);
+        });
+
+        expect(writtenNames()).toEqual(['GPS WP DISTANCE', 'GPS WP CROSS TRK']);
+    });
+
+    it('NULL_OUTPUT drops inside a pass', () => {
+        const ic = interconnect(failing429);
+
+        ic.writeNullState('all', () => NULL_OUTPUT.write('GPS WP DISTANCE', 'meters', 0));
+        ic.writeNullState([NULL_OUTPUT], () => NULL_OUTPUT.write('GPS WP DISTANCE', 'meters', 0));
+
+        expect(writtenNames()).toEqual([]);
+    });
+
+    it('the approach lamp group writes in a pass that lists one of its lamps, and drops in a pass that lists neither', () => {
+        const ic = interconnect();
+
+        ic.writeNullState([ic.arinc429Tx], () => ic.approachLamps.write('GPS APPROACH MODE', 'enum', 0));
+        expect(writtenNames()).toEqual([]);
+
+        ic.writeNullState([ic.armAnnunciator], () => ic.approachLamps.write('GPS APPROACH MODE', 'enum', 0));
+        expect(writtenNames()).toEqual(['GPS APPROACH MODE']);
+    });
+
+    it('a port of a failed component is looked up by its property name', () => {
+        const ic = interconnect();
+
+        expect(ic.output('arinc429Tx')).toBe(ic.arinc429Tx);
+        expect(ic.output('rs232Out')).toBe(ic.rs232Out);
+        expect(ic.output('obiBus')).toBe(ic.obiBus);
+    });
+
+    it('ends the pass when the write throws', () => {
+        const ic = interconnect(failing429);
+
+        expect(() => ic.writeNullState('all', () => {
+            throw new Error('boom');
+        })).toThrow('boom');
+        ic.arinc429Tx.write('GPS WP DISTANCE', 'meters', 5);
+
+        expect(writtenNames()).toEqual([]);
     });
 });

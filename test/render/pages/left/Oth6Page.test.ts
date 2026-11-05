@@ -135,3 +135,16 @@ describe('OTH 6 reserve as a user setting (#192)', () => {
         expect(storedSetting(unit, 'othReserve')).toBe(45);
     });
 });
+
+// #458: a failed RS-232 input leaves the transmitted fuel values missing (docs/failures.md, "RS-232 input")
+describe('OTH 6 page with a failed RS-232 input (#458)', () => {
+    it('shows the endurance, the range and the efficiency dashed', async () => {
+        const unit = await single({fobLb: 756, reserve: 0, groundspeedKt: 120, flowPph: 90});
+        expect(Screen.read().rows('L')[2]).toBe(' ENDUR 8:24'); // Precondition
+
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L').slice(2, 5)).toEqual([' ENDUR--:--', ' RANGE --.-', ' NM/GAL ---']);
+    });
+});

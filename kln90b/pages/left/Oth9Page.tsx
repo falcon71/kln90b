@@ -44,7 +44,7 @@ export class Oth9Page extends SixLineHalfPage {
     }
 
     public render(): VNode {
-        if (this.props.planeSettings.input.headingInput) {
+        if (this.props.sensors.in.isHeadingAvailable()) {
             return (<pre>
                 &nbspAIR DATA<br/>
                 TAS&nbsp&nbsp&nbsp{this.children.get("tas").render()}kt<br/>
@@ -70,13 +70,20 @@ export class Oth9Page extends SixLineHalfPage {
     protected redraw(): void {
         this.children.get("tas").speed = this.props.sensors.in.airdata.tas;
         this.children.get("mach").mach = this.props.sensors.in.airdata.mach;
-        if (!this.props.planeSettings.input.headingInput) {
+        //Without the heading or the TAS (a failed input, #458) the wind is dashed. The layout is chosen when the page is
+        //built, so a heading lost while the page is shown leaves the wind rows on it: they show dashes, not the last wind
+        const heading = this.props.sensors.in.headingGyro; //Null exactly while no heading is available
+        const tas = this.props.sensors.in.airdata.tas;
+        if (heading === null || tas === null) {
+            this.children.get("windComponent").speed = null;
+            this.children.get("windSpeed").speed = null;
+            this.children.get("windDir").bearing = null;
             return;
         }
 
-        const hdgTrue = this.props.magvar.magToTrue(this.props.sensors.in.headingGyro!);
-        const windSpeed = calculateWindspeed(this.props.sensors.in.airdata.tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
-        const windDir = calculateWindDirection(this.props.sensors.in.airdata.tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
+        const hdgTrue = this.props.magvar.magToTrue(heading);
+        const windSpeed = calculateWindspeed(tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
+        const windDir = calculateWindDirection(tas, this.props.sensors.in.gps.groundspeed, hdgTrue, this.props.sensors.in.gps.trackTrue);
         const headWind = calculateHeadwind(windSpeed, windDir, hdgTrue);
 
         this.children.get("windLabel").text = headWind >= 0 ? "HDWND" : "TLWND";

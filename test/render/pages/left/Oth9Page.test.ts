@@ -117,3 +117,35 @@ describe('OTH 9 page, wind (5-43)', () => {
         expect(Screen.read().rows('L')[4]).toBe('WIND  030°¥');
     });
 });
+
+// #458: a failed ARINC 429 air data receiver leaves every air data value missing, and the wind with them
+describe('OTH 9 page with a failed ARINC 429 air data receiver (#458)', () => {
+    it('shows the airspeeds and the wind dashed, with a heading input', async () => {
+        const unit = await bootUnit({panelXml: panelXml({...AIRDATA, ...fuelComputer(), 'Input.HeadingInput': true, 'Input.Airdata.Interface': 'ARINC429'}), magvar: 10});
+        unit.env.sim.set('AIRSPEED TRUE', 'knots', 100);
+        unit.env.sim.set('AIRSPEED MACH', 'mach', 0.15);
+        unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 350);
+        await settle(unit);
+        await moveAircraft(unit, {lat: 47.02, lon: 8.0}, {groundspeedKt: 83.282, trackTrue: 353.103});
+        await unit.panel.selectPage('L', 'OTH 9');
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(Screen.read().rows('L')[1]).toBe('TAS   100kt'); // Precondition
+
+        unit.props.failures.fail('airdata429');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L').slice(1)).toEqual(['TAS   ---kt', 'MACH    ---', 'HDWND ---kt', 'WIND  ---°¥', '      ---kt']);
+    });
+
+    it('shows the airspeeds dashed without a heading input', async () => {
+        const unit = await bootUnit({panelXml: panelXml({...AIRDATA, ...fuelComputer(), 'Input.Airdata.Interface': 'ARINC429'})});
+        unit.env.sim.set('AIRSPEED TRUE', 'knots', 187);
+        await unit.panel.selectPage('L', 'OTH 9');
+        await vi.advanceTimersByTimeAsync(1500);
+
+        unit.props.failures.fail('airdata429');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L').slice(1, 3)).toEqual(['TAS   ---kt', 'MACH    ---']);
+    });
+});

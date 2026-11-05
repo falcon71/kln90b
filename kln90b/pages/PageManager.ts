@@ -15,6 +15,7 @@ import {
     VorFacility,
 } from "@microsoft/msfs-sdk";
 import {NullPage} from "./NullPage";
+import {startTransmitters} from "../services/TransmitterStatus";
 import {MainPage} from "./MainPage";
 import {Nav2Page} from "./left/Nav2Page";
 import {Apt4Page} from "./right/Apt4Page";
@@ -60,6 +61,9 @@ export class PageManager implements DisplayTickable {
     }
 
     public startMainPage(props: PageProps) {
+        //#458: the failure detection starts here; this is the single place the main page appears, also at a force-ready start
+        props.memory.failureDetection.mainPageShown = true;
+        startTransmitters(props); //#458: an engine-running start skips the Self Test page
         const lastActiveWaypoint = props.memory.navPage.startPageWaypoint;
         if (lastActiveWaypoint === null) {
             this.setCurrentPage(MainPage, {

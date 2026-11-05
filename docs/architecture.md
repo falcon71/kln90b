@@ -200,9 +200,12 @@ Turn-On page ticks during the boot (#416).
 | constant                                 | rate                                                                         | tickables                                                                                                                                                                                                        |
 |------------------------------------------|------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `TICK_TIME_DISPLAY = 250` ms (4 Hz)      | `DisplayTickable.tick(blink)`; `blink` is true one tick in four (1 Hz blink) | `[pageManager]`, which ticks the current page and controls                                                                                                                                                       |
-| `TICK_TIME_CALC = 1000` ms (1 Hz)        | `CalcTickable.tick()`                                                        | `sensors, magvar, ndb/apt/vor NearestList, modeController, NavCalculator, airspaceAlert, HtAboveAirportAlert, AltAlert, Timers, vnav, messageHandler, RollSteeringController` (in this order; the order matters) |
+| `TICK_TIME_CALC = 1000` ms (1 Hz)        | `CalcTickable.tick()`                                                        | `sensors, FailureTrigger, FailureDetector, magvar, ndb/apt/vor NearestList, modeController, NavCalculator, airspaceAlert, HtAboveAirportAlert, AltAlert, Timers, vnav, messageHandler, RollSteeringController` (in this order; the order matters) |
 | `TICK_TIME_SIGNALS = 1000/16` ms (16 Hz) | `CalcTickable.tick()`                                                        | `SignalOutputFillterTick(sensors)`, which writes the smoothed `GPS WP CROSS TRK`                                                                                                                                 |
 
+- `CalcTickable.onTicksStopped?()` is called when the loops stop (power off, hot-swap disable), for a tickable that
+  measures the time between its ticks. `FailureTrigger` and `FailureDetector` use it to drop their reference time, so
+  the time the unit was off never counts (#458).
 - Rationale is given in the class doc: the real unit has a CRT redrawn line by line (maintenance manual p.43) and does
   its calculations at 1 Hz (from a video). The 16 Hz loop emulates the analog D-bar driver through
   `services/SignalOutputFilter`: the PWM deviation, clamped to two full scales, through the RC low-pass of the main
@@ -240,6 +243,21 @@ calls `in.reset()` and `out.reset()`, and on a power-off also `out.setPoweredOff
 `FuelComputer` (only if `Input.FuelComputer.IsInterfaced`) reads `FUEL TOTAL QUANTITY WEIGHT EX1`, `ENG FUEL FLOW PPH:n`
 and `GENERAL ENG FUEL USED SINCE START:n`, and converts them to the configured unit and fuel density. The KLN only knows
 1 or 2 engines; with more than 2 engines everything is summed into engine 1.
+
+**Failed inputs and missing values (#458).** The readers ask the port once per tick (`isReceiving`) and take the values
+of a failed port as missing, not as zero: `FuelComputer.fob`, `fuelFlow1/2` and the fuel used, and `Airdata.pressureAltitude`,
+`tas`, `mach`, `sat` and `tat` are nullable, and the pages, the fuel and speed displays and the temperature display show
+dashes for null (`getTotalFuelFlow()` and `getTotalFuelUsed()` are null while a part is). A failed encoder or a failed air
+data input leaves the altitude missing, so the altitude consumers and `ALTITUDE FAIL` follow. A failed RS-232 input keeps
+the barometer at its last value, as if no baro were transmitted, and a failed OBS resolver leaves `obsMag` null, as with
+`Input.ObsSource` 0. `SensorsIn.isHeadingAvailable()` is true while a heading input is installed **and** its port
+receives; every consumer that keys on the presence of a heading (the HDG up map, CAL 3, the roll steering, OTH 9) asks it,
+not `Input.HeadingInput`. The constructor reads the heading once, so a page or selector built before the first
+calculation tick (a force-ready start) sees it too, and `headingGyro` is null exactly while no heading is available.
+The heading can come and go while a page is shown: OTH 9 keeps the layout it was built with and dashes the wind rows
+without a heading, and CAL 3 hides or shows its HDG line and makes the field read-only or editable in the redraw. A single
+engine keeps `fuelFlow2` at 0 over a failure, so `getTotalFuelFlow()` returns with the repair. A fuel quantity the pilot
+entered stays a number.
 
 `Airdata`:
 
@@ -484,6 +502,12 @@ on them.
           lamp on the self-test themselves).
         - `L:KLN90B_AlertVolume` (#197): the SET 9 alert volume, 0 to 99, written by `AudioGenerator` at boot and on
           every change of `altAlertVolume`.
+        - `L:KLN90B_Arinc429OutputTransmitted`, `L:KLN90B_Rs232OutputTransmitted` (#458): 1 while the unit transmits on
+          that output (RS-232 only while it carries the nav data). 0 while off, while booting until the Self Test page
+          shows (`startTransmitters` in `WelcomePage.showSelfTestPage` and `PageManager.startMainPage`, which sets
+          `VolatileMemory.transmittersStarted`), and while the output is failed. Written by `services/TransmitterStatus.ts`
+          at the boot, at every power change, when the boot ends and at every failure change, through the `sim` port and
+          outside any null-state pass. For an EFIS that takes the nav data and the MSG annunciation over the bus.
     - Writable by aircraft:
         - `L:KLN90B_Brightness` (0 to 1)
         - `L:KLN90B_Disabled` (hot swap)
@@ -508,11 +532,44 @@ each documented with its pins. One `Interconnect` is built in `KLN90BCore.init()
   keep the `Interconnect` and ask it at the moment of use.
 - `gps(port)` is the gate of the GPS SimVars: the port while `writeGPSSimVars` is set, `NULL_OUTPUT` otherwise. It
   replaced the `if (!writeGPSSimVars) return` lines; the L:KLN90B_* outputs go to their port directly.
-- `GPS APPROACH MODE` goes through `approachLamps`, a group over the ARM and ACTV pins that #366 will let change the
-  value for a failed lamp. `L:KLN90B_AnnunTest` (deprecated) and the fictional constants go through `sim`, which never
+- `GPS APPROACH MODE` goes through `approachLamps`, a group over the ARM and ACTV pins that a later part of #366 will let
+  change the value for a failed lamp. `L:KLN90B_AnnunTest` (deprecated) and the fictional constants go through `sim`, which never
   fails.
-- The ports only carry the value until the failure simulation (#366) makes them fail.
-  `test/render/Interconnect.test.ts` holds the SimVar-to-port table and fails on a SimVar that bypasses the ports.
+- **Failing ports (#458).** `Interconnect` takes a `PortFailureSource` (`Failures` in the unit, `NO_FAILURES` in a test
+  that builds one alone). A `SimVarOutput` built with a failure test reports `isTransmitting` false while a failure of
+  the part is effective, and drops its writes; a `SimVarInput` reports `isReceiving` false and the readers treat the
+  value as missing (Core 3). `Failures` answers `isOutputFailed(port)` and `isInputFailed(port)` from the failure
+  catalog (`kln90b/failures/FailureCatalog.ts`: each failure names the ports it takes and the installation it needs),
+  and evaluates the eligibility at every call, since `SimVarSync` can change the options at runtime. The analog nav
+  port, the annunciator pins and `sim` take no failure in part 1. `approachLamps` is a group over the ARM and ACTV pins
+  and writes while one of them may.
+- **The null-state pass.** `Interconnect.writeNullState(ports | 'all', write)` runs `write` with a pass active: the
+  listed ports write even while failed, and every other port drops its writes. A port that fails writes its null state
+  once this way (`FailureOutputs`, on the `failureChanged` event, and when `SimVarSync` claims the GPS SimVars again at
+  a resume or a runtime switch-on of `L:KLN90B_WriteGpsSimvars`), and `Sensors` runs its power change and the boot reset
+  over `'all'`, so a port failed in an earlier session leaves its null state at the boot and at every power-on. From
+  then on a failed port writes nothing until the repair. `SensorsOut.writeNullState()` is the pass's write: the L:KLN90B
+  outputs of `setPoweredOff` plus the GPS SimVars of `reset`, without any change of state.
+- `test/render/Interconnect.test.ts` holds the SimVar-to-port table and fails on a SimVar that bypasses the ports.
+- **The failure state** (`kln90b/failures/`). `Failures` is stateless: the state is the settings group of
+  `KLN90BFailureSettings` (`failureMtbf`, and `failure_<key>` as `""` for working, `"{}"` for failed, with room for the
+  values later parts draw), a manager of its own so that a later wipe of the user memory leaves it alone, saved per
+  aircraft model with the other settings. `fail`/`repair` publish `failureChanged`. `FailureTrigger` (a calc tickable
+  right after `sensors`) draws a Poisson process over sim time, `1 - exp(-dt / MTBF)` per tick, picks among the random,
+  eligible, not yet active failures with equal chance, and counts no step larger than a minute. `FailureDetector` (right
+  after it) decides when the unit notices a failure; its state is `VolatileMemory.failureDetection`, so every power-on
+  starts it again, and `PageManager.startMainPage` sets `mainPageShown`, the start of the power-on detection. A scheduled
+  failure holds the seconds it still waits (`pendingS`), counted with the trigger's rule (no step back, none after a
+  stop, none larger than a minute), so a jump of the sim clock neither hides nor hurries a detection; a detected failure
+  is latched (`detected`) until it is repaired or no longer effective. The messages follow the detection
+  (`FailureMessage` in `data/PersistentMessages.ts`).
+- **The planner rule.** `WTFlightplanSync` holds FPL 0 and the direct-to plan only while the unit is powered and the
+  nav data port transmits (`isSending()`); `sync()` follows the rule, so a power-off and a failure of that port empty
+  the planner, and a power-on and the repair sync it once. This is the one change of behavior that is also there with
+  failures off: a power-off empties the planner, with `Output.WriteGPSSimVars` set. With the option off `sync()` writes
+  nothing at all, as before #458 (#142), not even the empty plans. While `Hardware.isDisabled` nothing is written. `KlnEfbLoader` ignores a
+  synced route while the nav data port is failed, whatever `Output.WriteGPSSimVars` says, and `KlnEfbSaver` answers
+  nothing then because the port gate is closed.
 
 - **Gated** by `writeGPSSimVars`:
     - `GPS OVERRIDDEN` (set to true every tick)
@@ -540,7 +597,8 @@ each documented with its pins. One `Interconnect` is built in `KLN90BCore.init()
 - Other outputs:
     - `WTFlightplanSync` mirrors FPL 0 into an SDK `FlightPlanner` with id `"kln90b"` (`initSyncRole:'primary'`): plan 0
       is DF legs and plan 1 is a direct-to plan "like the Garmins". Data stops after the MAP or an arc ("Install manual:
-      We do not return data after a fence"). This happens only when `writeGPSSimVars` is set, and `SimVarSync` calls `WTFlightplanSync.sync()` once when
+      We do not return data after a fence"). This happens only when `writeGPSSimVars` is set and the unit is on with a working nav data port (see "The
+      planner rule" above), and `SimVarSync` calls `WTFlightplanSync.sync()` once when
       `L:KLN90B_WriteGpsSimvars` switches it on at runtime. While `Hardware.isDisabled` is set nothing is written,
       whatever asks for the sync, and `SimVarSync.setDisabled` syncs once on the resume (#398).
     - `KlnEfbSaver` answers EFB `avionicsRouteRequested` (only with `writeGPSSimVars` set); `KlnEfbLoader` loads
@@ -1191,6 +1249,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
       #141)
     - `Output.{RmiInterface=OBI, DataInterface=ARINC429}`
     - `Output.ExternalAnnunciators.{MsgInstalled, WptInstalled, ArmInstalled, ActvInstalled}` = false
+    - `Output.RmiInstalled` = false (#458): true when an RMI is wired to the bearing output. Only then can `rmiOutput`
+      fail; the output is written either way
     - The `*Interface` keys and the annunciator keys (#451) change no read or write. `Interconnect` routes by the
       interface keys (Core 4); both only matter to the failure simulation (#366).
     - `debugMode` = false (hard-coded)
@@ -1412,6 +1472,20 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   changed, because every power-on, ACT visit and waypoint confirmation builds a new controller over them (#90).
   Without `Input.ExternalSwitches.AppArmSwitchInstalled` it removes APT 8 from the right tree, and so also ACT 8 (3-49,
   #133).
+- `FLR_PAGE_TREE` (one group: `Flr1Page`, `Flr2Page`, `Flr3Page`) is the tree of the fictional failure pages (#458). It is
+  not part of `LEFT_PAGE_TREE`: only the `FAILURES` button of SET 10 opens it, through `MainPage.openFailurePages()`,
+  which pushes `FlrPage` on the left (the button first turns the cursor off, so that the outer knob turns the pages again
+  after the close). `FlrPage`, `Flr1Page` and the tree are in `pages/left/Flr1Page.tsx`; `PageTreeController` imports
+  the tree as a type only and `Set10Page` does not import the file, so neither closes an import cycle. `FlrPage` is a
+  custom page tree controller like the ACT page: the inner knob moves between FLR 1 to 3, and the outer knob is not
+  handled, so the pushed page is popped and the event dispatched again (the KLN 89 trainer behavior above).
+  FLR 1 holds the `MtbfEditor` (three digits and `H`, 0 or CLR is OFF), the battery (a fixed figure until the battery
+  part) and the `SERVICE?` button, which asks `CONFIRM?` and then repairs everything (`failures.repairAll()`) and shows
+  `SERVICED` on the status line. FLR 2 and FLR 3 share `FailureListPage`: a static heading and a `List` of
+  `ConfirmListItem`s (`controls/ListItem.tsx`: an entry that shows a flashing prompt of its own in its place, asked by
+  CLR on FLR 2 and by ENT on FLR 3, confirmed by ENT, withdrawn by CLR). The lists come from `failures.activeList()` and
+  `failures.inactiveList()`, sorted by FLR name, and rebuild in the next display tick after a `failureChanged` event,
+  whoever caused it. The pages are recreated on every knob step like any other page; the state is the failure settings.
 - `CustomPageTreeController` / `isCustomPageTreeController(page)` (`"pageTreeController" in page`). `ActPagePage` and
   `WaypointConfirmPage` own a private `PageTreeController(RIGHT_PAGE_TREE, innerPage, ...)`, so the right inner knob
   browses APT 1-8 (APT 1-7 without the approach arm switch) etc. *of that waypoint* instead of the main tree. They copy

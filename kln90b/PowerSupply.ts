@@ -122,6 +122,11 @@ export class PowerSupply {
         }, RIDE_THROUGH_TIME);
     }
 
+    /** Whether the unit is powered right now. A subscriber that is built after a force-ready boot has seen no powerEvent */
+    public isPoweredOn(): boolean {
+        return this.isPowered;
+    }
+
     private cancelRideThrough(): void {
         if (this.rideThrough !== null) {
             window.clearTimeout(this.rideThrough);

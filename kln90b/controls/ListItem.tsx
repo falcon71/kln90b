@@ -154,3 +154,79 @@ export class SimpleListItem<T> implements Field, ListItem {
     }
 
 }
+
+export interface ConfirmListItemProps<T> {
+    bus: EventBus,
+    value: T,
+    text: string,
+    /** What the entry shows while it asks, 11 characters. It flashes in the entry's place */
+    prompt: string,
+    /** The key that asks. ENT answers it, the same key as on the entry; CLR withdraws it */
+    trigger: 'clear' | 'enter',
+    onConfirm: (value: T) => void,
+}
+
+/**
+ * An entry that asks for a confirmation with a prompt of its own: CLR asks and ENT confirms (FLR 2), or ENT asks and
+ * ENT confirms (FLR 3). CLR withdraws the question. The text changes inside the display tick (#458)
+ */
+export class ConfirmListItem<T> extends SimpleListItem<T> {
+
+    public constructor(private readonly confirmProps: ConfirmListItemProps<T>) {
+        super({bus: confirmProps.bus, value: confirmProps.value, fulltext: confirmProps.text});
+    }
+
+    public isEnterAccepted(): boolean {
+        return this.confirmProps.trigger === 'enter' || this.isEntered;
+    }
+
+    public isClearAccepted(): boolean {
+        return this.confirmProps.trigger === 'clear' || this.isEntered;
+    }
+
+    public enter(): Promise<EnterResult> {
+        if (this.isEntered) {
+            this.isEntered = false;
+            this.confirmProps.onConfirm(this.confirmProps.value);
+            return Promise.resolve(EnterResult.Handled_Keep_Focus);
+        }
+        if (this.confirmProps.trigger === 'enter') {
+            this.isEntered = true;
+            return Promise.resolve(EnterResult.Handled_Keep_Focus);
+        }
+        return Promise.resolve(EnterResult.Not_Handled);
+    }
+
+    public clear(): boolean {
+        if (this.isEntered) {
+            this.isEntered = false;
+            return true;
+        }
+        if (this.confirmProps.trigger === 'clear') {
+            this.isEntered = true;
+            return true;
+        }
+        return false;
+    }
+
+    public tick(blink: boolean): void {
+        if (!TickController.checkRef(this.ref)) {
+            return;
+        }
+        const text = this.isEntered ? this.confirmProps.prompt : this.confirmProps.text;
+        if (this.ref.instance.textContent !== text) {
+            this.ref.instance.textContent = text;
+        }
+        const classes = this.ref.instance.classList;
+        if (this.isFocused) {
+            classes.add("inverted");
+        } else {
+            classes.remove("inverted");
+        }
+        if (blink && (this.isEntered || (this.isFocused && this.isEnterAccepted()))) {
+            classes.add("inverted-blink");
+        } else {
+            classes.remove("inverted-blink");
+        }
+    }
+}

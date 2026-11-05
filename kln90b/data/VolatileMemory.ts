@@ -26,6 +26,7 @@ import type {Message} from "./MessageHandler";
 import {PowerEvent, PowerEventData} from "../PowerSupply";
 import {Sensors} from "../Sensors";
 import {SustainedCondition} from "./SustainedCondition";
+import type {FailureDetectionState} from "../failures/FailureDetector";
 
 /**
  * The state of a waypoint page type (APT, VOR, NDB, INT, SUP). The waypoint it shows is kept over a power cycle (KLN 89
@@ -362,6 +363,19 @@ export class VolatileMemory {
     public isReady = false;
 
     /**
+     * #458: what the failure detection has decided in this power-on. Forgotten at every power-on, also a short one: the
+     * unit looks at its parts and inputs again. It is no `*Page` state, so the guard test of the page states does not
+     * see it; its own test does
+     */
+    public readonly failureDetection: FailureDetectionState = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set()};
+
+    /**
+     * #458: the boot of this power-on is over (TransmitterStatus): the Self Test page has shown, or the main page at an
+     * engine-running start. Forgotten at every power-on, also a short one
+     */
+    public transmittersStarted: boolean = false;
+
+    /**
      * #416: the first failure of the current power-on that the reset does not recover from (a scan list that cannot be
      * built, spec 4.1a); null at every power-on
      */
@@ -399,6 +413,11 @@ export class VolatileMemory {
         const isCurrent = () => powerOn === this.powerOnCount;
         this.isReady = false;
         this.selfTestFailure = null;
+        this.failureDetection.mainPageShown = false;
+        this.failureDetection.powerOnScheduled = false;
+        this.failureDetection.pendingS.clear();
+        this.failureDetection.detected.clear();
+        this.transmittersStarted = false;
         this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry
         this.aptPage.lastMatch = null;

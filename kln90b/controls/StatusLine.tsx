@@ -35,6 +35,7 @@ export type StatusLineMessage =
     "NO VOR WPTS" |
     "OUTDATED DB" |
     "RMKS FULL" |
+    "SERVICED" |
     "USED IN FPL" |
     "USR DB FULL";
 

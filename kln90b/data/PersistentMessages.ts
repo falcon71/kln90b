@@ -18,6 +18,9 @@ import {SustainedCondition} from "./SustainedCondition";
 import {Raim, raimStatus} from "../GpsSolution";
 import {halForMode} from "../services/ModeController";
 import {GPS} from "../Gps";
+import {FailureDetector} from "../failures/FailureDetector";
+import {FAILURE_CATALOG, FailedInputPort, FailureKey} from "../failures/FailureCatalog";
+import {DataInterface} from "../settings/KLN90BPlaneSettings";
 
 /**
  * How long the course must be off before a course message that waits shows: the KA 90 Installation Manual pp. 3-43 and
@@ -36,12 +39,13 @@ export const RAIM_MESSAGE_DELAY = 10_000;
 
 /*
 Not built yet:
-- RAIM POSITION ERROR (a faulty satellite) and the failure messages of the unit's own hardware and interfaces (#366)
+- RAIM POSITION ERROR (a faulty satellite) (#366)
  */
 
 export function buildPersistentMessages(props: PageProps): Message[] {
     return [
-        new AltitudeFailMessage(props.planeSettings),
+        new AltitudeFailMessage(props.planeSettings, props.failureDetector),
+        ...FAILURE_CATALOG.filter(d => d.message !== null).map(d => new FailureMessage(d.key, [...d.message!], props.failureDetector)),
         new ArmGPSApproachMessage(props.memory.navPage),
         new DatabaseOutOfDateMessage(props.database),
         new IfRequiredSelectObsMessage(props.memory.navPage, props.modeController),
@@ -219,16 +223,55 @@ class AdjustCourseMessage implements Message {
     }
 }
 
+/**
+ * The failure messages of the unit's own hardware and interfaces (B-1 to B-4): each shows while the unit has detected
+ * its failure (FailureDetector, #458) and goes when the failure is repaired
+ */
+class FailureMessage implements Message {
+
+    public seen: boolean = false;
+
+    constructor(private readonly key: FailureKey, public readonly message: string[], private readonly detector: FailureDetector) {
+    }
+
+    public isConditionValid(): boolean {
+        return this.detector.isDetected(this.key);
+    }
+}
+
+/** The failures that take the altitude when the input port that carries it fails */
+const ALTITUDE_FAILURES: readonly FailureKey[] = ['altitude', 'rs232In', 'rs232Data', 'airdata429'];
+
+/**
+ * B-1: the altitude input is missing. That is the unit configured without one (the case of a unit that has none, VFR-only
+ * units excluded), or the failure of the input port that carries the altitude: the air data computer when there is one,
+ * else the gray code of the encoding altimeter. The failure of another port (the RS-232 of a fuel computer, say) does not
+ * take the altitude
+ */
 class AltitudeFailMessage implements Message {
 
     public message: string[] = ["ALTITUDE FAIL"];
     public seen: boolean = false;
 
-    constructor(private readonly planeSettings: KLN90PlaneSettings) {
+    constructor(private readonly planeSettings: KLN90PlaneSettings, private readonly detector: FailureDetector) {
     }
 
     public isConditionValid(): boolean {
-        return !this.planeSettings.vfrOnly && !this.planeSettings.input.altimeterInterfaced && !this.planeSettings.input.airdata.isInterfaced
+        const input = this.planeSettings.input;
+        if (!this.planeSettings.vfrOnly && !input.altimeterInterfaced && !input.airdata.isInterfaced) {
+            return true;
+        }
+
+        const port = this.altitudePort();
+        return port !== null && FAILURE_CATALOG.some(d => ALTITUDE_FAILURES.includes(d.key) && d.inputs.includes(port) && this.detector.isDetected(d.key));
+    }
+
+    private altitudePort(): FailedInputPort | null {
+        const input = this.planeSettings.input;
+        if (input.airdata.isInterfaced) {
+            return input.airdata.interface === DataInterface.ARINC429 ? 'arinc429AirdataRx' : 'rs232In';
+        }
+        return input.altimeterInterfaced ? 'grayCode' : null;
     }
 }
 

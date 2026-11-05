@@ -71,6 +71,6 @@ export class Oth8Page extends SixLineHalfPage {
 
         this.children.get("used1").fuel = this.props.sensors.in.fuelComputer.fuelUsed1;
         this.children.get("used2").fuel = this.props.sensors.in.fuelComputer.fuelUsed2;
-        this.children.get("usedTotal").fuel = this.props.sensors.in.fuelComputer.fuelUsed1! + this.props.sensors.in.fuelComputer.fuelUsed2!;
+        this.children.get("usedTotal").fuel = this.props.sensors.in.fuelComputer.getTotalFuelUsed(); //Dashed while a failed input leaves one missing (#458)
     }
 }

@@ -27,7 +27,7 @@ function fobFor(unit: string, type: string): number {
     simEnv().sim.set('FUEL TOTAL QUANTITY WEIGHT EX1', 'pounds', POUNDS_ON_BOARD);
     const computer = new FuelComputer(settings, new Interconnect(settings));
     computer.tick();
-    return computer.fob;
+    return computer.fob!; //Not null: nothing fails here
 }
 
 // Source: the panel.xml contract, cfg/panel.xml (Unit: GAL, IMP, L, KG or LB; Type: Avgas, JetA1 or JetB)

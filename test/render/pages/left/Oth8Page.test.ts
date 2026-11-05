@@ -117,3 +117,15 @@ describe('OTH 8 page, no fuel used yet (characterization)', () => {
         expect(Screen.read().rows('L')[5].trim()).toBe('0');
     });
 });
+
+// #458: a failed RS-232 input leaves the transmitted fuel values missing (docs/failures.md, "RS-232 input")
+describe('OTH 8 page with a failed RS-232 input (#458)', () => {
+    it('shows the fuel used of a twin and the total dashed', async () => {
+        const unit = await oth8(2, [102, 96]);
+
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L').slice(3)).toEqual(['ENG 1 -----', 'ENG 2 -----', 'TOTAL -----']);
+    });
+});

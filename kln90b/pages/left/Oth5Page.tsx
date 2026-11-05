@@ -82,15 +82,17 @@ export class Oth5Page extends SixLineHalfPage {
 
 
         const fob = this.props.sensors.in.fuelComputer.fob;
-        const ff = this.props.sensors.in.fuelComputer.fuelFlow1 + this.props.sensors.in.fuelComputer.fuelFlow2;
+        const ff = this.props.sensors.in.fuelComputer.getTotalFuelFlow(); //Null while a failed input leaves a value missing (#458)
 
         let reqd = null;
         let lfob = null;
         let extra = null;
-        if (this.props.memory.navPage.eteToDest !== null) {
+        if (this.props.memory.navPage.eteToDest !== null && ff !== null) {
             reqd = ff * this.props.memory.navPage.eteToDest / 3600;
-            lfob = fob - reqd;
-            extra = lfob - this.props.userSettings.getSetting('othReserve').get();
+            if (fob !== null) {
+                lfob = fob - reqd;
+                extra = lfob - this.props.userSettings.getSetting('othReserve').get();
+            }
         }
 
         this.children.get("reqd").fuel = reqd;
@@ -129,12 +131,12 @@ class FuelOnBoardSelect implements Field {
     }
 
     public innerLeft(): boolean {
-        this.sensors.in.fuelComputer.fob = Math.max(this.sensors.in.fuelComputer.fob - 1, 0);
+        this.sensors.in.fuelComputer.fob = Math.max((this.sensors.in.fuelComputer.fob ?? 0) - 1, 0);
         return true;
     }
 
     public innerRight(): boolean {
-        this.sensors.in.fuelComputer.fob = Math.min(this.sensors.in.fuelComputer.fob + 1, 99999);
+        this.sensors.in.fuelComputer.fob = Math.min((this.sensors.in.fuelComputer.fob ?? 0) + 1, 99999);
         return false;
     }
 
@@ -182,7 +184,8 @@ class FuelOnBoardSelect implements Field {
     }
 
     private getDisplayValue(): string {
-        return padInt(this.sensors.in.fuelComputer.fob, 1).padStart(5, " ")
+        const fob = this.sensors.in.fuelComputer.fob;
+        return fob === null ? "-----" : padInt(fob, 1).padStart(5, " "); //Dashed while a failed input leaves it missing (#458)
     }
 
 

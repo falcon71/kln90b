@@ -60,10 +60,12 @@ change what they mean; add new ones instead:
   sample.
 - **GPS SimVars** written when `Output.WriteGPSSimVars` is set (`SensorsOut` in `Sensors.ts`). The SDK `FlightPlanner`
   id `"kln90b"`
-  is mirrored from FPL 0 by `WTFlightplanSync`.
+  is mirrored from FPL 0 by `WTFlightplanSync`, but only while the unit is on and its data output works: a power-off or a
+  failed data output empties it.
 - **The EFB route sync** through the SDK `FlightPlanRouteManager`: the synced route is loaded into FPL 0
   (`KlnEfbLoader`) with its SID, STAR and approach where the unit can take them, and the route request is answered
-  from FPL 0 in the SDK's `FlightPlanRoute` format (`KlnEfbSaver`), but only with `Output.WriteGPSSimVars` set.
+  from FPL 0 in the SDK's `FlightPlanRoute` format (`KlnEfbSaver`), but only with `Output.WriteGPSSimVars` set. A
+  synced route is ignored while the data output has failed.
 - **Persisted user data** (setting keys, the V1/V2 waypoint and flight-plan string formats). Users keep their data
   across
   versions. Add keys with defaults; never repurpose a key or break the V1 loaders.
@@ -100,6 +102,8 @@ change what they mean; add new ones instead:
   STA 1, STA 2, the messages and the approach gate use it, and STA 5 and the gate predict it through an SDK prediction
   context. Satellite failures (#366) are not modeled. The wrapper reaches into private SDK internals, so recheck it
   after SDK upgrades.
+- **Failures** (`kln90b/failures/`, #458): a stateless service over saved settings, an MTBF trigger and a detector in
+  the calculation ticks, and failing `Interconnect` ports. Read `docs/failures.md` before touching them.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.
     - `data/flightplan/`: 26 flight plans (FPL 0 is active) of at most 30 en-route legs (FPL 0 up to 45 with
       procedures), and `ActiveWaypoint` with its turn stack.

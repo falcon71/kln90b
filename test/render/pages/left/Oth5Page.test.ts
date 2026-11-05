@@ -167,3 +167,41 @@ describe('OTH 5 reserve as a user setting (#192)', () => {
         expect(Screen.read().rows('L')[4]).toBe('RES:  00045');
     });
 });
+
+// #458: a failed RS-232 input leaves the transmitted fuel values missing (docs/failures.md, "RS-232 input")
+describe('OTH 5 page with a failed RS-232 input (#458)', () => {
+    it('shows the FOB and every figure derived from the fuel values dashed', async () => {
+        const unit = await twinOnRoute(30);
+
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L').slice(1)).toEqual(['FOB   -----', 'REQD  -----', 'L FOB -----', 'RES:  00030', 'EXTRA -----']);
+    });
+
+    // A FOB the pilot entered is not a received value (the colon after FOB), so the figures that need the fuel flow
+    // are dashed and the FOB stays
+    it('keeps a FOB the pilot entered', async () => {
+        const unit = await bootUnit({panelXml: panelXml(fuelComputer({fob: false}))});
+        unit.props.sensors.in.fuelComputer.fob = 40;
+        await unit.panel.selectPage('L', 'OTH 5');
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(Screen.read().rows('L')[1]).toBe('FOB:     40'); // Precondition
+
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L')[1]).toBe('FOB:     40');
+    });
+
+    it('shows the values again after the repair', async () => {
+        const unit = await twinOnRoute(30);
+        unit.props.failures.fail('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        unit.props.failures.repair('rs232In');
+        await vi.advanceTimersByTimeAsync(2500);
+
+        expect(Screen.read().rows('L')[1]).toBe('FOB     126');
+    });
+});

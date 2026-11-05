@@ -23,7 +23,7 @@ export class SelfTestLeftPage extends SixLineHalfPage {
         testFail: new Blink("TEST FAIL", false),
     });
 
-    /** #416: whether the self-test of this power-on has failed; it does not change while the page is shown */
+    /** #416, #458: whether the self-test of this power-on has failed or an active failure shows as TEST FAIL; it does not change while the page is shown */
     private readonly isTestFailed: boolean;
 
     readonly name: string = "     ";
@@ -32,7 +32,7 @@ export class SelfTestLeftPage extends SixLineHalfPage {
         super(props);
 
         this.props.memory.navPage.isSelfTestActive = true;
-        this.isTestFailed = this.props.memory.selfTestFailure !== null;
+        this.isTestFailed = this.props.memory.selfTestFailure !== null || this.props.failures.anyTestFail();
     }
 
 

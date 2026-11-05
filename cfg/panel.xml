@@ -33,6 +33,7 @@
             <WriteGPSSimVars>true</WriteGPSSimVars> <!-- if true, the KLN90 will write various GPS SimVars, which can be used for the HSI, RMI etc. Synced with L:KLN90B_WriteGpsSimvars -->
             <RmiInterface>OBI</RmiInterface> <!-- OBI or ARINC429, how the RMI receives L:KLN90B_GPS_WP_BEARING. Only used by the failure simulation -->
             <DataInterface>ARINC429</DataInterface> <!-- ARINC429 or RS232, how an EFIS, distance indicator or moving map receives position, distance, waypoints and the flight plan. Only used by the failure simulation -->
+            <RmiInstalled>false</RmiInstalled> <!-- true, when an RMI is wired to the bearing output. Only an installed RMI can fail in the failure simulation; the output is written either way -->
             <ExternalAnnunciators> <!-- true for each remote lamp the aircraft has. Only an installed lamp can fail in the failure simulation; the outputs are written either way -->
                 <MsgInstalled>false</MsgInstalled> <!-- L:KLN90B_MsgLight -->
                 <WptInstalled>false</WptInstalled> <!-- L:KLN90B_WptLight -->

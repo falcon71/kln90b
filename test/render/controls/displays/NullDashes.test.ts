@@ -1,11 +1,12 @@
 import {describe, expect, it} from 'vitest';
 import {mount} from '../../../harness/render/mount';
 import {TimeDisplay} from '../../../../kln90b/controls/displays/TimeDisplay';
-import {OthFuelDisplay, TripFuelDisplay} from '../../../../kln90b/controls/displays/FuelDisplay';
+import {FuelFlowDisplay, OthFuelDisplay, TripFuelDisplay} from '../../../../kln90b/controls/displays/FuelDisplay';
 import {AltitudeDisplay} from '../../../../kln90b/controls/displays/AltitudeDisplay';
 import {BearingDisplay} from '../../../../kln90b/controls/displays/BearingDisplay';
 import {DurationDisplay} from '../../../../kln90b/controls/displays/DurationDisplay';
-import {SpeedDisplay} from '../../../../kln90b/controls/displays/SpeedDisplay';
+import {MachDisplay, SpeedDisplay} from '../../../../kln90b/controls/displays/SpeedDisplay';
+import {TemperatureDisplay} from '../../../../kln90b/controls/displays/TemperatureDisplay';
 import {LatitudeDisplay} from '../../../../kln90b/controls/displays/LatitudeDisplay';
 import {LongitudeDisplay} from '../../../../kln90b/controls/displays/LongitudeDisplay';
 import {Alignment, RoundedDistanceDisplay} from '../../../../kln90b/controls/displays/RoundedDistanceDisplay';
@@ -37,5 +38,25 @@ describe('a null longitude renders as dashes (3-8)', () => {
     // code drew the latitude layout. The sibling is the LatitudeDisplay row of the table above (the same rendering path).
     it('LongitudeDisplay shows its dashes in the cells of the three degree digits (3-8, #224)', () => {
         expect(mount(new LongitudeDisplay(null)).text()).toBe("----°--.--'");
+    });
+});
+
+// #458: the values a failed input leaves missing. The dashes fill the cells of the value; a unit symbol stays
+describe('a null air data or fuel flow value renders as dashes (#458)', () => {
+    it.each([
+        ['MachDisplay', new MachDisplay(null), '---'],
+        ['TemperatureDisplay', new TemperatureDisplay(null), '---°C'],
+        ['FuelFlowDisplay', new FuelFlowDisplay(null), '----'],
+    ] as const)('%s', (_name, el, dashes) => {
+        expect(mount(el).text()).toBe(dashes);
+    });
+
+    // The dashes take the cells a value takes, so the row does not move
+    it.each([
+        ['MachDisplay', new MachDisplay(0.29), new MachDisplay(null)],
+        ['TemperatureDisplay', new TemperatureDisplay(-12), new TemperatureDisplay(null)],
+        ['FuelFlowDisplay', new FuelFlowDisplay(15), new FuelFlowDisplay(null)],
+    ] as const)('%s keeps its width', (_name, value, dashes) => {
+        expect(mount(dashes).text().length).toBe(mount(value).text().length);
     });
 });

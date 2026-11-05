@@ -21,6 +21,7 @@ import {showSuperNav5, SuperNav5} from '../../harness/render/superNav5';
 import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {KLNLegType} from '../../../kln90b/data/flightplan/Flightplan';
 import {insertLegIntoFpl} from '../../../kln90b/services/FlightplanUtils';
+import {PowerEvent} from '../../../kln90b/PowerSupply';
 
 // Public contract: the SDK FlightPlanner with the id "kln90b" mirrors FPL 0 (CLAUDE.md, "Public contract with aircraft";
 // the wiki page Accessing the Flight Plan; WTFlightplanSync). Plan 0 holds the legs of FPL 0, and a direct-to that leaves
@@ -737,5 +738,195 @@ describe('the "kln90b" flight planner after the entry of a DME arc is moved (6-1
         await vi.advanceTimersByTimeAsync(500);
 
         expectMoved(unit, plan);
+    });
+});
+
+// #458, design docs/superpowers/specs/2026-11-04-failures-framework-design.md "The planner at a failure and a power-off":
+// the planner stands for what the unit sends on the nav data port. A switched-off unit and a failed port send nothing, so
+// the receiving side has no route; a power-on and a repair sync it once.
+describe('the "kln90b" flight planner while the unit is off or the nav data port is failed (#458)', () => {
+    const {kaaa, abc} = standardRoute();
+    const bootOnRoute = (options: Record<string, string | boolean> = {}, simVars: { name: string, unit: string, value: number }[] = []) =>
+        bootOnStandardRoute({position: pointBefore(kaaa, abc, 20), panelXml: panelXml(options), simVars});
+    const FULL = ['KAAA', 'ABC', 'KBBB'];
+    const hasDtoPlan = (unit: HeadlessUnit) => plannerOf(unit).hasFlightPlan(1);
+
+    async function setDisabled(unit: HeadlessUnit, disabled: boolean): Promise<void> {
+        unit.env.sim.set('L:KLN90B_Disabled', 'bool', disabled);
+        await vi.advanceTimersByTimeAsync(300);
+    }
+
+    // The controller's ruling: with Output.WriteGPSSimVars off the unit leaves the planner alone, as before #458 (#142).
+    // The rule of this block holds only while the option is set
+    it('with Output.WriteGPSSimVars off, a power cycle, a resume and a failure of the nav data port write nothing', async () => {
+        const unit = await bootOnRoute({'Output.WriteGPSSimVars': false});
+        const planner = plannerOf(unit);
+        const calls = (['getFlightPlan', 'createFlightPlan', 'deleteFlightPlan', 'setActivePlanIndex'] as const)
+            .map(name => vi.spyOn(planner, name));
+        const powerEvents: boolean[] = [];
+        unit.core.bus.getSubscriber<PowerEvent>().on('powerEvent').handle(evt => powerEvents.push(evt.isPowered));
+
+        await unit.panel.powerOff();
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(2000);
+        await setDisabled(unit, true);
+        await setDisabled(unit, false);
+        unit.props.failures.fail('arinc429Out');
+        unit.props.failures.repair('arinc429Out');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(powerEvents).toEqual([true, false, true]); // Precondition: the replayed state, then the power cycle
+        expect(calls.map(c => c.mock.calls.length)).toEqual([0, 0, 0, 0]);
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('a power-off empties the planner, a power-on fills it', async () => {
+        const unit = await bootOnRoute();
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL); // Precondition
+
+        await unit.panel.powerOff();
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+        expect(hasDtoPlan(unit)).toBe(false);
+        expect(plannerOf(unit).activePlanIndex).toBe(0);
+
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL);
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('a power-off empties the direct-to plan, too', async () => {
+        const unit = await bootOnRoute();
+        await unit.panel.press('KLN90B_DCT_Push');
+        await unit.panel.enterIdent('L', 'ABC');
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.memory.navPage.activeWaypoint.isDctNavigation()).toBe(true); // Precondition
+        expect(plannerOf(unit).activePlanIndex).toBe(1); // Precondition
+
+        await unit.panel.powerOff();
+
+        expect(hasDtoPlan(unit)).toBe(false);
+        expect(plannerOf(unit).activePlanIndex).toBe(0);
+    });
+
+    it('a failure of the ARINC 429 output empties the planner with ARINC 429 nav data, the repair fills it', async () => {
+        const unit = await bootOnRoute();
+
+        unit.props.failures.fail('arinc429Out');
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+
+        unit.props.failures.repair('arinc429Out');
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL);
+    });
+
+    it('a failure of the RS-232 output empties the planner with RS-232 nav data, the repair fills it', async () => {
+        const unit = await bootOnRoute({'Output.DataInterface': 'RS232'});
+
+        unit.props.failures.fail('rs232Out');
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+
+        unit.props.failures.repair('rs232Out');
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL);
+    });
+
+    it('a failure of the port that does not carry the nav data leaves the planner as it is', async () => {
+        const unit = await bootOnRoute();
+
+        unit.props.failures.fail('rs232Out');
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL);
+    });
+
+    it('an edit of FPL 0 while failed does not reach the planner, the repair brings it', async () => {
+        const unit = await bootOnRoute();
+        const xray = intersection('XRAY', 47.2, 8.7);
+        unit.props.failures.fail('arinc429Out');
+
+        insertLeg(unit, 2, xray);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+
+        unit.props.failures.repair('arinc429Out');
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
+    });
+
+    it('a resume while off writes empty plans', async () => {
+        // The knob takes no input while disabled, so the power goes through the aircraft's supply
+        const unit = await bootOnRoute({'Input.ElectricitySimVar': 'CIRCUIT ON:1'}, [{name: 'CIRCUIT ON:1', unit: 'bool', value: 1}]);
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL); // Precondition
+        await setDisabled(unit, true);
+        unit.env.sim.set('CIRCUIT ON:1', 'bool', false);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL); // Disabled: nothing is written (#398)
+
+        await setDisabled(unit, false);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+    });
+
+    it('a resume while the port is failed writes empty plans', async () => {
+        const unit = await bootOnRoute();
+        unit.props.failures.fail('arinc429Out');
+        await setDisabled(unit, true);
+
+        await setDisabled(unit, false);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+    });
+
+    it('a failure while disabled writes nothing, the resume applies the rule', async () => {
+        const unit = await bootOnRoute();
+        await setDisabled(unit, true);
+
+        unit.props.failures.fail('arinc429Out');
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(FULL);
+
+        await setDisabled(unit, false);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+    });
+
+    // flightplanChanged and activeIdxChanged have their own gates: both ask isPowered() (#458)
+    it('an edit of FPL 0 while off does not reach the planner, the power-on brings it', async () => {
+        const unit = await bootOnRoute();
+        const xray = intersection('XRAY', 47.2, 8.7);
+        await unit.panel.powerOff();
+
+        insertLeg(unit, 2, xray);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(fplIdents(unit)).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']); // Precondition: the edit happened
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+
+        await unit.panel.powerOn();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual(['KAAA', 'ABC', 'XRAY', 'KBBB']);
+    });
+
+    it('a change of the active waypoint while off does not reach the planner', async () => {
+        const unit = await bootOnRoute();
+        const aw = unit.props.memory.navPage.activeWaypoint;
+        await unit.panel.powerOff();
+        expect(aw.isDctNavigation()).toBe(false); // Precondition
+
+        aw.directTo(kaaa, abc);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(aw.isDctNavigation()).toBe(true); // Precondition: the change happened
+        expect(identsOf(plannerOf(unit).getFlightPlan(0))).toEqual([]);
+        expect(hasDtoPlan(unit)).toBe(false);
     });
 });

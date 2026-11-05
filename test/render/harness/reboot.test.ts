@@ -29,7 +29,7 @@ describe('one unit per test (harness)', () => {
         first.env.coherent.replies.set('REBOOT_TEST_PING', () => 'pong');
         void Coherent.call('REBOOT_TEST_PING');
         first.props.remarksManager.saveRemarks('KAAA', ['REMARK ONE ', '           ', '           ']);
-        firstPlanner = plannerOf(first);
+        firstPlanner = plannerOf(first); // #458: a power-off empties the planner and the power-on syncs it again; design "The planner at a failure and a power-off"
 
         // The boot fetched the ephemeris; the second test checks that the teardown forgot it
         expect(first.env.xhr.requests.map(u => u.slice(u.lastIndexOf('/') + 1))).toEqual(['gps_ephemeris.json', 'msa.json', 'gps_sbas.json']);

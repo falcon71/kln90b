@@ -199,6 +199,8 @@ describe('the Direct To over a power cycle (#422)', () => {
         expect(screen.rows('R')[0].slice(1).split(' ')[0]).toBe('IAFAA');
     });
 
+    // (#458: a power-off empties the planner and the power-on syncs it again, so this asserts after the power-on; design
+    // "The planner at a failure and a power-off")
     // The SDK flight planner "kln90b" is part of the contract with aircraft: it leaves its Direct To plan at the power-on,
     // not only once the GPS has a fix and a leg is activated
     it('mirrors the dropped Direct To in the SDK flight planner at the power-on (#422)', async () => {
@@ -1468,5 +1470,25 @@ describe('the page states over a power-on (#192)', () => {
         expect(actual).toEqual(initial);
         expect(memory.navPage.airspaceWarned.size).toBe(0);
         expect(memory.navPage.airspaceEntered.size).toBe(0);
+    });
+});
+
+// #458: the failure detection is no page state, so the guard above does not see it
+describe('the failure detection over a power-on (#458)', () => {
+    it('failureDetection is reset at every power-on', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const detection = unit.props.memory.failureDetection;
+        detection.mainPageShown = true;
+        detection.powerOnScheduled = true;
+        detection.pendingS.set('rs232In', 1);
+        detection.detected.add('arinc429Out');
+
+        unit.props.memory.reset({isPowered: true, timeSincePowerChange: 1000}); // A short power cycle, under RESET_TIME
+
+        expect(detection.mainPageShown).toBe(false);
+        expect(detection.powerOnScheduled).toBe(false);
+        expect(detection.pendingS.size).toBe(0);
+        expect(detection.detected.size).toBe(0);
     });
 });
