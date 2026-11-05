@@ -59,11 +59,27 @@ describe('FAILURE_CATALOG', () => {
         ['airdata429', s => { s.input.airdata.isInterfaced = true; s.input.airdata.interface = DataInterface.ARINC429; },
             s => { s.input.airdata.isInterfaced = true; s.input.airdata.interface = DataInterface.RS232; }],
         ['altitude', () => undefined, s => { s.input.airdata.isInterfaced = true; }],
+        ['eeprom', () => undefined, undefined],
+        ['superflag', () => undefined, undefined],
+        ['msgWiring', s => { s.output.externalAnnunciators.msgInstalled = true; }, s => { s.output.externalAnnunciators.msgInstalled = false; }],
+        ['wptBulb', s => { s.output.externalAnnunciators.wptInstalled = true; }, s => { s.output.externalAnnunciators.wptInstalled = false; }],
+        ['actvDriver', s => { s.output.externalAnnunciators.actvInstalled = true; }, s => { s.output.externalAnnunciators.actvInstalled = false; }],
     ])('eligibility follows the plane settings: %s', (key, makeEligible, makeIneligible) => {
         if (makeIneligible) {
             expect(def(key).isEligible(plane(makeIneligible))).toBe(false);
         }
         expect(def(key).isEligible(plane(makeEligible))).toBe(true);
+    });
+
+    it('eeprom is internal, random and on TEST FAIL, with no ports (#459)', () => {
+        const d = def('eeprom');
+        expect(d.flrName).toBe('EEPROM');
+        expect(d.random).toBe(true);
+        expect(d.testFail).toBe(true);
+        expect(d.outputs).toEqual([]);
+        expect(d.inputs).toEqual([]);
+        expect(d.message).toEqual(['EEPROM FAILURE: IC1045', 'EXTERNAL D-BAR INVALID']);
+        expect(d.detection).toBe('internal');
     });
 
     it('rs232In needs a device on RS-232, and the heading input counts', () => {
@@ -90,5 +106,79 @@ describe('FAILURE_CATALOG', () => {
         expect(def('rs232In').isEligible(s)).toBe(true);
         s.input.headingInput = false;
         expect(def('rs232In').isEligible(s)).toBe(false);
+    });
+});
+
+describe('the lamp and superflag entries (#459)', () => {
+    const lamps = ['msg', 'wpt', 'arm', 'actv'] as const;
+
+    it('FLR names and messages', () => {
+        expect(def('msgBulb').flrName).toBe('MSG BULB');
+        expect(def('actvWiring').flrName).toBe('ACTV WIRING');
+        expect(def('wptDriver').flrName).toBe('WPT DRIVER');
+        expect(def('actvWiring').message).toEqual(['CHECK ACTV ANNUNCIATOR']);
+        expect(def('msgWiring').message).toEqual(['CHECK MSG ANNUNCIATOR']);
+        expect(def('armDriver').message).toEqual(['ARM ANNUNCIATOR FAIL']);
+        expect(def('wptDriver').message).toEqual(['WPT ANNUNCIATOR FAIL']);
+        expect(def('msgBulb').message).toBeNull();
+        expect(def('superflag').flrName).toBe('SUPERFLAG');
+        expect(def('superflag').message).toEqual(['NAV SUPER FLAG FAILURE']);
+    });
+
+    it('all are random, and only the drivers, the superflag and the EEPROM are on TEST FAIL', () => {
+        const keys: FailureKey[] = ['superflag', 'eeprom'];
+        for (const l of lamps) {
+            keys.push(`${l}Bulb`, `${l}Wiring`, `${l}Driver`);
+        }
+        for (const k of keys) {
+            expect(def(k).random).toBe(true);
+            expect(def(k).testFail).toBe(k.endsWith('Driver') || k === 'superflag' || k === 'eeprom');
+        }
+    });
+
+    it('detection, signal and lamp', () => {
+        for (const l of lamps) {
+            expect(def(`${l}Bulb`).detection).toBeNull();
+            expect(def(`${l}Bulb`).lamp).toEqual({lamp: l, kind: 'bulb'});
+            expect(def(`${l}Wiring`).detection).toBe('commandedOn');
+            expect(def(`${l}Wiring`).signal).toBe(l);
+            expect(def(`${l}Wiring`).lamp).toEqual({lamp: l, kind: 'wiring'});
+            expect(def(`${l}Driver`).detection).toBe('commandedOff');
+            expect(def(`${l}Driver`).signal).toBe(l);
+            expect(def(`${l}Driver`).lamp).toEqual({lamp: l, kind: 'driver'});
+        }
+        expect(def('superflag').detection).toBe('commandedOn');
+        expect(def('superflag').signal).toBe('superflag');
+        expect(def('superflag').outputs).toEqual(['superflag']);
+        expect(def('eeprom').detection).toBe('internal');
+    });
+
+    it('superflag and eeprom are eligible on a plane with everything off', () => {
+        const bare = plane(s => {
+            s.output.writeGPSSimVars = false;
+            s.output.dataInterface = DataInterface.ARINC429;
+            s.output.rmiInstalled = false;
+            s.input.obsSource = 0;
+            s.input.altimeterInterfaced = false;
+        });
+        expect(def('superflag').isEligible(bare)).toBe(true);
+        expect(def('eeprom').isEligible(bare)).toBe(true);
+    });
+
+    it('armDriver needs the lamp and WriteGPSSimVars', () => {
+        const s = plane(x => { x.output.externalAnnunciators.armInstalled = true; x.output.writeGPSSimVars = false; });
+        expect(def('armDriver').isEligible(s)).toBe(false);
+        s.output.writeGPSSimVars = true;
+        expect(def('armDriver').isEligible(s)).toBe(true);
+        expect(def('armDriver').isEligible(plane(x => { x.output.writeGPSSimVars = true; }))).toBe(false);
+        expect(def('actvBulb').isEligible(plane(x => { x.output.externalAnnunciators.actvInstalled = true; x.output.writeGPSSimVars = false; }))).toBe(false);
+    });
+
+    it('msgWiring and wptDriver follow their lamp even without WriteGPSSimVars', () => {
+        const s = plane(x => { x.output.writeGPSSimVars = false; x.output.externalAnnunciators.msgInstalled = true; });
+        expect(def('msgWiring').isEligible(s)).toBe(true);
+        expect(def('wptDriver').isEligible(s)).toBe(false);
+        s.output.externalAnnunciators.wptInstalled = true;
+        expect(def('wptDriver').isEligible(s)).toBe(true);
     });
 });

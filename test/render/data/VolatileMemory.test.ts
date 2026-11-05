@@ -1483,6 +1483,7 @@ describe('the failure detection over a power-on (#458)', () => {
         detection.powerOnScheduled = true;
         detection.pendingS.set('rs232In', 1);
         detection.detected.add('arinc429Out');
+        detection.noticed.add('msgWiring');
 
         unit.props.memory.reset({isPowered: true, timeSincePowerChange: 1000}); // A short power cycle, under RESET_TIME
 
@@ -1490,5 +1491,6 @@ describe('the failure detection over a power-on (#458)', () => {
         expect(detection.powerOnScheduled).toBe(false);
         expect(detection.pendingS.size).toBe(0);
         expect(detection.detected.size).toBe(0);
+        expect(detection.noticed.size).toBe(0);
     });
 });

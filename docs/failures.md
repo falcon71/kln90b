@@ -10,7 +10,9 @@ A behavior or value marked "guess" is not in the manuals; change it when a sourc
 the interface failures (`arinc429Out`, `rs232Out`, `rmiOutput`, `obsResolver`, `rs232In`, `rs232Data`, `airdata429`,
 `altitude`) are built (#458, design
 [superpowers/specs/2026-11-04-failures-framework-design.md](superpowers/specs/2026-11-04-failures-framework-design.md)).
-The other failures of the catalog are specified here and built by the later parts of #366 (#459 to #461). The source of
+The annunciator lamps (`…Driver`, `…Wiring`, `…Bulb`), the NAV superflag and the EEPROM are built too (#459, design
+[superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md](superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md)).
+The other failures of the catalog are specified here and built by the later parts of #366 (#460, #461). The source of
 truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
 
 Page numbers without a prefix are the KLN 90B Pilot's Guide (006-08773-0000). "IM" is the Installation Manual
@@ -125,6 +127,11 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
   - `superflag`: while the flag is supposed to be valid (navigation valid or the self-test pattern).
   - `…Wiring`: while the unit commands that lamp on. The driver senses overcurrent only then (CMM 25-26).
   - `…Driver`: while the unit commands that lamp off (see the annunciators).
+  - A wiring, driver or superflag condition is seen as the unit commands it, also before the first navigation page. One
+    seen while the Self Test page is shown (the self-test lights every lamp and sets the flag valid) is noticed at once
+    and detected with the first navigation page, with no delay. A command that comes later is detected in the
+    calculation tick that sees it. The unit takes what it commanded since the last tick, so a short pulse between two
+    ticks is not missed. A condition seen while the failure was not active does not count.
   - After every power-on the detection starts again, with the same rules. The self-test lights every lamp, so a wiring
     fault is found at every self-test.
   - The delays count sim time as the MTBF trigger counts it: a step back of the sim clock, a jump of more than a minute
@@ -178,8 +185,8 @@ A failed output port sends nothing, so the receiving equipment loses its data, f
   disabled after a crash in FS2020. `setWPIndex` now keeps the index within the count for every caller, the failed
   ports included. The synthetic zeroing test ran in the sim on 2026-11-03 and found the cause
   ([sim-flight-record.md](sim-flight-record.md)).
-- **What the zeroing does to an autopilot** (the Duke's default autopilot, 2026-11-03): a failed analog nav port
-  (`GPS IS ACTIVE WAY POINT` false, deviation 0) drops it from NAV to HDG at once, and it stays in HDG after the repair.
+- **What the zeroing does to an autopilot** (the Duke's default autopilot, 2026-11-03): a failed analog nav port with a
+  failed superflag (`GPS IS ACTIVE WAY POINT` false, deviation 0) drops it from NAV to HDG at once, and it stays in HDG after the repair.
   Failed ARINC 429 nav data alone leave it in NAV, tracking on the deviation. With `GPS IS ACTIVE WAY POINT` false the sim
   reports `GPS WP DISTANCE` 0, whatever the nav data port writes.
 - A failed input port reports `isReceiving` false. Its readers treat the value as missing (null, shown as dashes).
@@ -289,15 +296,39 @@ The serial EEPROM holds the CRT centering offsets and most likely the D-bar cali
 CDI driven by the unit must not be used, the rest of the unit including the internal CDI works, and the pages may
 not be centered.
 
-- **The screen is off center.** At the failure, draw an offset (guess: 2 to 6 CRT pixels, that is 8 to 24 screen
-  pixels, in each axis, either sign) and shift the whole screen content by it. The change happens in a display tick.
-- **The external deviation is wrong.** At the failure, draw a scale error (guess: 0.7 to 1.3) and an offset (guess:
-  up to ±30 % of full scale). `GPS WP CROSS TRK` carries the deviation with them. The internal CDI, the
-  XTK on the pages and the digital outputs stay right.
-- Both drawn values are persisted with the failure.
-- **The STA 4 counters are lost.** The operating hours and power cycles are assumed to live in the EEPROM (see the
-  battery), so a failed EEPROM cannot keep them: at the failure, and at every power-on while it is failed, they
-  restart at 0. A repair (a new EEPROM) does not bring them back.
+Both are shop calibrations of the unit itself (CMM 1024 to 1028). The display alignment (SET 10) moves the image with
+two knobs, the outer one vertically and the inner one horizontally, until it sits right in the bezel, and ENT stores
+the centering offsets. The D-bar calibration (SET 11) is done at two points: the knobs trim the output until it
+measures +300 mV, ENT, then -300 mV, and ENT saves both. Two points fix a gain and a zero point. What the calibrations
+correct is a property of the unit's CRT, yoke and parts, so with the EEPROM failed the unit falls back to nominal
+values and shows its own uncorrected errors, the same ones at every failure.
+
+- **The calibration values are properties of the unit** and are stored in a settings category of their own, the
+  unit's EEPROM (per aircraft profile, saved with the other categories): two centering offsets and two D-bar
+  calibration points. It is separate from `KLN90BUserSettings` and the user waypoints, flight plans and remarks,
+  which stand for the battery-backed nonvolatile memory that the battery's failure wipes; the EEPROM needs no battery.
+  The values are drawn when the settings are read at the start, for each value still at its default. The default is
+  0, which no draw gives, so a new installation and an existing profile get theirs at the next start. They are never
+  drawn again: a repair is a new EEPROM calibrated at the shop, and the next failure shows the same errors again.
+  Neither a repair, `SERVICE?` nor the battery's loss of the user memory changes them.
+  `PageContainer` gets the calibration at `propsReady`, so at the first boot of a session with the EEPROM failed the
+  Turn-On page shows centered and the screen shifts from then on; later power cycles shift from the start.
+- **The screen is off center.** The centering offsets (guess: 2 to 6 CRT pixels, that is 8 to 24 screen pixels, in
+  each axis, either sign) are missing while the failure is active, so the whole screen content, the FLR pages
+  included, is shifted by them. The change happens in a display tick. The maintainer checked in the sim on 2026-11-05
+  that the screen, the FLR pages included, stays readable at 6 pixels; the outer characters reach past the screen's
+  margin (4 CRT pixels horizontally, 3 vertically). The simulator's own error pages are not the unit's screen and stay
+  centered.
+- **The external deviation is wrong.** Each D-bar calibration point is the command, in nominal millivolts, that put out
+  exactly +300 mV or -300 mV at the shop. Without them the unit commands nominal values, and the output follows the
+  line through the two points: a gain of `600 / (plus - minus)` and a zero point of `300 - gain × plus` millivolts.
+  `GPS WP CROSS TRK` carries the deviation with that gain and that zero point (as a share of the 150 mV of full scale)
+  while the failure is active. The internal CDI, the XTK on the pages and the digital outputs stay right. The points
+  are drawn from a gain of 0.7 to 1.3 and a zero point of up to ±45 mV, ±30 % of full scale (guesses).
+- Not affected: OBS CAL (STA 3). It calibrates the OBS resolver input to the installed indicator (IM 2-65), nothing
+  says it is kept in the EEPROM, and Appendix B names only the external D-bar.
+- The STA 4 counters are not in the EEPROM: they are reset when the nonvolatile memory is cleared (5-31), which is the
+  battery's loss (see the battery).
 
 ### ARINC 429 transmitter (`arinc429Out`)
 
@@ -319,6 +350,8 @@ some HSIs and autopilots, sees a flag; the unit itself works (B-2). In the sim:
 - The deviation (`GPS WP CROSS TRK`), the CDI scaling and everything else keep working.
 - In the sim test of 2026-11-03, `GPS IS ACTIVE WAY POINT` false dropped the Duke's default autopilot from NAV to HDG
   (see "A failed port in general"), so a superflag failure disconnects such an autopilot although the deviation works.
+- With `GPS IS ACTIVE WAY POINT` false the sim reports `GPS WP DISTANCE` 0 (the sim test of 2026-11-03), so a flagged
+  superflag also zeroes the distance that a gauge reads from the sim.
 
 ### Annunciators
 
@@ -334,8 +367,12 @@ loop is forced to zero, so a driver that does not reach zero is the one driver f
 | `…Driver` (driver stuck on) | **lit while the unit is on** (inferred from the circuit) | while commanded off | `… ANNUNCIATOR FAIL` |
 
 - The stuck driver is the regulator loop failing to reach zero, and the loop runs on the unit's own supply. So the lamp
-  is lit whenever the unit is on and goes dark with the unit, as `setPoweredOff` writes it (guess).
+  is lit whenever the unit is on and goes dark with the unit, as `setPoweredOff` writes it (guess). The simulation
+  lights a stuck MSG or WPT lamp from the Self Test page on, because the status line first writes the lamps there, so
+  on the Turn-On page it is still dark.
 - `L:KLN90B_MsgLight` and `L:KLN90B_WptLight` hold false for a dark lamp and true for a stuck one, every display tick.
+- A lamp with both a dark failure (`…Bulb` or `…Wiring`) and a stuck one (`…Driver`) is dark: the open or bypassed lamp
+  cannot be lit by a driver that is stuck on.
 - `GPS APPROACH MODE` (`ApproachLampGroup`) changes the value instead of dropping the write: a dark ARM clears bit 1
   (1 → 0, 3 → 2), a dark ACTV clears bit 2 (2 → 0, 3 → 1), a stuck ARM sets bit 1, a stuck ACTV sets bit 2.
 - The status line `MSG`, the screen's mode texts and `L:KLN90B_AnnunTest` (the never-failing `sim` port) are not
@@ -405,9 +442,11 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
     search, unless the pilot enters the date, time and position (3-5, 3-17 to 3-19, the existing start model);
   - with no stored position there is nothing to compare the first fix with, so `POSITION DIFFERS FROM LAST POSITION BY
     >2NM` does not show after a wipe;
-  - kept: the STA 4 operating hours and power cycles (guess: hour counters are usually kept in EEPROM so that they
-    need no battery, and a few bytes fit next to the calibration; a failed EEPROM loses them, see the EEPROM), the failure state, the battery state and the
-    fictional SET 10 settings (not the unit's memory), and `userDataFormat` (it describes the storage, not data).
+  - the STA 4 operating hours and power cycles restart at 0: they are set to zero when the nonvolatile memory is
+    cleared (5-31);
+  - kept: the failure state, the battery state and the fictional SET 10 settings (not the unit's memory),
+    `userDataFormat` (it describes the storage, not data), and the EEPROM's calibration values (a settings category
+    of their own, see the EEPROM).
 - A failed battery stays failed until repaired, so the data is lost again at every power-on.
 - The first session after this feature is installed starts with a new battery: health 100 % and the session's sim
   date as the latest date seen.
@@ -427,7 +466,9 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
 
 - The failure state is persisted per aircraft model, under the same profile key as the user settings
   (`"<ATC MODEL>.profile_1"`): the MTBF, the active failures with their drawn values (spoofing position and time
-  shift, faulty PRN and error, EEPROM offsets), and the battery state (the health and the latest sim date seen).
+  shift, faulty PRN and error), and the battery state (the health and the latest sim date seen). The EEPROM's
+  calibration values are properties of the unit, not of a failure, and have a settings category of their own (see the
+  EEPROM).
 - **It lives in its own settings manager**, added to `KLN90BSettingSaveManager`, so that the battery's wipe of the
   user memory leaves it alone.
 - New keys only, with defaults that mean "nothing failed, MTBF off, new battery". Changes are saved when they happen.
@@ -510,9 +551,10 @@ From #451. Each port asks the failure state; the failures above say which port e
 |---|---|---|---|
 | ARINC 429 TX | 23/24 | `K:VOR1/2_SET`, `L:KLN90B_XTK`, `L:KLN90B_RollCommand`, `L:KLN90B_IntegrityWarn`, `GPS WP ETE/ETA`, `GPS ETE/ETA`, `GPS COURSE TO STEER`; the nav data and the RMI when routed here | `arinc429Out` |
 | RS-232 OUT | 13 | the nav data when routed here | `rs232Out` |
-| Analog nav | 18-22, 25 | `GPS WP CROSS TRK`, `GPS CDI SCALING`, `GPS IS ACTIVE FLIGHT PLAN/WAY POINT`, `L:KLN90B_HSI_TF_FLAGS` | never as a whole; `eeprom` changes the deviation, `superflag` the flags |
+| Analog nav | 19-22, 25 | `GPS WP CROSS TRK`, `GPS CDI SCALING` | never as a whole; `eeprom` changes the deviation |
+| NAV superflag | 18 | `L:KLN90B_HSI_TF_FLAGS`, `GPS IS ACTIVE FLIGHT PLAN/WAY POINT` | `superflag` |
 | OBI | 10-12 | `L:KLN90B_GPS_WP_BEARING` (default) | `rmiOutput` |
-| Annunciators | 14-17 | the lamps | the lamp failures, through the value changes above |
+| Annunciators | 14-17 | the lamps (`L:KLN90B_MsgLight`, `L:KLN90B_WptLight`, `GPS APPROACH MODE`) | the lamp failures, through the value changes above |
 | Sim | fictional | the vertical constants, `GPS OVERRIDDEN`, `L:KLN90B_AnnunTest` | never |
 | ARINC 429 EFIS RX | 4/5 | the heading (default) and the OBS course when routed here | never (whether an EFIS reads these values is unknown) |
 | ARINC 429 air data RX | 8/9 | the air data when routed here | `airdata429` |
@@ -548,7 +590,6 @@ as a detected failure, TEST FAIL for an active failure and the injectable random
    today read only the RAIM availability.
 4. **`SYSTEM TIME UPDATED` is checked only at acquisition** (`GPS.gpsAcquired`); spoofing needs the check while a fix
    is held (see spoofing).
-5. **`ApproachLampGroup`** passes values through; it gets the bit changes above.
 
 Already possible without new structure: the screen shift (a style change in a display tick) and spoofing (the
 measurement strategy). The FLR pages exist (#458).

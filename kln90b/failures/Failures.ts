@@ -1,7 +1,7 @@
 import {DefaultUserSettingManager, EventBus} from '@microsoft/msfs-sdk';
 import {KLN90PlaneSettings} from "../settings/KLN90BPlaneSettings";
 import {KLN90BFailureTypes} from "../settings/KLN90BFailureSettings";
-import {FAILURE_CATALOG, FailedInputPort, FailedOutputPort, FailureDefinition, FailureKey, failureSettingName} from "./FailureCatalog";
+import {FAILURE_CATALOG, FailedInputPort, FailedOutputPort, FailureDefinition, Lamp, FailureKey, failureSettingName} from "./FailureCatalog";
 
 export interface FailureChangedEvents {
     failureChanged: { key: FailureKey, active: boolean };
@@ -21,8 +21,14 @@ export class Failures {
     constructor(private readonly bus: EventBus, private readonly settings: DefaultUserSettingManager<KLN90BFailureTypes>, private readonly planeSettings: KLN90PlaneSettings) {
     }
 
+    //A loop, not find: isEffective asks it from the 16 Hz D-bar write (EepromCalibration), which allocates nothing
     public definition(key: FailureKey): FailureDefinition {
-        return FAILURE_CATALOG.find(d => d.key === key)!;
+        for (let i = 0; i < FAILURE_CATALOG.length; i++) {
+            if (FAILURE_CATALOG[i].key === key) {
+                return FAILURE_CATALOG[i];
+            }
+        }
+        throw new Error(`Unknown failure ${key}`);
     }
 
     public isActive(key: FailureKey): boolean {
@@ -60,6 +66,25 @@ export class Failures {
             }
         }
         return false;
+    }
+
+    /**
+     * What a lamp does regardless of the command (#459): 'dark' for a burnt bulb or a shorted output (the lamp is
+     * bypassed), 'stuck' for a driver stuck on. A dark lamp wins when both apply, as nothing lights then. Asked on every lamp write
+     */
+    public lampFault(lamp: Lamp): 'dark' | 'stuck' | null {
+        let stuck = false;
+        for (let i = 0; i < FAILURE_CATALOG.length; i++) {
+            const d = FAILURE_CATALOG[i];
+            if (d.lamp === undefined || d.lamp.lamp !== lamp || !this.isActive(d.key) || !d.isEligible(this.planeSettings)) {
+                continue;
+            }
+            if (d.lamp.kind !== 'driver') {
+                return 'dark';
+            }
+            stuck = true;
+        }
+        return stuck ? 'stuck' : null;
     }
 
     public activeList(): FailureDefinition[] {

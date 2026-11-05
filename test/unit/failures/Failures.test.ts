@@ -140,7 +140,7 @@ describe('Failures', () => {
         const {failures} = build();
         failures.fail('arinc429Out');
 
-        expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude']);
+        expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude', 'eeprom', 'superflag']);
     });
 
     it('anyTestFail needs an effective TEST FAIL failure', () => {
@@ -165,5 +165,49 @@ describe('Failures', () => {
         expect(failures.mtbfHours).toBe(999);
         failures.setMtbfHours(-3);
         expect(failures.mtbfHours).toBe(0);
+    });
+
+    describe('lampFault (#459)', () => {
+        const msgOn = (s: KLN90PlaneSettings) => { s.output.externalAnnunciators.msgInstalled = true; };
+
+        it('is null with nothing failed', () => {
+            expect(build(DataInterface.ARINC429, msgOn).failures.lampFault('msg')).toBeNull();
+        });
+
+        it('a bulb or a wiring failure darkens the lamp', () => {
+            const {failures} = build(DataInterface.ARINC429, msgOn);
+            failures.fail('msgBulb');
+            expect(failures.lampFault('msg')).toBe('dark');
+            failures.repair('msgBulb');
+            failures.fail('msgWiring');
+            expect(failures.lampFault('msg')).toBe('dark');
+        });
+
+        it('a driver failure sticks the lamp on', () => {
+            const {failures} = build(DataInterface.ARINC429, msgOn);
+            failures.fail('msgDriver');
+            expect(failures.lampFault('msg')).toBe('stuck');
+        });
+
+        it('a dark lamp wins over a stuck driver', () => {
+            const {failures} = build(DataInterface.ARINC429, msgOn);
+            failures.fail('msgBulb');
+            failures.fail('msgDriver');
+            expect(failures.lampFault('msg')).toBe('dark');
+        });
+
+        it('an undeclared lamp has no fault', () => {
+            const {failures} = build();
+            failures.fail('msgBulb');
+            expect(failures.isActive('msgBulb')).toBe(true);
+            expect(failures.lampFault('msg')).toBeNull();
+        });
+
+        it('the other lamps are not affected', () => {
+            const {failures} = build(DataInterface.ARINC429, s => { msgOn(s); s.output.externalAnnunciators.wptInstalled = true; });
+            failures.fail('msgBulb');
+            failures.fail('msgDriver');
+            expect(failures.lampFault('wpt')).toBeNull();
+        });
     });
 });

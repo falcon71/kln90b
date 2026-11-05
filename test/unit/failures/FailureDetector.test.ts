@@ -4,6 +4,7 @@ import {Failures} from '../../../kln90b/failures/Failures';
 import {FailureDetectionState, FailureDetector} from '../../../kln90b/failures/FailureDetector';
 import {KLN90BFailureSettings} from '../../../kln90b/settings/KLN90BFailureSettings';
 import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from '../../../kln90b/settings/KLN90BPlaneSettings';
+import {CommandedSignals} from '../../../kln90b/Interconnect';
 import {clearStatic} from '../../harness/singletons';
 
 /** Air data over ARINC 429 and a fuel computer (RS-232 in), RS-232 output: every kind of detection is eligible */
@@ -20,7 +21,7 @@ function plane(headingRs232 = false): KLN90PlaneSettings {
         output: {
             obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true, rmiInterface: RmiInterface.OBI, rmiInstalled: false,
             dataInterface: DataInterface.RS232,
-            externalAnnunciators: {msgInstalled: false, wptInstalled: false, armInstalled: false, actvInstalled: false},
+            externalAnnunciators: {msgInstalled: true, wptInstalled: true, armInstalled: true, actvInstalled: true},
         },
     };
 }
@@ -30,6 +31,7 @@ let state: FailureDetectionState;
 let failures: Failures;
 let random: number;
 let detector: FailureDetector;
+let commanded: CommandedSignals;
 
 function tickAt(t: number) {
     now = t;
@@ -40,9 +42,10 @@ beforeEach(() => {
     clearStatic(KLN90BFailureSettings, 'INSTANCE', false);
     now = 1000;
     random = 0;
-    state = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set()};
+    commanded = new CommandedSignals();
+    state = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set(), noticed: new Set()};
     failures = new Failures(new EventBus(), KLN90BFailureSettings.getManager(new EventBus()), plane());
-    detector = new FailureDetector(failures, () => state, () => now, () => random);
+    detector = new FailureDetector(failures, () => state, commanded, () => now, () => random);
 });
 
 describe('FailureDetector', () => {
@@ -119,7 +122,7 @@ describe('FailureDetector', () => {
         const settings = plane();
         settings.input.fuelComputer.isInterfaced = false;
         const ineligible = new Failures(new EventBus(), KLN90BFailureSettings.getManager(new EventBus()), settings);
-        const own = new FailureDetector(ineligible, () => state, () => now, () => random);
+        const own = new FailureDetector(ineligible, () => state, commanded, () => now, () => random);
         ineligible.fail('rs232In');
         now = 1003;
         own.tick();
@@ -227,5 +230,104 @@ describe('FailureDetector over a jump of the sim clock', () => {
         expect(detector.isDetected('rs232In')).toBe(false);
         tickAt(1038);
         expect(detector.isDetected('rs232In')).toBe(true);
+    });
+});
+
+// #459: a lamp or the superflag is detected from what the unit commanded, not after a delay
+describe('FailureDetector from the commanded state', () => {
+    it('a wiring fault seen before the main page is detected at the main page', () => {
+        failures.fail('msgWiring');
+        commanded.record('msg', true);
+        tickAt(1000);
+
+        expect(state.noticed.has('msgWiring')).toBe(true);
+        expect(detector.isDetected('msgWiring')).toBe(false);
+
+        state.mainPageShown = true;
+        tickAt(1001);
+        expect(detector.isDetected('msgWiring')).toBe(true);
+        expect(state.pendingS.size).toBe(0);
+    });
+
+    it('a wiring fault is not detected without the lamp commanded on', () => {
+        state.mainPageShown = true;
+        failures.fail('msgWiring');
+        commanded.record('msg', false);
+        tickAt(1000);
+        tickAt(1100);
+
+        expect(detector.isDetected('msgWiring')).toBe(false);
+        expect(state.noticed.size).toBe(0);
+        expect(state.pendingS.size).toBe(0);
+    });
+
+    it('a driver fault is detected in the tick that sees the lamp commanded off', () => {
+        state.mainPageShown = true;
+        tickAt(1000);
+        failures.fail('wptDriver');
+        tickAt(1001);
+        expect(detector.isDetected('wptDriver')).toBe(false);
+        expect(state.pendingS.size).toBe(0);
+
+        commanded.record('wpt', false);
+        tickAt(1002);
+        expect(detector.isDetected('wptDriver')).toBe(true);
+        expect(detector.isDetected('wptWiring')).toBe(false);
+    });
+
+    it('the superflag is detected when the flag was commanded valid', () => {
+        state.mainPageShown = true;
+        tickAt(1000);
+        failures.fail('superflag');
+        tickAt(1001);
+        expect(detector.isDetected('superflag')).toBe(false);
+
+        commanded.record('superflag', true);
+        tickAt(1002);
+        expect(detector.isDetected('superflag')).toBe(true);
+    });
+
+    it('a command seen while the failure was not active does not count', () => {
+        state.mainPageShown = true;
+        commanded.record('msg', true);
+        tickAt(1000);
+        failures.fail('msgWiring');
+        tickAt(1001);
+
+        expect(detector.isDetected('msgWiring')).toBe(false);
+        expect(state.noticed.size).toBe(0);
+    });
+
+    it('the flags are cleared when the ticks stop', () => {
+        commanded.record('msg', true);
+        detector.onTicksStopped();
+        failures.fail('msgWiring');
+        tickAt(1000);
+
+        expect(state.noticed.size).toBe(0);
+    });
+
+    it('a repair drops a noticed failure', () => {
+        failures.fail('msgWiring');
+        commanded.record('msg', true);
+        tickAt(1000);
+        expect(state.noticed.has('msgWiring')).toBe(true);
+
+        failures.repair('msgWiring');
+        tickAt(1001);
+        expect(state.noticed.size).toBe(0);
+        state.mainPageShown = true;
+        failures.fail('msgWiring');
+        tickAt(1002);
+        expect(detector.isDetected('msgWiring')).toBe(false);
+    });
+
+    it('eeprom is detected at the first tick of the main page', () => {
+        failures.fail('eeprom');
+        tickAt(1000);
+        expect(detector.isDetected('eeprom')).toBe(false);
+        state.mainPageShown = true;
+        tickAt(1001);
+        expect(detector.isDetected('eeprom')).toBe(true);
     });
 });

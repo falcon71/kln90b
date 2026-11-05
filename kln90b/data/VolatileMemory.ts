@@ -367,7 +367,7 @@ export class VolatileMemory {
      * unit looks at its parts and inputs again. It is no `*Page` state, so the guard test of the page states does not
      * see it; its own test does
      */
-    public readonly failureDetection: FailureDetectionState = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set()};
+    public readonly failureDetection: FailureDetectionState = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set(), noticed: new Set()};
 
     /**
      * #458: the boot of this power-on is over (TransmitterStatus): the Self Test page has shown, or the main page at an
@@ -417,6 +417,7 @@ export class VolatileMemory {
         this.failureDetection.powerOnScheduled = false;
         this.failureDetection.pendingS.clear();
         this.failureDetection.detected.clear();
+        this.failureDetection.noticed.clear();
         this.transmittersStarted = false;
         this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry

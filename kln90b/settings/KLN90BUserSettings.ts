@@ -134,6 +134,11 @@ export type KLN90BUserSettingsTypes = {
     userDataFormat: number,
 }
 
+/**
+ * The unit's battery-backed nonvolatile memory, which a failed battery wipes (#461). Its keys that are not that memory:
+ * userDataFormat describes the storage itself, and fastGpsAcquisition is the fictional SET 10 page of this simulation (not the real unit's maintenance page of that number).
+ * The unit's EEPROM is KLN90BEepromSettings, the failure simulation KLN90BFailureSettings.
+ */
 export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSettingsTypes> {
 
 

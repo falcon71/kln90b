@@ -41,7 +41,8 @@ export class FailureOutputs {
 
     /**
      * A pass over every effectively failed output port. SimVarSync calls it when the unit claims the GPS SimVars again:
-     * otherwise the failed port's GPS SimVars keep what another unit or the sim's own GPS last wrote
+     * otherwise the failed port's GPS SimVars keep what another unit or the sim's own GPS last wrote. KLN90BCore calls
+     * it at the boot too, because the boot's own pass does not write the flag LVar
      */
     public writeFailedNullStates(): void {
         this.writeNullStates(FAILABLE_OUTPUTS.filter(p => this.failures.isOutputFailed(p)));

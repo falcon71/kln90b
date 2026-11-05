@@ -102,7 +102,9 @@ describe('persisted user setting keys', () => {
         for (let i = 0; i < 100; i++) expected[`${PREFIX}rmk${i}`] = '""';
         // The failure simulation (#458): the MTBF in hours, off, and one text for each failure, empty = working
         expected[`${PREFIX}failureMtbf`] = '0';
-        for (const key of ['arinc429Out', 'rs232Out', 'rmiOutput', 'obsResolver', 'rs232In', 'rs232Data', 'airdata429', 'altitude']) expected[`${PREFIX}failure_${key}`] = '""';
+        for (const key of ['arinc429Out', 'rs232Out', 'rmiOutput', 'obsResolver', 'rs232In', 'rs232Data', 'airdata429', 'altitude', 'eeprom', 'superflag', 'msgBulb', 'wptBulb', 'armBulb', 'actvBulb', 'msgWiring', 'wptWiring', 'armWiring', 'actvWiring', 'msgDriver', 'wptDriver', 'armDriver', 'actvDriver']) expected[`${PREFIX}failure_${key}`] = '""';
+        // The unit's EEPROM (#459): the CRT centering and the D-bar calibration points, 0 = not drawn yet
+        for (const key of ['eepromCrtCenterX', 'eepromCrtCenterY', 'eepromDbarCalPlus', 'eepromDbarCalMinus']) expected[`${PREFIX}${key}`] = '0';
 
         expect(Object.fromEntries(data)).toEqual(expected);
     });

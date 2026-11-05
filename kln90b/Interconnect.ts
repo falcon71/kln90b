@@ -1,6 +1,6 @@
 import {SimVarValueType} from "@microsoft/msfs-sdk";
 import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from "./settings/KLN90BPlaneSettings";
-import {FailedInputPort, FailedOutputPort} from "./failures/FailureCatalog";
+import {CommandedSignal, FailedInputPort, FailedOutputPort, Lamp} from "./failures/FailureCatalog";
 
 //The physical interfaces of the unit, one object each, after the interconnect drawing (Installation manual 006-10521-0005
 //Rev 5, figure 2-17, 2-45 to 2-57) (#451). Every SimVar the unit reads or writes for an input or an output goes through
@@ -43,6 +43,9 @@ export interface PortFailureSource {
     isOutputFailed(port: FailedOutputPort): boolean;
 
     isInputFailed(port: FailedInputPort): boolean;
+
+    /** What the lamp does regardless of the command (#459) */
+    lampFault(lamp: Lamp): 'dark' | 'stuck' | null;
 }
 
 /**
@@ -51,7 +54,46 @@ export interface PortFailureSource {
 export const NO_FAILURES: PortFailureSource = {
     isOutputFailed: () => false,
     isInputFailed: () => false,
+    lampFault: () => null,
 };
+
+/**
+ * Which signals the unit commanded on and off since the failure detector last looked (#459). A short pulse between two
+ * 1 Hz checks would otherwise be missed
+ */
+export class CommandedSignals {
+    private readonly flags = new Map<CommandedSignal, {on: boolean, off: boolean}>();
+
+    public record(signal: CommandedSignal, on: boolean): void {
+        this.flagsOf(signal)[on ? 'on' : 'off'] = true;
+    }
+
+    /** True when the signal was commanded that way since the last take of that pair; clears it */
+    public take(signal: CommandedSignal, on: boolean): boolean {
+        const flags = this.flagsOf(signal);
+        const key = on ? 'on' : 'off';
+        const was = flags[key];
+        flags[key] = false;
+        return was;
+    }
+
+    public clear(): void {
+        this.flags.forEach(flags => {
+            flags.on = false;
+            flags.off = false;
+        });
+    }
+
+    /** Created once per signal, so a port write allocates nothing after the first */
+    private flagsOf(signal: CommandedSignal): {on: boolean, off: boolean} {
+        let flags = this.flags.get(signal);
+        if (flags === undefined) {
+            flags = {on: false, off: false};
+            this.flags.set(signal, flags);
+        }
+        return flags;
+    }
+}
 
 /**
  * The null-state pass of an Interconnect (#458). Outside a pass a port writes while it transmits. Inside one, the ports
@@ -67,6 +109,11 @@ export class NullStatePass {
 
     public mayWrite(port: OutputPort): boolean {
         return this.ports === null ? port.isTransmitting : this.lists(port);
+    }
+
+    /** True inside a pass, whichever ports it lists */
+    public isRunning(): boolean {
+        return this.ports !== null;
     }
 
     public run(ports: readonly OutputPort[] | 'all', write: () => void): void {
@@ -87,7 +134,7 @@ export class SimVarOutput implements OutputPort {
      * @param pass The null-state pass of the Interconnect the port belongs to
      */
     constructor(public readonly name: string, private readonly isFailed: () => boolean = () => false,
-                private readonly pass: NullStatePass = new NullStatePass()) {
+                protected readonly pass: NullStatePass = new NullStatePass()) {
     }
 
     public get isTransmitting(): boolean {
@@ -98,6 +145,30 @@ export class SimVarOutput implements OutputPort {
         if (this.pass.mayWrite(this)) {
             SimVar.SetSimVarValue(simVar, unit, value);
         }
+    }
+}
+
+/**
+ * A remote lamp output, P901 pin 14 WPT or 15 MSG (#459). Outside a null-state pass it writes what the lamp does: false
+ * for a dark lamp (a burnt bulb, or a short that bypasses it), true for a stuck driver, the commanded value otherwise,
+ * and it records what the unit commanded for the failure detector. Inside a pass it writes the value it gets and records
+ * nothing: the stuck driver is the sense regulator's loop failing to reach zero, and that loop runs on the unit's own
+ * supply, so the power change's pass leaves the lamp dark (docs/failures.md, "Annunciators"; CMM 25-26)
+ */
+export class LampOutput extends SimVarOutput {
+    constructor(name: string, private readonly lamp: Lamp, private readonly failures: PortFailureSource,
+                private readonly commanded: CommandedSignals, pass: NullStatePass) {
+        super(name, undefined, pass);
+    }
+
+    public write(simVar: string, unit: SimVarValueType | string, value: number | boolean | string): void {
+        if (this.pass.isRunning()) {
+            super.write(simVar, unit, value);
+            return;
+        }
+        this.commanded.record(this.lamp, !!value);
+        const fault = this.failures.lampFault(this.lamp);
+        super.write(simVar, unit, fault === null ? value : fault === 'stuck');
     }
 }
 
@@ -133,17 +204,24 @@ export const NULL_OUTPUT: OutputPort = {
     },
 };
 
+/** The bits of GPS APPROACH MODE for the ARM and the ACTV lamp */
+const ARM_BIT = 1;
+const ACTV_BIT = 2;
+
 /**
  * GPS APPROACH MODE lights the ARM lamp (1) and the ACTV lamp (2), and both on the self-test (3); it is the SimVar the wiki
- * documents for the lamps of the GPS APR switch-annunciator, so it stays one SimVar over two outputs. The group passes the
- * value through. With #366 it changes the value for a failed lamp instead of dropping the write, so the lamp that works
- * keeps working: with ARM failed 1 becomes 0 and 3 becomes 2, with ACTV failed 2 becomes 0 and 3 becomes 1
+ * documents for the lamps of the GPS APR switch-annunciator, so it stays one SimVar over two outputs. For a failed lamp
+ * (#459) the group changes the value instead of dropping the write, so the lamp that works keeps working: a dark ARM
+ * clears bit 1 (1 → 0, 3 → 2), a dark ACTV clears bit 2 (2 → 0, 3 → 1), a stuck ARM sets bit 1, a stuck ACTV sets bit 2.
+ * It records the commanded bits as the lamp ports do (LampOutput), and inside a null-state pass it passes the value
+ * through and records nothing (docs/failures.md, "Annunciators")
  */
 export class ApproachLampGroup implements OutputPort {
     public readonly name = "Approach lamps";
 
     constructor(private readonly arm: OutputPort, private readonly actv: OutputPort,
-                private readonly pass: NullStatePass = new NullStatePass()) {
+                private readonly failures: PortFailureSource, private readonly commanded: CommandedSignals,
+                private readonly pass: NullStatePass) {
     }
 
     public get isTransmitting(): boolean {
@@ -154,8 +232,28 @@ export class ApproachLampGroup implements OutputPort {
      * By the rule of its lamps: it writes while one of them may write, outside a pass or in a pass that lists it
      */
     public write(simVar: string, unit: SimVarValueType | string, value: number | boolean | string): void {
-        if (this.pass.mayWrite(this.arm) || this.pass.mayWrite(this.actv)) {
+        if (!this.pass.mayWrite(this.arm) && !this.pass.mayWrite(this.actv)) {
+            return;
+        }
+        if (this.pass.isRunning()) {
             SimVar.SetSimVarValue(simVar, unit, value);
+            return;
+        }
+        const mode = Number(value);
+        this.commanded.record('arm', (mode & ARM_BIT) !== 0);
+        this.commanded.record('actv', (mode & ACTV_BIT) !== 0);
+        SimVar.SetSimVarValue(simVar, unit, ApproachLampGroup.lampBit(ApproachLampGroup.lampBit(mode, ARM_BIT, this.failures.lampFault('arm')),
+            ACTV_BIT, this.failures.lampFault('actv')));
+    }
+
+    private static lampBit(mode: number, bit: number, fault: 'dark' | 'stuck' | null): number {
+        switch (fault) {
+            case 'dark':
+                return mode & ~bit;
+            case 'stuck':
+                return mode | bit;
+            default:
+                return mode;
         }
     }
 }
@@ -172,6 +270,9 @@ export class Interconnect {
 
     private readonly pass = new NullStatePass();
 
+    /** What the unit commanded on and off, for the failure detector (#459) */
+    public readonly commanded = new CommandedSignals();
+
     //##############
     //###Outputs####
     //##############
@@ -186,7 +287,7 @@ export class Interconnect {
     public readonly rs232Out: OutputPort = new SimVarOutput("RS-232 OUT", () => this.failures.isOutputFailed('rs232Out'), this.pass);
     /**
      * The CDI/HSI outputs: P901 pin 22 +RIGHT against pin 25 +LEFT/NAV FLAG- (deviation), pin 21 +TO against pin 20 +FROM,
-     * pin 19 NAV FLAG+ against pin 25, pin 18 NAV SUPERFLAG (Installation manual 1-7, 1-8, 2-5)
+     * pin 19 NAV FLAG+ against pin 25 (Installation manual 1-7, 1-8, 2-5). The superflag is a port of its own
      */
     public readonly analogNav: OutputPort = new SimVarOutput("Analog nav", undefined, this.pass);
     /**
@@ -197,11 +298,11 @@ export class Interconnect {
     /**
      * P901 pin 14 WPT ALERT, pulled low to light a remote lamp (Installation manual 1-7, 2-5)
      */
-    public readonly wptAnnunciator: OutputPort = new SimVarOutput("WPT annunciator", undefined, this.pass);
+    public readonly wptAnnunciator: OutputPort = new LampOutput("WPT annunciator", 'wpt', this.failures, this.commanded, this.pass);
     /**
      * P901 pin 15 MSG, pulled low to light a remote lamp (Installation manual 1-7, 2-5)
      */
-    public readonly msgAnnunciator: OutputPort = new SimVarOutput("MSG annunciator", undefined, this.pass);
+    public readonly msgAnnunciator: OutputPort = new LampOutput("MSG annunciator", 'msg', this.failures, this.commanded, this.pass);
     /**
      * P901 pin 16 APPROACH ACTIVE, pulled low to light the ACTV lamp of the GPS APR switch-annunciator (Installation
      * manual 1-7, 2-5). Strapped to pin 30 on a VFR only unit (2-6)
@@ -215,7 +316,12 @@ export class Interconnect {
     /**
      * Pins 16 and 17 for GPS APPROACH MODE (see ApproachLampGroup)
      */
-    public readonly approachLamps: OutputPort = new ApproachLampGroup(this.armAnnunciator, this.actvAnnunciator, this.pass);
+    public readonly approachLamps: OutputPort = new ApproachLampGroup(this.armAnnunciator, this.actvAnnunciator, this.failures, this.commanded, this.pass);
+    /**
+     * P901 pin 18 NAV SUPERFLAG (Installation manual 1-7, 2-5). It carries the sim's stand-ins for the flag:
+     * L:KLN90B_HSI_TF_FLAGS and GPS IS ACTIVE WAY POINT/FLIGHT PLAN, whose flagged state a failed port leaves (#459)
+     */
+    public readonly superflag: OutputPort = new SimVarOutput("NAV superflag", () => this.failures.isOutputFailed('superflag'), this.pass);
     /**
      * Fictional: what the sim needs and no wire carries, the GPS SimVar constants, GPS OVERRIDDEN and
      * L:KLN90B_AnnunTest. It never fails

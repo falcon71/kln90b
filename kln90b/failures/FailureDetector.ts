@@ -1,4 +1,5 @@
 import {CalcTickable} from "../TickController";
+import {CommandedSignals} from "../Interconnect";
 import {Failures} from "./Failures";
 import {Detection, FAILURE_CATALOG, FailureKey} from "./FailureCatalog";
 import {MAX_TRIGGER_STEP_S} from "./FailureTrigger";
@@ -29,6 +30,12 @@ export interface FailureDetectionState {
     pendingS: Map<FailureKey, number>;
     /** The failures the unit has noticed. A failure stays detected until it is repaired or no longer effective */
     detected: Set<FailureKey>;
+    /**
+     * The commanded failures (lamps, superflag) whose wrong signal the unit has seen in this power-on, also before the
+     * main page: a wiring fault is found while the Self Test page has the lamp lit and shown from the first navigation
+     * page (#459, docs/superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md, "Detection")
+     */
+    noticed: Set<FailureKey>;
 }
 
 /**
@@ -42,14 +49,16 @@ export class FailureDetector implements CalcTickable {
     /**
      * @param failures
      * @param state The detection state of this power-on, read at every call, as VolatileMemory replaces its contents
+     * @param commanded What the unit commanded since the last tick; every pair is taken in every tick
      * @param simTimeS The sim clock in seconds
      * @param random Replaceable, so that tests can steer the draws
      */
-    constructor(private readonly failures: Failures, private readonly state: () => FailureDetectionState, private readonly simTimeS: () => number, public random: () => number = Math.random) {
+    constructor(private readonly failures: Failures, private readonly state: () => FailureDetectionState, private readonly commanded: CommandedSignals, private readonly simTimeS: () => number, public random: () => number = Math.random) {
     }
 
     public onTicksStopped(): void {
         this.lastTimeS = null;
+        this.commanded.clear();
     }
 
     public tick(): void {
@@ -69,6 +78,21 @@ export class FailureDetector implements CalcTickable {
             }
         }
 
+        //Taken in every tick, also for a failure that is not effective: a command seen while it was not active is dropped
+        for (const d of FAILURE_CATALOG) {
+            if (d.signal === undefined || (d.detection !== 'commandedOn' && d.detection !== 'commandedOff')) {
+                continue;
+            }
+            if (this.commanded.take(d.signal, d.detection === 'commandedOn')) {
+                state.noticed.add(d.key);
+            }
+        }
+        for (const key of Array.from(state.noticed)) {
+            if (!this.failures.isEffective(key)) {
+                state.noticed.delete(key);
+            }
+        }
+
         if (!state.mainPageShown) {
             return;
         }
@@ -85,6 +109,13 @@ export class FailureDetector implements CalcTickable {
         state.powerOnScheduled = true;
         for (const d of FAILURE_CATALOG) {
             if (d.detection === null || state.pendingS.has(d.key) || state.detected.has(d.key) || !this.failures.isEffective(d.key)) {
+                continue;
+            }
+            if (d.detection === 'commandedOn' || d.detection === 'commandedOff') {
+                //Never delayed: noticed at the power-on, or in the tick that sees the command (noticed holds both)
+                if (state.noticed.has(d.key)) {
+                    state.detected.add(d.key);
+                }
                 continue;
             }
             state.pendingS.set(d.key, this.delay(d.detection, atPowerOn));
