@@ -112,7 +112,8 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
 
 - **The messages are persistent messages** (`data/PersistentMessages.ts`): valid while the failure is active and
   detected. The MSG prompt flashes for a new one and stays on steady while the condition holds (3-16). A repair ends
-  the condition and the message goes.
+  the condition and the message goes. The EEPROM is the exception: the unit reads it at a power-on only, so its message
+  follows that read and stays after a repair until the next power-on (see the EEPROM).
 - **When a failure is detected** (CMM 1018/1019, CMM 25-26, guesses where the manuals are silent):
   - Interface inputs (`rs232In`, `rs232Data`, `airdata429`, `altitude`): within about 10 s after the data stops, as in
     the CMM loop-back test, and not all at the same moment. A bench video of a real unit with no RS-232 or air data
@@ -123,7 +124,9 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
     in operation, a loss shows after a delay drawn from 2 to 10 s (guess).
   - Unit-internal failures (`gpsAntenna`, `gpsReceiver`, `eeprom`, `arinc429Out`, `rs232Out`): in the next calculation
     tick, but at a power-on not before the first navigation page. Detection starts with that page for every failure
-    (the design's choice), so the Self Test page shows `TEST FAIL` and no failure message yet.
+    (the design's choice), so the Self Test page shows `TEST FAIL` and no failure message yet. `eeprom` is detected only
+    from the first navigation page after a power-on whose read of the EEPROM failed, and stays detected until the
+    next power-on (see the EEPROM).
   - `superflag`: while the flag is supposed to be valid (navigation valid or the self-test pattern).
   - `…Wiring`: while the unit commands that lamp on. The driver senses overcurrent only then (CMM 25-26).
   - `…Driver`: while the unit commands that lamp off (see the annunciators).
@@ -135,10 +138,11 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
   - After every power-on the detection starts again, with the same rules. The self-test lights every lamp, so a wiring
     fault is found at every self-test.
   - The delays count sim time as the MTBF trigger counts it: a step back of the sim clock, a jump of more than a minute
-    and the time the unit was off or disabled count nothing. A detected failure stays detected until it is repaired, so
-    setting the sim clock back does not hide its message.
+    and the time the unit was off or disabled count nothing. A detected failure stays detected until it is repaired (the
+    EEPROM until the next power-on), so setting the sim clock back does not hide its message.
 - **TEST FAIL** (3-4): while a failure marked "TEST FAIL" in the catalog is active, the Self Test page shows the
-  flashing `TEST FAIL` in place of `ANNUN ON`. This path is separate from the start-up failure of #416:
+  flashing `TEST FAIL` in place of `ANNUN ON`. For the EEPROM it is the read of this power-on that counts, not the
+  failure as it stands now (see the EEPROM). This path is separate from the start-up failure of #416:
   it posts no `DATA BASE CHECKSUM ERR` and does not touch `memory.selfTestFailure`. The pilot can still approve the
   page, and the failure's own message is on the MSG page.
 - **`ALTITUDE FAIL`** was a static check of the configuration (`AltitudeFailMessage`: an IFR unit with no
@@ -314,7 +318,7 @@ values and shows its own uncorrected errors, the same ones at every failure.
   `PageContainer` gets the calibration at `propsReady`, so at the first boot of a session with the EEPROM failed the
   Turn-On page shows centered and the screen shifts from then on; later power cycles shift from the start.
 - **The screen is off center.** The centering offsets (guess: 2 to 6 CRT pixels, that is 8 to 24 screen pixels, in
-  each axis, either sign) are missing while the failure is active, so the whole screen content, the FLR pages
+  each axis, either sign) are missing after a power-on whose read failed, so the whole screen content, the FLR pages
   included, is shifted by them. The change happens in a display tick. The maintainer checked in the sim on 2026-11-05
   that the screen, the FLR pages included, stays readable at 6 pixels; the outer characters reach past the screen's
   margin (4 CRT pixels horizontally, 3 vertically). The simulator's own error pages are not the unit's screen and stay
@@ -323,12 +327,42 @@ values and shows its own uncorrected errors, the same ones at every failure.
   exactly +300 mV or -300 mV at the shop. Without them the unit commands nominal values, and the output follows the
   line through the two points: a gain of `600 / (plus - minus)` and a zero point of `300 - gain × plus` millivolts.
   `GPS WP CROSS TRK` carries the deviation with that gain and that zero point (as a share of the 150 mV of full scale)
-  while the failure is active. The internal CDI, the XTK on the pages and the digital outputs stay right. The points
-  are drawn from a gain of 0.7 to 1.3 and a zero point of up to ±45 mV, ±30 % of full scale (guesses).
+  after a power-on whose read failed. The internal CDI, the XTK on the pages and the digital outputs stay right. The
+  points are drawn from a gain of 0.7 to 1.3 and a zero point of up to ±45 mV, ±30 % of full scale (guesses).
 - Not affected: OBS CAL (STA 3). It calibrates the OBS resolver input to the installed indicator (IM 2-65), nothing
   says it is kept in the EEPROM, and Appendix B names only the external D-bar.
 - The STA 4 counters are not in the EEPROM: they are reset when the nonvolatile memory is cleared (5-31), which is the
   battery's loss (see the battery).
+- **The EEPROM is read at a power-on only** (maintainer, 2026-11-05). The unit reads the calibration at a power-on and
+  keeps it in volatile memory while it is powered:
+  - A failure in operation, from FLR 3 or the MTBF trigger, has no visible effect in that power-on: no screen shift, no
+    D-bar error, no message and no `TEST FAIL`.
+  - At a power-on with the EEPROM failed, the read fails its integrity check. The screen and the D-bar use the
+    uncalibrated values above, the Self Test page shows `TEST FAIL`, and `EEPROM FAILURE: IC1045` /
+    `EXTERNAL D-BAR INVALID` is posted with the first navigation page (the rule for the unit's own failures).
+  - A repair from FLR 2 or FLR 1 `SERVICE?` has no visible effect either: the uncalibrated values, the message and the
+    MSG prompt stay until the next power-on, which reads a good EEPROM.
+  - Only a real power-on reads: the first one of a session, a cold one and an engine-running start alike, and every
+    one after the unit was off. The battery's ride-through of a short supply loss and the hot-swap disable and resume
+    are no power-on and keep what the last one read.
+- **Why at a power-on only.** The sources give no timing in so many words, so this is the reading that fits them best;
+  a future source can be weighed against it:
+  - The CMM's theory of operation: the EEPROM is a 256-bit serial chip driven bit by bit through output lines of the
+    DUART (EEDI, EESK, EECS). The CRT centering offsets are stored there at the alignment (SET 10, ENT) and the D-bar
+    calibration at SET 11. Values used on every CRT frame and every D-bar update cannot be fetched from such a chip each
+    time, so the unit reads them once and works from RAM.
+  - IM C-4: the receiver module's own EEPROM error is a failed sum-check self-test, Bendix/King's way of testing an
+    EEPROM. A checksum over the contents is naturally run right after the read at the power-on.
+  - Pilot's Guide B-2, the message: its advice to note the message's data before the unit is switched off is about
+    the IC designator in the message. It suggests that the message may not come back after a power cycle (a marginal
+    chip that reads a good checksum the next time), not that calibration data is lost.
+  - IM A-7: the RS-232 self-test data record carries the EEPROM's IC designator among both power-on and continuous
+    results, so it gives no timing.
+  - Ruled out for lack of evidence, to be revisited if a source turns up: a check in the background during operation.
+    The message could then show in flight while the values in RAM stay right until the next power-on.
+- **In the code**: the catalog marks the EEPROM `readAtPowerOn`. `VolatileMemory.reset`, the power-on reset, reads it
+  into `failureDetection.failedAtPowerOn`, and `FailureDetector.actsOnUnit` answers from that for the calibration
+  (`EepromCalibration`), the detection, the message and `TEST FAIL`. The other failures act as they are now.
 
 ### ARINC 429 transmitter (`arinc429Out`)
 
@@ -478,7 +512,9 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
 
 - FLR 2 repairs one failure; FLR 1 `SERVICE?` repairs every failure and installs a new battery (health 100 %).
 - A repair ends the effect at once: the port works from the next tick, the lamp follows its command, the receiver
-  acquires again, the screen recenters, the message condition ends. Data lost by a dead battery stays lost.
+  acquires again, the message condition ends. Data lost by a dead battery stays lost.
+- The EEPROM is the exception, as the unit reads it at a power-on only: the screen recenters, the D-bar is right again
+  and the message goes at the next power-on (see the EEPROM).
 
 ## UI
 

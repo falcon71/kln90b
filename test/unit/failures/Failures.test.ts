@@ -143,20 +143,6 @@ describe('Failures', () => {
         expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude', 'eeprom', 'superflag']);
     });
 
-    it('anyTestFail needs an effective TEST FAIL failure', () => {
-        let {failures} = build(DataInterface.ARINC429);
-        failures.fail('rs232Out');
-        expect(failures.anyTestFail()).toBe(false);
-
-        ({failures} = build(DataInterface.RS232));
-        failures.fail('rs232Out');
-        expect(failures.anyTestFail()).toBe(true);
-
-        ({failures} = build(DataInterface.RS232, s => { s.input.fuelComputer.isInterfaced = true; }));
-        failures.fail('rs232In');
-        expect(failures.anyTestFail()).toBe(false);
-    });
-
     it('the MTBF is kept within 0 to 999 hours', () => {
         const {failures} = build();
         failures.setMtbfHours(50);

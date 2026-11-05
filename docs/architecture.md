@@ -575,8 +575,12 @@ each documented with its pins. One `Interconnect` is built in `KLN90BCore.init()
   starts it again, and `PageManager.startMainPage` sets `mainPageShown`, the start of the power-on detection. A scheduled
   failure holds the seconds it still waits (`pendingS`), counted with the trigger's rule (no step back, none after a
   stop, none larger than a minute), so a jump of the sim clock neither hides nor hurries a detection; a detected failure
-  is latched (`detected`) until it is repaired or no longer effective. The messages follow the detection
-  (`FailureMessage` in `data/PersistentMessages.ts`).
+  is latched (`detected`) until it is repaired or no longer effective (the EEPROM until the next power-on, below). The
+  messages follow the detection (`FailureMessage` in `data/PersistentMessages.ts`). The detection, the messages and
+  `TEST FAIL` (`FailureDetector.anyTestFail`) ask `FailureDetector.actsOnUnit`, which is `Failures.isEffective` except
+  for a part the unit reads at a power-on only (`readAtPowerOn`, the EEPROM, #459): that one acts as the read of this
+  power-on found it (`failureDetection.failedAtPowerOn`), so a failure or a repair in operation shows at the next
+  power-on.
 - **The planner rule.** `WTFlightplanSync` holds FPL 0 and the direct-to plan only while the unit is powered and the
   nav data port transmits (`isSending()`); `sync()` follows the rule, so a power-off and a failure of that port empty
   the planner, and a power-on and the repair sync it once. This is the one change of behavior that is also there with
@@ -1127,9 +1131,12 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   `eepromDbarCalPlus/Minus`, the shop calibration of the CRT centering (SET 10) and the D-bar (SET 11). The defaults are
   0, which no draw gives; `EepromCalibration.drawMissing` runs once in `KLN90BCore` after the load and gives each value
   at 0 a drawn one, which the save manager stores. `EepromCalibration` (`kln90b/failures/`, in `PageProps`) answers only
-  while the `eeprom` failure is active: `PageContainer` shifts the whole screen by `screenShiftXPx`/`screenShiftYPx` in a
-  display tick, and `SensorsOut.setFilteredOutputs` puts the deviation through `dbarDeviation` (gain and zero point of
-  the two stored points) for `GPS WP CROSS TRK`.
+  after a power-on whose read of the EEPROM failed: `PageContainer` shifts the whole screen by
+  `screenShiftXPx`/`screenShiftYPx` in a display tick, and `SensorsOut.setFilteredOutputs` puts the deviation through
+  `dbarDeviation` (gain and zero point of the two stored points) for `GPS WP CROSS TRK`. The unit reads the EEPROM at a
+  power-on only (docs/failures.md, "EEPROM"): the catalog marks it `readAtPowerOn`, `VolatileMemory.reset` reads it into
+  `failureDetection.failedAtPowerOn`, and `FailureDetector.actsOnUnit('eeprom')` answers from that read until the next
+  power-on, for the calibration as for the detection and `TEST FAIL`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
 - `KLN90BUserRemarkSettings`: `rmk0..rmk99` (`NUM_REMARKS=100`, the 100 airports of 3-47; `rmk10` and up since #92).

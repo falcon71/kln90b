@@ -244,3 +244,21 @@ The reviewers verify the tests by mutation (CLAUDE.md).
   shift (a small class in `kln90b/failures/` is the obvious place).
 - How the definitions name their lamp and signal.
 - How the tests fail a component (the #458 helpers).
+
+## Amendment, 2026-11-05: the EEPROM is read at a power-on only
+
+After the build the maintainer decided that the EEPROM's failure and its repair do not act at once. The unit reads the
+calibration from the EEPROM at a power-on and keeps it in RAM until the next one, so:
+
+- A failure in operation shows nothing in that power-on: no screen shift, no D-bar error, no message, no `TEST FAIL`.
+- A power-on with the EEPROM failed fails the read's integrity check: the screen and the D-bar are uncalibrated, the
+  Self Test page shows `TEST FAIL` and the message comes with the first navigation page.
+- A repair (FLR 2 or `SERVICE?`) shows nothing either until the next power-on; the message stays until then.
+- Only a power event that powers the unit reads; the battery's ride-through and the hot-swap resume do not.
+
+This replaces "Applied while `eeprom` is effective" in "The unit's EEPROM calibration", the effective-state wording of
+"The EEPROM", the `eeprom` line of "Detection" (detected from the first navigation page after a power-on whose read
+failed) and "TEST FAIL" (now `FailureDetector.anyTestFail()`, which asks the read for the EEPROM). The catalog marks the
+EEPROM `readAtPowerOn`; `VolatileMemory.reset` keeps the read's result in `failureDetection.failedAtPowerOn`, and
+`FailureDetector.actsOnUnit` answers from it. The rules and the reasoning from the CMM, IM C-4, IM A-7 and Pilot's
+Guide B-2 are in [docs/failures.md](../../failures.md), "EEPROM".

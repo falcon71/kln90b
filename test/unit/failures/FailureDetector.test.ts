@@ -6,6 +6,7 @@ import {KLN90BFailureSettings} from '../../../kln90b/settings/KLN90BFailureSetti
 import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from '../../../kln90b/settings/KLN90BPlaneSettings';
 import {CommandedSignals} from '../../../kln90b/Interconnect';
 import {clearStatic} from '../../harness/singletons';
+import {countAllocations, noAllocations} from '../../harness/allocation';
 
 /** Air data over ARINC 429 and a fuel computer (RS-232 in), RS-232 output: every kind of detection is eligible */
 function plane(headingRs232 = false): KLN90PlaneSettings {
@@ -43,7 +44,7 @@ beforeEach(() => {
     now = 1000;
     random = 0;
     commanded = new CommandedSignals();
-    state = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set(), noticed: new Set()};
+    state = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set(), noticed: new Set(), failedAtPowerOn: new Set()};
     failures = new Failures(new EventBus(), KLN90BFailureSettings.getManager(new EventBus()), plane());
     detector = new FailureDetector(failures, () => state, commanded, () => now, () => random);
 });
@@ -322,12 +323,117 @@ describe('FailureDetector from the commanded state', () => {
         expect(detector.isDetected('msgWiring')).toBe(false);
     });
 
-    it('eeprom is detected at the first tick of the main page', () => {
+    it('eeprom is detected at the first tick of the main page after a failed read', () => {
         failures.fail('eeprom');
+        state.failedAtPowerOn.add('eeprom'); // The power-on read found it failed (VolatileMemory.reset)
         tickAt(1000);
         expect(detector.isDetected('eeprom')).toBe(false);
         state.mainPageShown = true;
         tickAt(1001);
         expect(detector.isDetected('eeprom')).toBe(true);
+    });
+});
+
+// #459: the unit reads its EEPROM at a power-on only (docs/failures.md, "EEPROM"). The detector, TEST FAIL and the
+// calibration (through actsOnUnit) follow the result of that read, FailureDetectionState.failedAtPowerOn, not the
+// failure as it stands now
+describe('FailureDetector and a part read at power-on (#459)', () => {
+    it('a failure after the read is not detected and fails no self-test', () => {
+        state.mainPageShown = true;
+        tickAt(1000);
+        failures.fail('eeprom');
+        for (let t = 1001; t <= 1030; t++) {
+            tickAt(t);
+        }
+
+        expect(failures.isEffective('eeprom')).toBe(true); // Precondition: failed now
+        expect(state.pendingS.has('eeprom')).toBe(false);
+        expect(state.detected.has('eeprom')).toBe(false);
+        expect(detector.isDetected('eeprom')).toBe(false);
+        expect(detector.actsOnUnit('eeprom')).toBe(false);
+        expect(detector.anyTestFail()).toBe(false);
+    });
+
+    it('a failed read stays detected and fails the self-test after the repair', () => {
+        failures.fail('eeprom');
+        state.failedAtPowerOn.add('eeprom');
+        state.mainPageShown = true;
+        tickAt(1000);
+        expect(detector.isDetected('eeprom')).toBe(true); // Precondition
+
+        failures.repair('eeprom');
+        for (let t = 1001; t <= 1030; t++) {
+            tickAt(t);
+        }
+
+        expect(failures.isEffective('eeprom')).toBe(false); // Precondition: repaired now
+        expect(state.detected.has('eeprom')).toBe(true);
+        expect(detector.isDetected('eeprom')).toBe(true);
+        expect(detector.actsOnUnit('eeprom')).toBe(true);
+        expect(detector.anyTestFail()).toBe(true);
+    });
+
+    // A failed read shows TEST FAIL on the Self Test page, before the main page and so before any detection
+    it('a failed read fails the self-test before the main page', () => {
+        state.failedAtPowerOn.add('eeprom');
+        tickAt(1000);
+
+        expect(detector.anyTestFail()).toBe(true);
+        expect(detector.isDetected('eeprom')).toBe(false);
+    });
+
+    // The other parts are checked as they are now: a failure in operation and a repair act at once
+    it('every other part acts as it is now', () => {
+        state.failedAtPowerOn.add('arinc429Out'); // Not a part read at power-on: the set is not asked for it
+        expect(detector.actsOnUnit('arinc429Out')).toBe(false);
+        expect(detector.anyTestFail()).toBe(false);
+
+        failures.fail('arinc429Out');
+        expect(detector.actsOnUnit('arinc429Out')).toBe(true);
+        expect(detector.anyTestFail()).toBe(true);
+        state.mainPageShown = true;
+        tickAt(1000);
+        expect(detector.isDetected('arinc429Out')).toBe(true);
+
+        failures.repair('arinc429Out');
+        expect(detector.actsOnUnit('arinc429Out')).toBe(false);
+        expect(detector.anyTestFail()).toBe(false);
+        expect(detector.isDetected('arinc429Out')).toBe(false);
+    });
+
+    // The calibration asks actsOnUnit('eeprom') on every 16 Hz D-bar write (EepromCalibration), so it allocates nothing:
+    // no array method that builds an array or takes a closure, and no iterator of an array, set or map
+    // (test/harness/allocation.ts)
+    describe('the 16 Hz path', () => {
+        it('actsOnUnit calls no allocating built-in', () => {
+            state.failedAtPowerOn.add('eeprom');
+
+            const {result: acts, counts} = countAllocations(() => detector.actsOnUnit('eeprom'));
+
+            expect(acts).toBe(true); // Precondition: the read-at-power-on path ran
+            expect(counts).toEqual(noAllocations());
+        });
+    });
+});
+
+// TEST FAIL (3-4, #458): a failure marked TEST FAIL in the catalog, as the unit sees it
+describe('FailureDetector.anyTestFail', () => {
+    it('needs a TEST FAIL failure', () => {
+        failures.fail('rs232In'); // Not on TEST FAIL
+        expect(detector.anyTestFail()).toBe(false);
+
+        failures.fail('rs232Out');
+        expect(detector.anyTestFail()).toBe(true);
+    });
+
+    it('an ineligible TEST FAIL failure does not count', () => {
+        const settings = plane();
+        settings.output.dataInterface = DataInterface.ARINC429; // The RS-232 output is not the data interface
+        const ineligible = new Failures(new EventBus(), KLN90BFailureSettings.getManager(new EventBus()), settings);
+        const own = new FailureDetector(ineligible, () => state, commanded, () => now, () => random);
+        ineligible.fail('rs232Out');
+
+        expect(ineligible.isActive('rs232Out')).toBe(true); // Precondition: stored
+        expect(own.anyTestFail()).toBe(false);
     });
 });

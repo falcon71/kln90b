@@ -266,7 +266,10 @@ export class KLN90BCore {
         const planeSettingsParser = new KLN90BPlaneSettingsParser();
         this.planeSettings = planeSettingsParser.parsePlaneSettings(xmlConfig);
         const failures = new Failures(this.bus, KLN90BFailureSettings.getManager(this.bus), this.planeSettings);
-        const eepromCalibration = new EepromCalibration(KLN90BEepromSettings.getManager(this.bus), failures);
+        //The read of the EEPROM at the power-on is kept in VolatileMemory and judged by the detector, both built later;
+        //no D-bar write or display tick asks before (#459)
+        const eepromReadFailed = () => this.failureDetector !== undefined && this.failureDetector.actsOnUnit('eeprom');
+        const eepromCalibration = new EepromCalibration(KLN90BEepromSettings.getManager(this.bus), eepromReadFailed);
         //One wiring for the whole unit: every interface SimVar goes through its ports (#451)
         const interconnect = new Interconnect(this.planeSettings, failures);
 
@@ -379,7 +382,7 @@ export class KLN90BCore {
         }
 
 
-        const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint);
+        const memory = new VolatileMemory(this.bus, this.userSettings, facilityLoader, sensors, scanlists, flightplans, lastActiveWaypoint, failures);
 
         this.wtFlightplanSync = new WTFlightplanSync(this.bus, facilityLoader, interconnect, memory.navPage.activeWaypoint, this.hardware, () => this.powerSupply!.isPoweredOn());
         failureOutputs.setPlannerSync(this.wtFlightplanSync);
