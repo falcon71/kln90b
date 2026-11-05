@@ -837,8 +837,9 @@ describe('GPS receiver channels (5-29)', () => {
 });
 
 // characterization: the STA 1 pages of a unit with a fix, from the ephemeris in resources/ at the fake clock's start.
-// They read the SDK satellites through private fields (channels, state, signal strength, zenith angle), so an SDK
+// They read the SDK satellites through private fields (channels, state, zenith angle), so an SDK
 // upgrade that changes them shows here
+// The SNR follows the elevation (GpsSignal.ts, #464): 50 + 12 × log10(sin(elevation)), 41 at 10°, 45 at 25°, 50 at 76°
 // NAV A shows whenever there is an altitude, as on a real unit with all eight satellites in use (decided in #215)
 describe('STA 1 page with a fix (characterization)', () => {
     it('characterization: both STA 1 pages after an engine-running boot', async () => {
@@ -854,14 +855,14 @@ describe('STA 1 page with a fix (characterization)', () => {
           [
             "STATE NAV A",
             " SV SNR ELE",
-            " 01  40 25°",
-            " 08  52 76°",
-            " 10  46 48°",
-            " 14  37 10°",
-            " 16  37 10°",
-            " 21  47 55°",
-            " 23  39 18°",
-            " 27  48 57°",
+            " 01  45 25°",
+            " 08  50 76°",
+            " 10  48 48°",
+            " 14  41 10°",
+            " 16  41 10°",
+            " 21  49 55°",
+            " 23  44 18°",
+            " 27  49 57°",
             "           ",
             "           ",
             "STA+1",

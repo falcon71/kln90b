@@ -15,6 +15,7 @@ import {padInt} from "../../data/NumberFormat";
 import {SearchMode} from "../../GpsSearch";
 import {Raim, raimStatus} from "../../GpsSolution";
 import {halForMode} from "../../services/ModeController";
+import {satelliteSnr} from "../../GpsSignal";
 
 
 type Sta1PageTypes = {
@@ -29,7 +30,8 @@ type Sta1PageTypes = {
 type SatRow = {
     prn: number,
     state: GPSSatelliteState,
-    signalStrength: number,
+    /** The SNR of the satellite's true direction (GpsSignal.ts, #464), shown while it is in use */
+    snr: number,
     /** Degrees above the horizon, or null when the receiver does not know where the satellite stands */
     ele: number | null,
 };
@@ -155,7 +157,8 @@ export class Sta1Page extends SixLineHalfPage {
                 return {
                     prn: p.prn,
                     state: sat?.state.get() ?? GPSSatelliteState.None,
-                    signalStrength: sat?.signalStrength.get() ?? 0,
+                    //The signal comes from where the satellite really stands, not from where the unit predicts it
+                    snr: sat === undefined ? 0 : satelliteSnr(sat.position.get()[0]),
                     ele: toElevation(p.position.get()[0]),
                 };
             }).sort(byPrn);
@@ -165,7 +168,7 @@ export class Sta1Page extends SixLineHalfPage {
         return sats.map(sat => ({
             prn: sat.prn,
             state: sat.state.get(),
-            signalStrength: sat.signalStrength.get(),
+            snr: satelliteSnr(sat.position.get()[0]),
             //A satellite searched blindly has no known position until its orbit data is in (#213)
             ele: gps.isValid() || sat.isCachedEphemerisValid(gps.simTimeUnix) ? toElevation(sat.position.get()[0]) : null,
         })).sort(byPrn);
@@ -186,7 +189,7 @@ export class Sta1Page extends SixLineHalfPage {
             case GPSSatelliteState.InUseDiffApplied:
                 used = ' ';
                 health = ' ';
-                snr = 35 + row.signalStrength * 20; //5-30: Values range 35 to 55
+                snr = row.snr; //5-29, 5-30, Installation Manual C-7: the curve of an aircraft antenna (#464)
                 break;
             case GPSSatelliteState.Unreachable:
                 used = '*';
