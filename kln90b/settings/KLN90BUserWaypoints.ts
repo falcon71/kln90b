@@ -9,6 +9,9 @@ export const MAX_USER_WAYPOINTS = 250;
 
 type Def = UserSettingDefinition<KLN90BUserWaypointsTypes[keyof KLN90BUserWaypointsTypes]>;
 
+/**
+ * The user waypoints, part of the unit's battery-backed nonvolatile memory, which a failed battery wipes (#461).
+ */
 export class KLN90BUserWaypointsSettings {
     private static INSTANCE: DefaultUserSettingManager<KLN90BUserWaypointsTypes> | undefined;
 

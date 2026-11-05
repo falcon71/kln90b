@@ -16,6 +16,8 @@ import {PowerEvent} from "../PowerSupply";
 import {KLN90BUserSettings} from "../settings/KLN90BUserSettings";
 import {ErrorPage} from "./ErrorPage";
 import {PanelXmlErrorPage} from "./PanelXmlErrorPage";
+import {PropsReadyEvent} from "../KLN90BCore";
+import {EepromCalibration} from "../failures/EepromCalibration";
 import KEY_ENTER = KeyCode.KEY_ENTER;
 import KEY_ESCAPE = KeyCode.KEY_ESCAPE;
 
@@ -41,10 +43,17 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
     private readonly keyboardId = this.genGuid();
     private currentPage: DisplayComponent<PageProps> & Page | undefined;
 
+    /** Exists once the services do: the container is built before them */
+    private eepromCalibration: EepromCalibration | undefined;
+    /** The shift last set, in screen pixels, so that the style is set only when it changes */
+    private screenShiftX = 0;
+    private screenShiftY = 0;
+
     constructor(props: PageContainerProps) {
         super(props);
         this.keyboardPublisher = props.bus.getPublisher<KeyboardEvent>();
         props.bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.resetKeyboard.bind(this));
+        props.bus.getSubscriber<PropsReadyEvent>().on("propsReady").handle(pageProps => this.eepromCalibration = pageProps.eepromCalibration);
     }
 
     private _isLeftKeyboardActive = false;
@@ -88,6 +97,25 @@ export class PageContainer extends DisplayComponent<PageContainerProps> implemen
 
         this.getCurrentPage().tick(blink);
         this.getCurrentPage().children.walk((el) => el.tick(blink));
+        this.shiftScreen();
+    }
+
+    /**
+     * A failed EEPROM leaves the CRT uncentered (#459, EepromCalibration), so every page of the unit, the FLR pages
+     * included, is off center. The simulator's error pages are not the unit's screen and stay centered
+     */
+    private shiftScreen(): void {
+        if (this.eepromCalibration === undefined) {
+            return;
+        }
+        const x = this.eepromCalibration.screenShiftXPx();
+        const y = this.eepromCalibration.screenShiftYPx();
+        if (x === this.screenShiftX && y === this.screenShiftY) {
+            return;
+        }
+        this.screenShiftX = x;
+        this.screenShiftY = y;
+        this.containerRef.instance.style.transform = x === 0 && y === 0 ? "" : `translate(${x}px, ${y}px)`;
     }
 
     public setCurrentPage<T extends ComponentProps>(type: DisplayComponentFactory<T>, props: T) {

@@ -10,6 +10,9 @@ export const NUM_FLIGHTPLANS = 25;
 
 type Def = UserSettingDefinition<KLN90BUserFlightplansTypes[keyof KLN90BUserFlightplansTypes]>;
 
+/**
+ * The flight plans, part of the unit's battery-backed nonvolatile memory, which a failed battery wipes (#461).
+ */
 export class KLN90BUserFlightplansSettings {
     private static INSTANCE: DefaultUserSettingManager<KLN90BUserFlightplansTypes> | undefined;
 

@@ -20,6 +20,7 @@ import {KLNFacilityRepository} from "../data/navdata/KLNFacilityRepository";
 import {PendingCalls} from "../services/PendingCalls";
 import {FailureDetector} from "../failures/FailureDetector";
 import {Failures} from "../failures/Failures";
+import {EepromCalibration} from "../failures/EepromCalibration";
 
 export enum PageSide {
     LeftPage,
@@ -36,6 +37,7 @@ export interface PageProps extends ComponentProps {
     planeSettings: KLN90PlaneSettings;
     failures: Failures;
     failureDetector: FailureDetector;
+    eepromCalibration: EepromCalibration;
     sensors: Sensors;
     pageManager: PageManager;
     messageHandler: MessageHandler;

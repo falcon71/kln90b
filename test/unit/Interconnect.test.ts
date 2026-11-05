@@ -1,6 +1,9 @@
 // @vitest-environment happy-dom
-import {beforeEach, describe, expect, it} from 'vitest';
-import {ApproachLampGroup, Interconnect, NULL_OUTPUT, PortFailureSource, SimVarOutput} from '../../kln90b/Interconnect';
+import {afterEach, beforeEach, describe, expect, it, MockInstance, vi} from 'vitest';
+import {
+    ApproachLampGroup, CommandedSignals, Interconnect, LampOutput, NO_FAILURES, NULL_OUTPUT, NullStatePass, PortFailureSource, SimVarOutput,
+} from '../../kln90b/Interconnect';
+import {Lamp} from '../../kln90b/failures/FailureCatalog';
 import {KLN90BPlaneSettingsParser, KLN90PlaneSettings} from '../../kln90b/settings/KLN90BPlaneSettings';
 import {panelXml, PanelOptions} from '../harness/panelXml';
 import {simEnv} from '../harness/sim/install';
@@ -115,7 +118,8 @@ describe('ports (#451)', () => {
         expect(ic.grayCode.isReceiving).toBe(true);
     });
 
-    // Until #366, the group passes the value through; the self-test value 3 lights both lamps
+    // With nothing failed the group passes the value through (#459 changes it for a failed lamp); the self-test value 3
+    // lights both lamps
     it('passes GPS APPROACH MODE through the approach lamp group', () => {
         const ic = new Interconnect(settingsFor());
         expect(ic.approachLamps).toBeInstanceOf(ApproachLampGroup);
@@ -133,6 +137,7 @@ describe('failed ports and the null-state pass (#458)', () => {
     const failing429: PortFailureSource = {
         isOutputFailed: port => port === 'arinc429Tx',
         isInputFailed: () => false,
+        lampFault: () => null,
     };
     // The parser writes LVars, so the writes count from the Interconnect on
     let mark = 0;
@@ -200,6 +205,30 @@ describe('failed ports and the null-state pass (#458)', () => {
         expect(ic.output('arinc429Tx')).toBe(ic.arinc429Tx);
         expect(ic.output('rs232Out')).toBe(ic.rs232Out);
         expect(ic.output('obiBus')).toBe(ic.obiBus);
+        expect(ic.output('superflag')).toBe(ic.superflag);
+    });
+
+    it('a failed superflag port drops its writes and leaves the other ports alone (#459)', () => {
+        const ic = interconnect({...failing429, isOutputFailed: port => port === 'superflag'});
+        expect(ic.superflag.isTransmitting).toBe(false);
+        expect(ic.obiBus.isTransmitting).toBe(true);
+
+        ic.superflag.write('GPS WP DISTANCE', 'meters', 5);
+        expect(writtenNames()).toEqual([]);
+        ic.obiBus.write('GPS WP DISTANCE', 'meters', 6);
+        expect(writtenNames()).toEqual(['GPS WP DISTANCE']);
+    });
+
+    it('a failed obiBus leaves the superflag port transmitting (#459)', () => {
+        const ic = interconnect({...failing429, isOutputFailed: port => port === 'obiBus'});
+        expect(ic.superflag.isTransmitting).toBe(true);
+        expect(ic.obiBus.isTransmitting).toBe(false);
+    });
+
+    it('NO_FAILURES has no lamp fault (#459)', () => {
+        for (const lamp of ['msg', 'wpt', 'arm', 'actv'] as const) {
+            expect(NO_FAILURES.lampFault(lamp)).toBeNull();
+        }
     });
 
     it('ends the pass when the write throws', () => {
@@ -211,5 +240,219 @@ describe('failed ports and the null-state pass (#458)', () => {
         ic.arinc429Tx.write('GPS WP DISTANCE', 'meters', 5);
 
         expect(writtenNames()).toEqual([]);
+    });
+});
+
+// #459: a lamp port writes what the lamp does, not what the unit commands: false for a dark lamp (bulb or wiring), true
+// for a stuck one (driver). It records what the unit commanded, for the failure detector. A null-state pass passes the
+// value through, so a power change leaves every lamp dark (docs/failures.md, "Annunciators"; CMM 25-26)
+describe('the lamp ports (#459)', () => {
+    let faults: Partial<Record<Lamp, 'dark' | 'stuck' | null>>;
+    const failures: PortFailureSource = {
+        isOutputFailed: () => false,
+        isInputFailed: () => false,
+        lampFault: lamp => faults[lamp] ?? null,
+    };
+    let commanded: CommandedSignals;
+    let pass: NullStatePass;
+    let set: MockInstance<typeof SimVar.SetSimVarValue>;
+    /** The values written, in order */
+    const written = () => set.mock.calls.map(args => args[2]);
+
+    beforeEach(() => {
+        faults = {};
+        commanded = new CommandedSignals();
+        pass = new NullStatePass();
+        set = vi.spyOn(SimVar, 'SetSimVarValue');
+    });
+    afterEach(() => set.mockRestore());
+
+    const msgLamp = () => new LampOutput('MSG annunciator', 'msg', failures, commanded, pass);
+
+    it('a working lamp writes the commanded value', () => {
+        const lamp = msgLamp();
+
+        lamp.write('L:KLN90B_MsgLight', 'bool', true);
+        lamp.write('L:KLN90B_MsgLight', 'bool', false);
+
+        expect(written()).toEqual([true, false]);
+        expect(set.mock.calls[0][0]).toBe('L:KLN90B_MsgLight');
+        expect(set.mock.calls[0][1]).toBe('bool');
+    });
+
+    it('a dark lamp writes false for true', () => {
+        faults.msg = 'dark';
+        const lamp = msgLamp();
+
+        lamp.write('L:KLN90B_MsgLight', 'bool', true);
+        lamp.write('L:KLN90B_MsgLight', 'bool', false);
+
+        expect(written()).toEqual([false, false]);
+    });
+
+    it('a stuck lamp writes true for false', () => {
+        faults.msg = 'stuck';
+        const lamp = msgLamp();
+
+        lamp.write('L:KLN90B_MsgLight', 'bool', false);
+        lamp.write('L:KLN90B_MsgLight', 'bool', true);
+
+        expect(written()).toEqual([true, true]);
+    });
+
+    it('asks about its own lamp', () => {
+        faults.wpt = 'dark';
+        const lamp = msgLamp();
+
+        lamp.write('L:KLN90B_MsgLight', 'bool', true);
+
+        expect(written()).toEqual([true]);
+    });
+
+    it('records the commanded value, not the written one', () => {
+        faults.msg = 'dark';
+        const lamp = msgLamp();
+
+        lamp.write('L:KLN90B_MsgLight', 'bool', true);
+
+        expect(commanded.take('msg', true)).toBe(true);
+        expect(commanded.take('msg', false)).toBe(false);
+
+        faults.msg = 'stuck';
+        lamp.write('L:KLN90B_MsgLight', 'bool', false);
+
+        expect(commanded.take('msg', false)).toBe(true);
+        expect(commanded.take('msg', true)).toBe(false);
+        expect(commanded.take('wpt', false)).toBe(false);
+    });
+
+    it('a null-state pass writes the value as given and records nothing', () => {
+        faults.msg = 'stuck';
+        const lamp = msgLamp();
+
+        pass.run('all', () => lamp.write('L:KLN90B_MsgLight', 'bool', false));
+
+        expect(written()).toEqual([false]);
+        expect(commanded.take('msg', false)).toBe(false);
+        expect(commanded.take('msg', true)).toBe(false);
+    });
+
+    it('a null-state pass that does not list the lamp drops the write', () => {
+        faults.msg = 'stuck';
+        const lamp = msgLamp();
+
+        pass.run([NULL_OUTPUT], () => lamp.write('L:KLN90B_MsgLight', 'bool', false));
+
+        expect(written()).toEqual([]);
+        expect(commanded.take('msg', false)).toBe(false);
+    });
+
+    it('reports whether a pass runs', () => {
+        expect(pass.isRunning()).toBe(false);
+        pass.run([], () => expect(pass.isRunning()).toBe(true));
+        pass.run('all', () => expect(pass.isRunning()).toBe(true));
+        expect(pass.isRunning()).toBe(false);
+    });
+
+    describe('the approach lamp group', () => {
+        const group = () => new ApproachLampGroup(new SimVarOutput('ARM annunciator', undefined, pass),
+            new SimVarOutput('ACTV annunciator', undefined, pass), failures, commanded, pass);
+        const writeAll = (g: ApproachLampGroup, values: number[]) => values.forEach(v => g.write('GPS APPROACH MODE', 'enum', v));
+
+        it('passes the value through with nothing failed', () => {
+            writeAll(group(), [0, 1, 2, 3]);
+
+            expect(written()).toEqual([0, 1, 2, 3]);
+            expect(set.mock.calls[0][0]).toBe('GPS APPROACH MODE');
+        });
+
+        it('a dark ARM clears bit 1', () => {
+            faults.arm = 'dark';
+            writeAll(group(), [0, 1, 2, 3]);
+
+            expect(written()).toEqual([0, 0, 2, 2]);
+        });
+
+        it('a dark ACTV clears bit 2', () => {
+            faults.actv = 'dark';
+            writeAll(group(), [0, 1, 2, 3]);
+
+            expect(written()).toEqual([0, 1, 0, 1]);
+        });
+
+        it('a stuck ARM sets bit 1', () => {
+            faults.arm = 'stuck';
+            writeAll(group(), [0, 1, 2, 3]);
+
+            expect(written()).toEqual([1, 1, 3, 3]);
+        });
+
+        it('a stuck ACTV sets bit 2', () => {
+            faults.actv = 'stuck';
+            writeAll(group(), [0, 1, 2, 3]);
+
+            expect(written()).toEqual([2, 3, 2, 3]);
+        });
+
+        it('a dark ARM and a stuck ACTV', () => {
+            faults.arm = 'dark';
+            faults.actv = 'stuck';
+            writeAll(group(), [0, 1, 2, 3]);
+
+            expect(written()).toEqual([2, 2, 2, 2]);
+        });
+
+        it('records the commanded bits', () => {
+            faults.arm = 'dark';
+            faults.actv = 'stuck';
+            const g = group();
+            const taken = () => ({
+                armOn: commanded.take('arm', true), armOff: commanded.take('arm', false),
+                actvOn: commanded.take('actv', true), actvOff: commanded.take('actv', false),
+            });
+
+            g.write('GPS APPROACH MODE', 'enum', 0);
+            expect(taken()).toEqual({armOn: false, armOff: true, actvOn: false, actvOff: true});
+            g.write('GPS APPROACH MODE', 'enum', 1);
+            expect(taken()).toEqual({armOn: true, armOff: false, actvOn: false, actvOff: true});
+            g.write('GPS APPROACH MODE', 'enum', 2);
+            expect(taken()).toEqual({armOn: false, armOff: true, actvOn: true, actvOff: false});
+            g.write('GPS APPROACH MODE', 'enum', 3);
+            expect(taken()).toEqual({armOn: true, armOff: false, actvOn: true, actvOff: false});
+        });
+
+        it('a null-state pass writes the value as given and records nothing', () => {
+            faults.arm = 'stuck';
+            const g = group();
+
+            pass.run('all', () => g.write('GPS APPROACH MODE', 'enum', 0));
+
+            expect(written()).toEqual([0]);
+            expect([commanded.take('arm', true), commanded.take('arm', false), commanded.take('actv', true),
+                commanded.take('actv', false)]).toEqual([false, false, false, false]);
+        });
+    });
+
+    it('the Interconnect wires the lamp ports to its failures and its command flags', () => {
+        faults = {msg: 'dark', wpt: 'stuck', arm: 'stuck'};
+        const ic = new Interconnect(settingsFor(), failures);
+        set.mockClear();
+
+        ic.msgAnnunciator.write('L:KLN90B_MsgLight', 'bool', true);
+        ic.wptAnnunciator.write('L:KLN90B_WptLight', 'bool', false);
+        ic.approachLamps.write('GPS APPROACH MODE', 'enum', 0);
+        expect(written()).toEqual([false, true, 1]);
+        expect(ic.commanded.take('msg', true)).toBe(true);
+        expect(ic.commanded.take('wpt', false)).toBe(true);
+        expect(ic.commanded.take('arm', false)).toBe(true);
+        expect(ic.msgAnnunciator).toBeInstanceOf(LampOutput);
+        expect(ic.wptAnnunciator).toBeInstanceOf(LampOutput);
+
+        ic.writeNullState('all', () => {
+            ic.wptAnnunciator.write('L:KLN90B_WptLight', 'bool', false);
+            ic.approachLamps.write('GPS APPROACH MODE', 'enum', 0);
+        });
+        expect(written()).toEqual([false, true, 1, false, 0]);
+        expect(ic.commanded.take('wpt', false)).toBe(false);
     });
 });

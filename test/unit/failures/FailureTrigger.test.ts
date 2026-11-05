@@ -28,8 +28,8 @@ function plane(): KLN90PlaneSettings {
 }
 
 const ALWAYS_HIT = () => 0;
-/** The eligible random failures of plane(): ARINC 429 output, OBS resolver and altitude */
-const ELIGIBLE: FailureKey[] = ['arinc429Out', 'obsResolver', 'altitude'];
+/** The eligible random failures of plane(): ARINC 429 output, OBS resolver, altitude, EEPROM and the superflag */
+const ELIGIBLE: FailureKey[] = ['arinc429Out', 'obsResolver', 'altitude', 'eeprom', 'superflag'];
 
 let events: { key: FailureKey, active: boolean }[];
 let now: number;
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 describe('FailureTrigger', () => {
-    it('the eligible candidates are the three the tests assume', () => {
+    it('the eligible candidates are the ones the tests assume', () => {
         const {failures} = build(ALWAYS_HIT);
         expect(failures.randomCandidates().map(d => d.key).sort()).toEqual([...ELIGIBLE].sort());
     });
@@ -114,9 +114,10 @@ describe('FailureTrigger', () => {
             counts[e.key] = (counts[e.key] ?? 0) + 1;
         }
         expect(Object.keys(counts).sort()).toEqual([...ELIGIBLE].sort());
+        const expected = 3000 / ELIGIBLE.length;
         for (const key of ELIGIBLE) {
-            expect(counts[key]).toBeGreaterThan(900);
-            expect(counts[key]).toBeLessThan(1100);
+            expect(counts[key]).toBeGreaterThan(expected * 0.9);
+            expect(counts[key]).toBeLessThan(expected * 1.1);
         }
     });
 
@@ -124,6 +125,8 @@ describe('FailureTrigger', () => {
         const {trigger, failures} = build(ALWAYS_HIT);
         failures.fail('obsResolver');
         failures.fail('altitude');
+        failures.fail('eeprom');
+        failures.fail('superflag');
         events.length = 0;
         // rs232Out is ineligible on this plane and stays out; only arinc429Out is left, and it is active too
         failures.fail('arinc429Out');

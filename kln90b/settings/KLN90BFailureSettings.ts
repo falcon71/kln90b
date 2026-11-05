@@ -9,6 +9,10 @@ export type KLN90BFailureTypes = { failureMtbf: number } & { [K in `failure_${Fa
 
 type Def = UserSettingDefinition<KLN90BFailureTypes[keyof KLN90BFailureTypes]>;
 
+/**
+ * Fictional: the simulation's own state, which failures the unit has, not memory of the unit. Neither the battery's
+ * failure (#461) nor the EEPROM's reaches it.
+ */
 export class KLN90BFailureSettings {
     private static INSTANCE: DefaultUserSettingManager<KLN90BFailureTypes> | undefined;
 

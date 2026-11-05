@@ -11,6 +11,9 @@ export const NUM_REMARKS = 100;
 
 type Def = UserSettingDefinition<KLN90BUserRemarkTypes[keyof KLN90BUserRemarkTypes]>;
 
+/**
+ * The airport remarks, part of the unit's battery-backed nonvolatile memory, which a failed battery wipes (#461).
+ */
 export class KLN90BUserRemarkSettings {
     private static INSTANCE: DefaultUserSettingManager<KLN90BUserRemarkTypes> | undefined;
 

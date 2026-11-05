@@ -94,7 +94,7 @@ afterEach(() => {
 describe('a failed output port (#458)', () => {
     it('every SimVar of the failable ports has a null value', () => {
         const failable = [...simVarsOf(DEFAULT_TABLE, 'ARINC 429 TX'), ...simVarsOf(DEFAULT_TABLE, 'OBI'),
-            ...simVarsOf(RS232_TABLE, 'RS-232 OUT')];
+            ...simVarsOf(DEFAULT_TABLE, 'NAV superflag'), ...simVarsOf(RS232_TABLE, 'RS-232 OUT')];
 
         expect(failable.filter(name => !(name in NULL_VALUES))).toEqual([]);
     });

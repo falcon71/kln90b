@@ -65,6 +65,13 @@ export class SignalOutputFilter {
     }
 
     /**
+     * The full scale deflection of the CDI last set, in the unit of the cross track
+     */
+    getScale(): number {
+        return this.scale;
+    }
+
+    /**
      * The capacitor discharges while the unit is off
      */
     reset() {

@@ -45,6 +45,8 @@ import {FailureTrigger} from "./failures/FailureTrigger";
 import {FailureOutputs} from "./failures/FailureOutputs";
 import {TransmitterStatus} from "./services/TransmitterStatus";
 import {KLN90BFailureSettings} from "./settings/KLN90BFailureSettings";
+import {KLN90BEepromSettings} from "./settings/KLN90BEepromSettings";
+import {EepromCalibration} from "./failures/EepromCalibration";
 import {VolatileMemory} from "./data/VolatileMemory";
 import {NearestUtils} from "./data/navdata/NearestUtils";
 import {RemarksManager} from "./settings/RemarksManager";
@@ -171,6 +173,8 @@ export class KLN90BCore {
         console.log(saveKey);
         this.settingSaveManager.load(saveKey);
         this.settingSaveManager.startAutoSave(saveKey);
+        //After the load and with the auto save running, so that the drawn values are stored (#459)
+        EepromCalibration.drawMissing(KLN90BEepromSettings.getManager(this.bus));
 
         this.hEventPublisher = new HEventPublisher(this.bus);
 
@@ -262,6 +266,7 @@ export class KLN90BCore {
         const planeSettingsParser = new KLN90BPlaneSettingsParser();
         this.planeSettings = planeSettingsParser.parsePlaneSettings(xmlConfig);
         const failures = new Failures(this.bus, KLN90BFailureSettings.getManager(this.bus), this.planeSettings);
+        const eepromCalibration = new EepromCalibration(KLN90BEepromSettings.getManager(this.bus), failures);
         //One wiring for the whole unit: every interface SimVar goes through its ports (#451)
         const interconnect = new Interconnect(this.planeSettings, failures);
 
@@ -290,8 +295,12 @@ export class KLN90BCore {
 
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
-        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, interconnect, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement());
+        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, interconnect, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement(), eepromCalibration);
         const failureOutputs = new FailureOutputs(this.bus, failures, interconnect, sensors.out);
+        //The boot's own null-state pass (SensorsOut.reset) does not write the flag LVar L:KLN90B_HSI_TF_FLAGS, so a
+        //superflag failed in an earlier session would leave what the LVar held, after an instrument reload say. This
+        //writes only failed ports, so it changes nothing while nothing is failed (#459, design "The superflag port")
+        failureOutputs.writeFailedNullStates();
         const transmitterStatus = new TransmitterStatus(this.bus, failures, interconnect, () => this.powerSupply!.isPoweredOn());
 
         //The display ticks run from the start of the boot, so that the Turn-On page shows and checks the boot while it is
@@ -386,7 +395,7 @@ export class KLN90BCore {
 
         this.failureTrigger = new FailureTrigger(this.bus, failures, () => sensors.in.gps.simTimeUnix / 1000); //simTimeUnix is in ms
 
-        const failureDetector = this.failureDetector = new FailureDetector(failures, () => memory.failureDetection, () => sensors.in.gps.simTimeUnix / 1000);
+        const failureDetector = this.failureDetector = new FailureDetector(failures, () => memory.failureDetection, interconnect.commanded, () => sensors.in.gps.simTimeUnix / 1000);
 
         this.tickManager.addCalculations(
             [
@@ -436,6 +445,7 @@ export class KLN90BCore {
                 planeSettings: this.planeSettings!,
                 failures: failures,
                 failureDetector: failureDetector,
+                eepromCalibration: eepromCalibration,
                 sensors: sensors,
                 pageManager: this.pageManager,
                 messageHandler: this.messageHandler,

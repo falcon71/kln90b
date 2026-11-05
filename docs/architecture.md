@@ -95,7 +95,7 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
 and contains:
 `ref, bus, userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (VolatileMemory), facilityLoader,
 facilityRepository, nearestLists, nearestUtils, remarksManager, scanLists, msa, vnav, modeController, database, magvar, sidstar,
-pendingCalls`.
+pendingCalls`. The failure simulation adds `failures`, `failureDetector` and `eepromCalibration` (after `planeSettings`).
 `PowerSupply` and `WelcomePage` start with a reduced `WelcomePageProps` and swap in the full props when `propsReady`
 arrives.
 
@@ -532,17 +532,31 @@ each documented with its pins. One `Interconnect` is built in `KLN90BCore.init()
   keep the `Interconnect` and ask it at the moment of use.
 - `gps(port)` is the gate of the GPS SimVars: the port while `writeGPSSimVars` is set, `NULL_OUTPUT` otherwise. It
   replaced the `if (!writeGPSSimVars) return` lines; the L:KLN90B_* outputs go to their port directly.
-- `GPS APPROACH MODE` goes through `approachLamps`, a group over the ARM and ACTV pins that a later part of #366 will let
-  change the value for a failed lamp. `L:KLN90B_AnnunTest` (deprecated) and the fictional constants go through `sim`, which never
-  fails.
+- `L:KLN90B_AnnunTest` (deprecated) and the fictional constants go through `sim`, which never fails.
+- **The lamp ports (#459).** The MSG and WPT pins are `LampOutput`s: outside a null-state pass a write goes out as what
+  the lamp does (`PortFailureSource.lampFault`: false for a dark lamp, true for a stuck driver, the commanded value
+  otherwise) and records what the unit commanded. Inside a pass (`NullStatePass.isRunning`) the value goes through and
+  nothing is recorded, so a power-off leaves a stuck lamp dark. `GPS APPROACH MODE` goes through `approachLamps`
+  (`ApproachLampGroup`), a group over the ARM and ACTV pins that changes the bits of the value for a failed lamp
+  instead of dropping the write, so the other lamp keeps working, and records the commanded bits as the lamp ports do.
+- **The superflag port (#459).** `superflag` is the port of P901 pin 18. It carries `L:KLN90B_HSI_TF_FLAGS` and
+  `GPS IS ACTIVE FLIGHT PLAN`/`WAY POINT`, which the analog nav port carried before, and fails with the `superflag`
+  failure. `SensorsOut` records what it commands before the write, because a failed port drops the write first.
+  `KLN90BCore` writes the null state of every failed port once after `Sensors` is built
+  (`FailureOutputs.writeFailedNullStates`), since the boot's pass does not write the flag LVar.
+- **The command flags (#459).** `Interconnect.commanded` is a `CommandedSignals`: the lamps and the superflag that the
+  unit commanded on and off since the last look. `FailureDetector` takes each pair in every calculation tick (`take`
+  clears it), so a pulse between two ticks is seen, and keeps the commanded failures it has seen in
+  `VolatileMemory.failureDetection.noticed`. One seen on the Self Test page is detected with the first navigation page.
+  `onTicksStopped` clears the flags.
 - **Failing ports (#458).** `Interconnect` takes a `PortFailureSource` (`Failures` in the unit, `NO_FAILURES` in a test
   that builds one alone). A `SimVarOutput` built with a failure test reports `isTransmitting` false while a failure of
   the part is effective, and drops its writes; a `SimVarInput` reports `isReceiving` false and the readers treat the
   value as missing (Core 3). `Failures` answers `isOutputFailed(port)` and `isInputFailed(port)` from the failure
   catalog (`kln90b/failures/FailureCatalog.ts`: each failure names the ports it takes and the installation it needs),
   and evaluates the eligibility at every call, since `SimVarSync` can change the options at runtime. The analog nav
-  port, the annunciator pins and `sim` take no failure in part 1. `approachLamps` is a group over the ARM and ACTV pins
-  and writes while one of them may.
+  port and `sim` take no failure; the annunciator pins never stop, the lamp ports (above) change the value they write, and the superflag port fails (#459,
+  below).
 - **The null-state pass.** `Interconnect.writeNullState(ports | 'all', write)` runs `write` with a pass active: the
   listed ports write even while failed, and every other port drops its writes. A port that fails writes its null state
   once this way (`FailureOutputs`, on the `failureChanged` event, and when `SimVarSync` claims the GPS SimVars again at
@@ -1099,7 +1113,7 @@ inputs as the KLN 89 does: angle, offset and waypoint cleared, FR set to SEL (#7
 ## Core 7. Persistence
 
 Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (DataStore) under the key
-`"<ATC MODEL>.profile_1"`. `KLN90BSettingSaveManager` concatenates four managers:
+`"<ATC MODEL>.profile_1"`. `KLN90BSettingSaveManager` concatenates these managers:
 
 - `KLN90BUserSettings`: the typed keys that `KLN90BUserSettingsTypes` declares. These include `welcome1..4`, `powercycles`, `totalTime`, `timezone`, baro,
   `lastLatitude/Longitude`, `lastAlmanacDownload`, `lastEphemeris`, `activeWaypoint` (ICAO **V2** string; V1 from older
@@ -1109,10 +1123,24 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   (`aptPageWpt`, `vorPageWpt`, `ndbPageWpt`, `intPageWpt`, `supPageWpt`) and the TRI waypoints (`tri1To`, `tri3From`,
   `tri3To`), likewise since #192 and saved as ICAO **V2** strings (the V1 format is deprecated), `turnAnticipation`, the
   NAV 5 and Super NAV 5 layout, CAL page inputs, `fastGpsAcquisition` and `userDataFormat`.
+- `KLN90BEepromSettings` (#459): the unit's EEPROM, which needs no battery: `eepromCrtCenterX/Y` and
+  `eepromDbarCalPlus/Minus`, the shop calibration of the CRT centering (SET 10) and the D-bar (SET 11). The defaults are
+  0, which no draw gives; `EepromCalibration.drawMissing` runs once in `KLN90BCore` after the load and gives each value
+  at 0 a drawn one, which the save manager stores. `EepromCalibration` (`kln90b/failures/`, in `PageProps`) answers only
+  while the `eeprom` failure is active: `PageContainer` shifts the whole screen by `screenShiftXPx`/`screenShiftYPx` in a
+  display tick, and `SensorsOut.setFilteredOutputs` puts the deviation through `dbarDeviation` (gain and zero point of
+  the two stored points) for `GPS WP CROSS TRK`.
 - `KLN90BUserWaypointsSettings`: `wpt0..wpt249` (`MAX_USER_WAYPOINTS=250`).
 - `KLN90BUserFlightplansSettings`: `fpl0..fpl25` (`NUM_FLIGHTPLANS=25`, inclusive loop).
 - `KLN90BUserRemarkSettings`: `rmk0..rmk99` (`NUM_REMARKS=100`, the 100 airports of 3-47; `rmk10` and up since #92).
   `RemarksManager` writes the airports into the first slots on every save and empties the rest.
+- **Which memory each category stands for** (the header comment of each class says so):
+    - the battery-backed nonvolatile memory, which the battery's failure wipes (#461): `KLN90BUserSettings` (not
+      `userDataFormat`, which describes the storage, nor `fastGpsAcquisition`, the fictional SET 10 page), the user
+      waypoints, the flight plans and the remarks;
+    - the EEPROM: `KLN90BEepromSettings`, which no wipe reaches;
+    - fictional simulation state, not memory of the unit: `KLN90BFailureSettings`, which neither the battery nor the
+      EEPROM reaches.
 - The setting key names and value formats are **backward-compatibility-critical**. Users keep data across versions. Add
   new keys with defaults; never repurpose old ones.
 
@@ -1399,7 +1427,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
 - `PageProps` (`pages/Page.tsx`) is the single "services bag" passed to every page and many controls. It holds bus,
   userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (`VolatileMemory`),
   facilityLoader, facilityRepository, nearestLists, nearestUtils, scanLists, remarksManager, msa, vnav, modeController,
-  database, magvar, sidstar and pendingCalls. It is assembled in `KLN90BCore.asyncInit` and published as `propsReady`.
+  database, magvar, sidstar and pendingCalls, and `failures`, `failureDetector` and `eepromCalibration` for the failure
+  simulation. It is assembled in `KLN90BCore.asyncInit` and published as `propsReady`.
 
 ## UI 1. Page model
 

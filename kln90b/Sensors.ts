@@ -406,13 +406,29 @@ export class SensorsIn implements CalcTickable {
 
 }
 
+/**
+ * What the D-bar pin puts out for the deviation the unit means to put out: the EEPROM's calibration (#459,
+ * EepromCalibration), which changes it only while the EEPROM has failed
+ */
+export interface DbarOutput {
+    /**
+     * @param filtered The deviation the unit means to put out
+     * @param fullScale The deviation of full scale in the same unit
+     */
+    dbarDeviation(filtered: number, fullScale: number): number;
+}
+
+/** No calibration error */
+const EXACT_DBAR: DbarOutput = {dbarDeviation: v => v};
+
 export class SensorsOut {
 
     public obsOut: number | null = null;
 
     private xtkFilter = new SignalOutputFilter();
 
-    constructor(private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect, public readonly audioGenerator: AudioGenerator, private readonly hardware: Hardware) {
+    constructor(private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect, public readonly audioGenerator: AudioGenerator, private readonly hardware: Hardware,
+                private readonly dbar: DbarOutput = EXACT_DBAR) {
         //The boot claims the GPS SimVars, so a port failed in an earlier session writes its null state, as at a power
         //change (#458)
         this.interconnect.writeNullState('all', () => this.reset());
@@ -471,6 +487,7 @@ export class SensorsOut {
 
     private writeGpsXtk(xtk: number | null, scaling: number) {
         const gpsAnalogNav = this.interconnect.gps(this.interconnect.analogNav);
+        const gpsSuperflag = this.interconnect.gps(this.interconnect.superflag);
         const gpsSim = this.interconnect.gps(this.interconnect.sim);
         //Real unit: the CDI scale, either
         //- analog: the deviation voltage of P901 pin 22 against pin 25 is 30, 150 or 500 mV per nm for a full scale of 5,
@@ -480,13 +497,14 @@ export class SensorsOut {
         gpsAnalogNav.write('GPS CDI SCALING', SimVarValueType.Meters, UnitType.NMILE.convertTo(scaling, UnitType.METER));
         //Real unit: fictional, no output says whether there is an active waypoint. The nearest are the NAV flag (P901 pin
         //19 against pin 25, flag in view below 50 mV), the NAV superflag (P901 pin 18, invalid below 3.5 V) (Installation
-        //manual 1-7, 2-5) and ARINC 429 label 275 bit 29 HSI valid, 0 = nav warning (GAMA 11 page 19)
+        //manual 1-7, 2-5) and ARINC 429 label 275 bit 29 HSI valid, 0 = nav warning (GAMA 11 page 19). They go out on the
+        //superflag port, so a failed superflag flags them (#459)
         if (xtk === null) {
-            gpsAnalogNav.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
-            gpsAnalogNav.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
+            gpsSuperflag.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, false);
+            gpsSuperflag.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, false);
         } else {
-            gpsAnalogNav.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
-            gpsAnalogNav.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
+            gpsSuperflag.write('GPS IS ACTIVE FLIGHT PLAN', SimVarValueType.Bool, true);
+            gpsSuperflag.write('GPS IS ACTIVE WAY POINT', SimVarValueType.Bool, true);
         }
 
         //The KLN does not output vertical information
@@ -506,10 +524,13 @@ export class SensorsOut {
         //  19)
         //- ARINC 429 transmitter, label 275: bit 23 = 1 TO, bit 24 = 1 FROM (GAMA 11 page 19)
         //- RS-232 OUT, item t GPS discretes, character e: T or F, dashed while NAV is flagged (Installation manual A-6)
+        //The LVar's 0 is the flag, so it goes out on the superflag port (#459). What the unit commands is recorded here
+        //for the failure detector, because a failed port drops the write before it sees the value
+        this.interconnect.commanded.record('superflag', toFrom !== null);
         if (toFrom === null) {
-            this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+            this.interconnect.superflag.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
         } else {
-            this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, toFrom === TO ? 1 : 2);
+            this.interconnect.superflag.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, toFrom === TO ? 1 : 2);
         }
     }
 
@@ -518,8 +539,12 @@ export class SensorsOut {
      */
     public setFilteredOutputs() {
         //Real unit: the analog CDI deviation, P901 pin 22 +RIGHT against pin 25 +LEFT/NAV FLAG -, +/-150 mV at full scale
-        //and +/-300 mV at most (Installation manual 1-7, 2-5). The digital cross track is ARINC 429 label 116 (setXTK)
-        this.interconnect.gps(this.interconnect.analogNav).write('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(this.xtkFilter.getCurrentValue(), UnitType.METER));
+        //and +/-300 mV at most (Installation manual 1-7, 2-5). The digital cross track is ARINC 429 label 116 (setXTK).
+        //A failed EEPROM puts the pin off by the uncorrected gain and zero point (#459, EepromCalibration); the zero point
+        //shows while the deviation is flagged too, as on a miscalibrated pin. The full scale is the filter's, so a power
+        //change resets both together
+        const deviation = this.dbar.dbarDeviation(this.xtkFilter.getCurrentValue(), this.xtkFilter.getScale());
+        this.interconnect.gps(this.interconnect.analogNav).write('GPS WP CROSS TRK', SimVarValueType.Meters, UnitType.NMILE.convertTo(deviation, UnitType.METER));
     }
 
     /**
@@ -912,7 +937,7 @@ export class SensorsOut {
         //Real unit: without power the annunciator pins are open, the 429 transmitter is silent and the analog outputs
         //are flagged; each output's interface is on its setter above
         this.writeDigitalLVarNullState();
-        this.interconnect.analogNav.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
+        this.interconnect.superflag.write(LVAR_HSI_TF_FLAGS, SimVarValueType.Enum, 0);
         this.interconnect.msgAnnunciator.write(LVAR_MSG_LIGHT, SimVarValueType.Bool, false);
         this.interconnect.wptAnnunciator.write(LVAR_WPT_LIGHT, SimVarValueType.Bool, false);
         this.interconnect.sim.write(LVAR_ANNUN_TEST, SimVarValueType.Bool, false);
@@ -1007,9 +1032,9 @@ export class Sensors implements CalcTickable {
 
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, public readonly interconnect: Interconnect, audioGenerator: AudioGenerator,
-                messageHandler: MessageHandler, hardware: Hardware, gpsMeasurement: GpsMeasurement) {
+                messageHandler: MessageHandler, hardware: Hardware, gpsMeasurement: GpsMeasurement, dbar: DbarOutput = EXACT_DBAR) {
         this.in = new SensorsIn(bus, userSettings, options, interconnect, messageHandler, gpsMeasurement);
-        this.out = new SensorsOut(options, interconnect, audioGenerator, hardware);
+        this.out = new SensorsOut(options, interconnect, audioGenerator, hardware, dbar);
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));
     }
