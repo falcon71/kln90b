@@ -1,0 +1,899 @@
+import {beforeEach, describe, expect, it} from 'vitest';
+import {EventBus, GPSSatellite, GPSSatelliteState} from '@microsoft/msfs-sdk';
+import {Failures} from '../../../kln90b/failures/Failures';
+import {ReceiverView, GpsFailures, FAULT_SWITCH_S, FAULT_DETECTION_BIAS_M} from '../../../kln90b/failures/GpsFailures';
+import {GpsGeometry} from '../../../kln90b/GpsSolution';
+import {KLN90BFailureSettings} from '../../../kln90b/settings/KLN90BFailureSettings';
+import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from '../../../kln90b/settings/KLN90BPlaneSettings';
+import {clearStatic} from '../../harness/singletons';
+
+function plane(takeHomeMode: boolean): KLN90PlaneSettings {
+    return {
+        takeHomeMode, basePath: '', debugMode: false, vfrOnly: false,
+        input: {
+            altimeterInterfaced: true, obsSource: 1, headingInput: false, headingSimVar: '', electricitySimVar: '',
+            airdata: {isInterfaced: false, baroSource: 0, interface: DataInterface.RS232},
+            obsInterface: ObsInterface.ANALOG, headingInterface: DataInterface.ARINC429,
+            fuelComputer: {isInterfaced: false} as KLN90PlaneSettings['input']['fuelComputer'],
+            externalSwitches: {legObsSwitchInstalled: false, appArmSwitchInstalled: false},
+        },
+        output: {
+            obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true, rmiInterface: RmiInterface.OBI, rmiInstalled: false,
+            dataInterface: DataInterface.ARINC429,
+            externalAnnunciators: {msgInstalled: false, wptInstalled: false, armInstalled: false, actvInstalled: false},
+        },
+    };
+}
+
+const deg = (d: number) => d * Math.PI / 180;
+
+/** A satellite at the given elevation */
+function sat(prn: number, elevationDeg: number, state: GPSSatelliteState = GPSSatelliteState.InUse): GPSSatellite {
+    const zenith = deg(90 - elevationDeg);
+    return {prn, position: {get: () => Float64Array.of(zenith, 0)}, state: {get: () => state}} as unknown as GPSSatellite;
+}
+
+let sats: GPSSatellite[];
+let solutionPrns: number[];
+let solution: GpsGeometry;
+let valid: boolean;
+let settings: ReturnType<typeof KLN90BFailureSettings.getManager>;
+let failures: Failures;
+let gf: GpsFailures;
+
+function build(takeHome = false, random: () => number = () => 0.5) {
+    clearStatic(KLN90BFailureSettings, 'INSTANCE', false);
+    const bus = new EventBus();
+    settings = KLN90BFailureSettings.getManager(bus);
+    failures = new Failures(bus, settings, plane(takeHome));
+    const receiver: ReceiverView = {
+        satellites: () => sats,
+        solutionPrns: () => solutionPrns,
+        get solution() {
+            return solution;
+        },
+        isValid: () => valid,
+    };
+    gf = new GpsFailures(bus, failures, receiver, takeHome, random);
+}
+
+/** Stores jamming values as an earlier session would have, without the draw of a fresh failure */
+function storeJamming(text: string) {
+    settings.getSetting('failure_gpsJamming').set(text);
+}
+
+function stored(): { rampS: number, finalDb: number, elapsedS: number } {
+    return JSON.parse(settings.getSetting('failure_gpsJamming').get());
+}
+
+function run(fromS: number, toS: number) {
+    for (let t = fromS; t <= toS; t++) {
+        gf.tick(t);
+    }
+}
+
+beforeEach(() => {
+    sats = [sat(1, 10), sat(2, 30), sat(3, 3, GPSSatelliteState.None)];
+    solutionPrns = [];
+    solution = {} as GpsGeometry;
+    valid = true;
+    build();
+});
+
+describe('GpsFailures receiver failures', () => {
+    it('nothing failed: nothing blocked', () => {
+        gf.tick(0);
+        gf.tick(1);
+        for (let prn = 0; prn < 256; prn++) {
+            expect(gf.isBlocked(prn)).toBe(false);
+        }
+        expect(gf.jammingDb).toBe(0);
+        expect(gf.receiverFailed).toBe(false);
+        expect(gf.jamming).toBe(false);
+        expect(gf.jammedRows()).toEqual([]);
+    });
+
+    it('an antenna failure blocks every PRN', () => {
+        failures.fail('gpsAntenna');
+        expect(gf.receiverFailed).toBe(true);
+        for (let prn = 0; prn < 256; prn++) {
+            expect(gf.isBlocked(prn)).toBe(true);
+        }
+    });
+
+    it('with both receiver failures, repairing one leaves every PRN blocked; repairing both frees them', () => {
+        failures.fail('gpsAntenna');
+        failures.fail('gpsReceiver');
+        failures.repair('gpsAntenna');
+        expect(gf.receiverFailed).toBe(true);
+        expect(gf.isBlocked(7)).toBe(true);
+        failures.repair('gpsReceiver');
+        expect(gf.receiverFailed).toBe(false);
+        expect(gf.isBlocked(7)).toBe(false);
+    });
+
+    it('take-home mode has no receiver failures', () => {
+        build(true);
+        failures.fail('gpsAntenna');
+        failures.fail('gpsJamming');
+        expect(gf.receiverFailed).toBe(false);
+        expect(gf.jamming).toBe(false);
+        gf.tick(0);
+        gf.tick(1);
+        expect(gf.isBlocked(1)).toBe(false);
+        expect(gf.jammingDb).toBe(0);
+    });
+});
+
+describe('GpsFailures jamming', () => {
+    it.each([[0, 1, 180, 28], [1, 0, 360, 24]])('draws the ranges: random %d then %d gives rampS %d, finalDb %d', (r1, r2, rampS, finalDb) => {
+        const draws = [r1, r2];
+        let i = 0;
+        gf.random = () => draws[i++];
+        failures.fail('gpsJamming');
+        expect(stored()).toEqual({rampS, finalDb, elapsedS: 0});
+        expect(i).toBe(2);
+    });
+
+    it('draws its values when the failure starts', () => {
+        failures.fail('gpsJamming');
+        expect(stored()).toEqual({rampS: 270, finalDb: 26, elapsedS: 0});
+    });
+
+    it('ramps linearly with the wander pinned', () => {
+        storeJamming('{"rampS":200,"finalDb":26,"elapsedS":0}');
+        gf.wanderSigmaDb = 0;
+        run(0, 100);
+        expect(gf.jammingDb).toBeCloseTo(13, 9);
+    });
+
+    //A satellite whose SNR the test sets directly: the zenith angle that gives it on the curve of GpsSignal
+    function snrSat(prn: number, snr: number, state: GPSSatelliteState = GPSSatelliteState.InUse) {
+        const s = {zenith: 0};
+        const set = (v: number) => s.zenith = Math.acos(Math.pow(10, (v - 50) / 12));
+        set(snr);
+        sats = [{prn, position: {get: () => Float64Array.of(s.zenith, 0)}, state: {get: () => state}} as unknown as GPSSatellite];
+        return set;
+    }
+
+    //SNR 50 exactly at the zenith (log10(1) = 0), so a whole-number level gives a jammed SNR of exactly that level below 50
+    it('a tracked satellite at exactly 30 is not lost; just below 30 it is', () => {
+        storeJamming('{"rampS":100,"finalDb":20,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        const set = snrSat(1, 50);
+        gf.tick(0);
+        expect(gf.jammingDb).toBe(20); // Precondition: the jammed SNR is exactly 30
+        expect(gf.isBlocked(1)).toBe(false);
+        set(49.99);
+        gf.tick(1);
+        expect(gf.isBlocked(1)).toBe(true);
+    });
+
+    it('a blocked satellite stays blocked just below 35 and is free at exactly 35', () => {
+        storeJamming('{"rampS":100,"finalDb":15,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        const set = snrSat(1, 41);
+        gf.tick(0);
+        expect(gf.isBlocked(1)).toBe(true);
+        set(49.99);
+        gf.tick(1);
+        expect(gf.isBlocked(1)).toBe(true);
+        set(50);
+        gf.tick(2);
+        expect(gf.jammingDb).toBe(15); // Precondition: the jammed SNR is exactly 35
+        expect(gf.isBlocked(1)).toBe(false);
+        //Free and tracked again: it holds on down to 30, not 35
+        set(46);
+        gf.tick(3);
+        expect(gf.isBlocked(1)).toBe(false);
+    });
+
+    //Tracked is any state from Acquired on (the SDK's own tracked states), not only in use
+    it('acquired and ephemeris-collected satellites at a jammed SNR of 32 stay unblocked; an untracked one is blocked', () => {
+        storeJamming('{"rampS":100,"finalDb":12,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        snrSat(1, 44, GPSSatelliteState.Acquired);
+        const acquired = sats[0];
+        snrSat(2, 44, GPSSatelliteState.DataCollected);
+        const collected = sats[0];
+        snrSat(3, 44, GPSSatelliteState.None);
+        sats = [acquired, collected, sats[0]];
+        gf.tick(0);
+        expect(gf.jammingDb).toBe(12); // Precondition: a jammed SNR of 32, between the loss and the acquire level
+        expect(gf.isBlocked(1)).toBe(false);
+        expect(gf.isBlocked(2)).toBe(false);
+        expect(gf.isBlocked(3)).toBe(true);
+    });
+
+    it('the 10 degree satellite is not lost at 10.8 dB of jamming and lost at 10.9 dB', () => {
+        //SNR 40.876 at 10 degrees; the ramp climbs 0.1 dB a second
+        storeJamming('{"rampS":1000,"finalDb":100,"elapsedS":0}');
+        gf.wanderSigmaDb = 0;
+        run(0, 108);
+        expect(gf.jammingDb).toBeCloseTo(10.8, 9);
+        expect(gf.isBlocked(1)).toBe(false);
+        gf.tick(109);
+        expect(gf.isBlocked(1)).toBe(true);
+    });
+
+    it('an untracked satellite is blocked while the level is above its acquire margin', () => {
+        //Satellite 2 at 30 degrees, SNR 46.39, untracked: blocked above 11.39 dB
+        sats = [sat(2, 30, GPSSatelliteState.None)];
+        storeJamming('{"rampS":100,"finalDb":12,"elapsedS":0}');
+        gf.wanderSigmaDb = 0;
+        run(0, 90);
+        expect(gf.jammingDb).toBeCloseTo(10.8, 9);
+        expect(gf.isBlocked(2)).toBe(false);
+        run(91, 100);
+        expect(gf.isBlocked(2)).toBe(true);
+    });
+
+    it('saves the progress every 10 s and once at the end', () => {
+        storeJamming('{"rampS":35,"finalDb":26,"elapsedS":0}');
+        gf.wanderSigmaDb = 0;
+        let writes = 0;
+        const original = failures.setValues.bind(failures);
+        failures.setValues = (key, values) => {
+            writes++;
+            original(key, values);
+        };
+        gf.tick(0);
+        run(1, 9);
+        expect(writes).toBe(0);
+        gf.tick(10);
+        expect(writes).toBe(1);
+        expect(stored().elapsedS).toBe(10);
+        run(11, 19);
+        expect(writes).toBe(1);
+        gf.tick(20);
+        expect(stored().elapsedS).toBe(20);
+        run(21, 34);
+        expect(writes).toBe(3);
+        gf.tick(35);
+        expect(writes).toBe(4);
+        expect(stored().elapsedS).toBe(35);
+        run(36, 100);
+        expect(writes).toBe(4);
+    });
+
+    it('a ramp loaded finished is not saved again; one loaded mid-way saves after 10 s of progress, not before', () => {
+        let writes = 0;
+        const wrap = () => {
+            const original = failures.setValues.bind(failures);
+            failures.setValues = (key, values) => {
+                writes++;
+                original(key, values);
+            };
+        };
+        wrap();
+        storeJamming('{"rampS":100,"finalDb":26,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        run(0, 50);
+        expect(writes).toBe(0);
+        build();
+        wrap();
+        storeJamming('{"rampS":1000,"finalDb":26,"elapsedS":500}');
+        gf.wanderSigmaDb = 0;
+        run(0, 9);
+        expect(writes).toBe(0);
+        gf.tick(10);
+        expect(writes).toBe(1);
+        expect(stored().elapsedS).toBe(510);
+    });
+
+    it('a step back and a jump of hours count nothing; the ramp goes on from where it was', () => {
+        storeJamming('{"rampS":200,"finalDb":26,"elapsedS":50}');
+        gf.wanderSigmaDb = 0;
+        gf.tick(1000);
+        gf.tick(1001);
+        expect(gf.jammingDb).toBeCloseTo(26 * 51 / 200, 9);
+        gf.tick(900);
+        expect(gf.jammingDb).toBeCloseTo(26 * 51 / 200, 9);
+        gf.tick(900 + 7200);
+        expect(gf.jammingDb).toBeCloseTo(26 * 51 / 200, 9);
+        gf.tick(900 + 7201);
+        expect(gf.jammingDb).toBeCloseTo(26 * 52 / 200, 9);
+    });
+
+    it('the first tick after reset sets only the reference, even a short step after the last tick', () => {
+        storeJamming('{"rampS":200,"finalDb":26,"elapsedS":50}');
+        gf.wanderSigmaDb = 0;
+        gf.tick(1000);
+        gf.tick(1001);
+        gf.reset();
+        gf.tick(1030);
+        expect(gf.jammingDb).toBeCloseTo(26 * 51 / 200, 9);
+        gf.tick(1031);
+        expect(gf.jammingDb).toBeCloseTo(26 * 52 / 200, 9);
+    });
+
+    //The forced acquisition of an engine-running start runs before the first tick after the reset of the power-on
+    it('refreshBlocks after a reset blocks from the stored ramp without a tick, counting no time and drawing nothing', () => {
+        storeJamming('{"rampS":200,"finalDb":28,"elapsedS":100}');
+        let draws = 0;
+        gf.random = () => {
+            draws++;
+            return 0.5;
+        };
+        gf.reset();
+        gf.refreshBlocks();
+        expect(gf.jammingDb).toBe(14);
+        //SNR 40.9, 46.4 and 30 at the antenna, 26.9, 32.4 and 16 with the jamming: 1 and 2 are tracked, so 1 is lost
+        //below 30 and 2 holds on; 3 is untracked and under the acquire level of 35
+        expect(gf.isBlocked(1)).toBe(true);
+        expect(gf.isBlocked(2)).toBe(false);
+        expect(gf.isBlocked(3)).toBe(true);
+        gf.refreshBlocks();
+        expect(gf.jammingDb).toBe(14);
+        expect(draws).toBe(0);
+        expect(stored()).toEqual({rampS: 200, finalDb: 28, elapsedS: 100});
+    });
+
+    it('refreshBlocks with nothing failed blocks nothing', () => {
+        gf.refreshBlocks();
+        expect(gf.jammingDb).toBe(0);
+        expect(gf.isBlocked(1)).toBe(false);
+        expect(gf.isBlocked(2)).toBe(false);
+        expect(gf.isBlocked(3)).toBe(false);
+    });
+
+    it('the first tick of a new instance counts nothing', () => {
+        storeJamming('{"rampS":200,"finalDb":26,"elapsedS":50}');
+        gf.wanderSigmaDb = 0;
+        gf.tick(30);
+        expect(gf.jammingDb).toBeCloseTo(26 * 50 / 200, 9);
+    });
+
+    it.each(['{}', 'garbage', '{"rampS":"x","finalDb":5,"elapsedS":3}', '{"rampS":0,"finalDb":26}'])('stored %s is drawn anew in the tick', text => {
+        storeJamming(text);
+        expect(() => gf.tick(0)).not.toThrow();
+        expect(stored()).toEqual({rampS: 270, finalDb: 26, elapsedS: 0});
+    });
+
+    it('the wander stays within 15 dB with a standard deviation of 2 to 4 dB', () => {
+        build(false, Math.random);
+        //Pin the ramp complete at a level high enough that the clamp at 0 does not cut the wander
+        storeJamming('{"rampS":100,"finalDb":100,"elapsedS":100}');
+        gf.wanderSigmaDb = 3;
+        gf.reset();
+        gf.tick(0);
+        const values: number[] = [];
+        for (let t = 1; t <= 10000; t++) {
+            gf.tick(t);
+            values.push(gf.jammingDb - 100);
+        }
+        const mean = values.reduce((a, b) => a + b, 0) / values.length;
+        const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length);
+        expect(Math.max(...values.map(Math.abs))).toBeLessThan(15);
+        expect(sd).toBeGreaterThan(2);
+        expect(sd).toBeLessThan(4);
+    });
+
+    //One normal of -4: random draws u1 = 1 - exp(-8), u2 = 0.5; the spare of the pair is 0 to within 1e-15
+    function steerNormal() {
+        const draws = [1 - Math.exp(-8), 0.5];
+        let i = 0;
+        gf.random = () => draws[i++];
+    }
+
+    it('the level never goes below 0', () => {
+        storeJamming('{"rampS":100,"finalDb":26,"elapsedS":0}');
+        steerNormal();
+        gf.tick(0);
+        gf.tick(1);
+        //Ramp 0.26 dB, wander about -5 dB
+        expect(gf.jammingDb).toBe(0);
+    });
+
+    it('the wander decays with a correlation time of 10 s', () => {
+        storeJamming('{"rampS":100,"finalDb":100,"elapsedS":100}');
+        steerNormal();
+        gf.tick(0);
+        gf.tick(1);
+        const w1 = gf.jammingDb - 100;
+        //One step of -4 sigma-units: 3 * sqrt(1 - exp(-0.2)) * -4
+        expect(w1).toBeCloseTo(-12 * Math.sqrt(1 - Math.exp(-0.2)), 9);
+        gf.tick(2);
+        expect(gf.jammingDb - 100).toBeCloseTo(w1 * Math.exp(-0.1), 9);
+    });
+
+    it('clears a stale cache when the failure is no longer effective, without an event', () => {
+        storeJamming('{"rampS":100,"finalDb":28,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        gf.tick(0);
+        expect(gf.jammingDb).toBe(28);
+        settings.getSetting('failure_gpsJamming').set('');
+        gf.tick(1);
+        expect(gf.jammingDb).toBe(0);
+        expect(gf.isBlocked(1)).toBe(false);
+    });
+
+    it('a repair clears the level and the blocks before the next tick', () => {
+        storeJamming('{"rampS":100,"finalDb":28,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        gf.tick(0);
+        expect(gf.jammingDb).toBe(28);
+        expect(gf.isBlocked(1)).toBe(true);
+        failures.repair('gpsJamming');
+        expect(gf.jammingDb).toBe(0);
+        expect(gf.isBlocked(1)).toBe(false);
+        expect(gf.isBlocked(2)).toBe(false);
+    });
+
+    it('jammedRows lists the blocked satellites above 5 degrees and not one at 3 degrees', () => {
+        storeJamming('{"rampS":100,"finalDb":28,"elapsedS":100}');
+        gf.wanderSigmaDb = 0;
+        gf.tick(0);
+        expect(gf.isBlocked(1)).toBe(true);
+        expect(gf.isBlocked(2)).toBe(true);
+        expect(gf.isBlocked(3)).toBe(true);
+        expect(gf.jammedRows()).toEqual([1, 2]);
+    });
+});
+
+describe('GpsFailures faulty satellite', () => {
+    function storedFault(): { prn: number, biasM: number, rampS: number, elapsedS: number } {
+        return JSON.parse(settings.getSetting('failure_faultySatellite').get());
+    }
+
+    function storeFault(text: string) {
+        settings.getSetting('failure_faultySatellite').set(text);
+    }
+
+    function good(measurements = 6, maxSlope = 1): GpsGeometry {
+        return {valid: true, measurements, maxSlope} as GpsGeometry;
+    }
+
+    it('the constants of the design', () => {
+        expect(FAULT_SWITCH_S).toBe(120);
+        expect(FAULT_DETECTION_BIAS_M).toBeCloseTo(26.5, 12);
+    });
+
+    it('without the failure there is no satellite and no bias', () => {
+        solutionPrns = [1, 2];
+        gf.tick(0);
+        gf.tick(1);
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+        expect(gf.faultDetected(2)).toBe(false);
+    });
+
+    it('picks the highest satellite of the solution, not the highest in the sky', () => {
+        sats = [sat(1, 10), sat(2, 30), sat(3, 60), sat(4, 45)];
+        solutionPrns = [1, 2, 4];
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBe(4);
+        expect(storedFault().prn).toBe(4);
+    });
+
+    it('picks the satellite with the smallest zenith whatever the order of the solution', () => {
+        sats = [sat(1, 10), sat(2, 30), sat(3, 30.1), sat(4, 12)];
+        solutionPrns = [4, 3, 2, 1];
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBe(3);
+    });
+
+    it('without a solution takes the highest satellite above 5 degrees', () => {
+        sats = [sat(5, 5.5), sat(2, 4.99), sat(3, 3), sat(1, 5.01)];
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBe(5);
+        sats = [sat(1, 5.01), sat(2, 4.99), sat(3, 3)];
+        build();
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBe(1);
+        sats = [sat(2, 4.99), sat(3, 3)];
+        build();
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBeNull();
+    });
+
+    it('without any satellite nothing is drawn; once there are some, the draw is made once', () => {
+        sats = [];
+        let draws = 0;
+        gf.random = () => {
+            draws++;
+            return 0.5;
+        };
+        failures.fail('faultySatellite');
+        gf.tick(0);
+        gf.tick(1);
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+        expect(draws).toBe(0);
+        sats = [sat(7, 40)];
+        gf.tick(2);
+        expect(gf.faultyPrn).toBe(7);
+        expect(draws).toBe(2);
+        gf.tick(3);
+        gf.tick(4);
+        expect(draws).toBe(2);
+        expect(storedFault()).toEqual({prn: 7, biasM: 1750, rampS: 210, elapsedS: 0});
+    });
+
+    it.each([[0, 1, 500, 300], [1, 0, 3000, 120], [0.5, 0.5, 1750, 210]])('draws the ranges: random %d then %d gives biasM %d, rampS %d', (r1, r2, biasM, rampS) => {
+        const draws = [r1, r2];
+        let i = 0;
+        gf.random = () => draws[i++];
+        solutionPrns = [2];
+        failures.fail('faultySatellite');
+        expect(storedFault()).toEqual({prn: 2, biasM, rampS, elapsedS: 0});
+        expect(i).toBe(2);
+    });
+
+    it('the bias ramps linearly: 875 m after 105 s of the 210 s ramp, then holds at 1750', () => {
+        solutionPrns = [2];
+        failures.fail('faultySatellite');
+        gf.tick(0);
+        expect(gf.faultyBiasM).toBe(0);
+        run(1, 105);
+        expect(gf.faultyBiasM).toBeCloseTo(875, 9);
+        run(106, 209);
+        expect(gf.faultyBiasM).toBeCloseTo(1750 * 209 / 210, 9);
+        run(210, 400);
+        expect(gf.faultyBiasM).toBe(1750);
+    });
+
+    it('saves the progress every 10 s and once at the end', () => {
+        storeFault('{"prn":2,"biasM":1000,"rampS":35,"elapsedS":0}');
+        solutionPrns = [2];
+        let writes = 0;
+        const original = failures.setValues.bind(failures);
+        failures.setValues = (key, values) => {
+            writes++;
+            original(key, values);
+        };
+        gf.tick(0);
+        run(1, 9);
+        expect(writes).toBe(0);
+        gf.tick(10);
+        expect(writes).toBe(1);
+        expect(storedFault().elapsedS).toBe(10);
+        run(11, 19);
+        expect(writes).toBe(1);
+        gf.tick(20);
+        expect(storedFault().elapsedS).toBe(20);
+        run(21, 34);
+        expect(writes).toBe(3);
+        gf.tick(35);
+        expect(writes).toBe(4);
+        expect(storedFault()).toEqual({prn: 2, biasM: 1000, rampS: 35, elapsedS: 35});
+        run(36, 100);
+        expect(writes).toBe(4);
+    });
+
+    it('continues the stored ramp from its progress', () => {
+        storeFault('{"prn":2,"biasM":1000,"rampS":200,"elapsedS":50}');
+        solutionPrns = [2];
+        gf.tick(0);
+        expect(gf.faultyPrn).toBe(2);
+        expect(gf.faultyBiasM).toBe(250);
+        gf.tick(1);
+        expect(gf.faultyBiasM).toBe(255);
+    });
+
+    it('a step back, a jump of hours and the first tick after reset count nothing', () => {
+        storeFault('{"prn":2,"biasM":1000,"rampS":200,"elapsedS":50}');
+        solutionPrns = [2];
+        gf.tick(1000);
+        gf.tick(1001);
+        expect(gf.faultyBiasM).toBeCloseTo(255, 9);
+        gf.tick(900);
+        expect(gf.faultyBiasM).toBeCloseTo(255, 9);
+        gf.tick(900 + 7200);
+        expect(gf.faultyBiasM).toBeCloseTo(255, 9);
+        gf.tick(900 + 7201);
+        expect(gf.faultyBiasM).toBeCloseTo(260, 9);
+        //A step of 1 s, which would count without the reset
+        gf.reset();
+        gf.tick(900 + 7202);
+        expect(gf.faultyBiasM).toBeCloseTo(260, 9);
+        gf.tick(900 + 7203);
+        expect(gf.faultyBiasM).toBeCloseTo(265, 9);
+    });
+
+    it.each([
+        '{}', 'garbage', '{"prn":2,"biasM":"x","rampS":100,"elapsedS":3}', '{"prn":2,"biasM":1000,"rampS":0}',
+        '{"biasM":1000,"rampS":100,"elapsedS":3}', '{"prn":null,"biasM":1000,"rampS":100}', '{"prn":2,"rampS":100}',
+    ])('stored %s is drawn anew in the tick', text => {
+        solutionPrns = [2];
+        storeFault(text);
+        expect(() => gf.tick(0)).not.toThrow();
+        expect(storedFault()).toEqual({prn: 2, biasM: 1750, rampS: 210, elapsedS: 0});
+    });
+
+    it('a stored value without elapsedS starts at 0', () => {
+        solutionPrns = [2];
+        storeFault('{"prn":3,"biasM":1000,"rampS":100}');
+        gf.tick(0);
+        expect(gf.faultyPrn).toBe(3);
+        expect(gf.faultyBiasM).toBe(0);
+        gf.tick(1);
+        expect(gf.faultyBiasM).toBe(10);
+    });
+
+    it('parses the stored values once, not at every tick', () => {
+        solutionPrns = [2];
+        failures.fail('faultySatellite');
+        let reads = 0;
+        const original = failures.values.bind(failures);
+        failures.values = key => {
+            reads++;
+            return original(key);
+        };
+        run(0, 50);
+        expect(reads).toBe(0);
+    });
+
+    it('a repair clears the satellite and the bias at once, and a new failure is drawn anew', () => {
+        solutionPrns = [2];
+        failures.fail('faultySatellite');
+        run(0, 50);
+        expect(gf.faultyBiasM).toBeGreaterThan(0);
+        failures.repair('faultySatellite');
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+        solutionPrns = [1];
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBe(1);
+        gf.tick(51);
+        expect(gf.faultyBiasM).toBeCloseTo(1750 / 210, 9);
+    });
+
+    it('clears a stale cache when the failure is no longer effective, without an event', () => {
+        solutionPrns = [2];
+        failures.fail('faultySatellite');
+        run(0, 10);
+        settings.getSetting('failure_faultySatellite').set('');
+        gf.tick(11);
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+    });
+
+    it('take-home mode has no faulty satellite', () => {
+        build(true);
+        solutionPrns = [2];
+        failures.fail('faultySatellite');
+        run(0, 100);
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+    });
+
+    it('take-home mode: nothing is drawn or readable even before a tick', () => {
+        build(true);
+        solutionPrns = [1, 2, 3, 4, 5];
+        solution = good();
+        failures.fail('faultySatellite');
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+        expect(gf.faultDetected(2)).toBe(false);
+    });
+
+    it('a stored text cleared without an event is not readable before the next tick', () => {
+        solutionPrns = [1, 2, 3, 4, 5];
+        solution = good();
+        storeFault('{"prn":2,"biasM":1000,"rampS":100,"elapsedS":100}');
+        gf.tick(0);
+        expect(gf.faultyPrn).toBe(2);
+        expect(gf.faultDetected(2)).toBe(true);
+        settings.getSetting('failure_faultySatellite').set('');
+        expect(gf.faultyPrn).toBeNull();
+        expect(gf.faultyBiasM).toBe(0);
+        expect(gf.faultDetected(2)).toBe(false);
+    });
+
+    it('with unusable stored values and no satellite, the text is parsed once and only the pick is retried', () => {
+        sats = [];
+        storeFault('{}');
+        let reads = 0;
+        const original = failures.values.bind(failures);
+        failures.values = key => {
+            reads++;
+            return original(key);
+        };
+        run(0, 20);
+        expect(reads).toBe(1);
+        expect(gf.faultyPrn).toBeNull();
+        sats = [sat(7, 40)];
+        gf.tick(21);
+        expect(gf.faultyPrn).toBe(7);
+        expect(reads).toBe(1);
+        expect(storedFault()).toEqual({prn: 7, biasM: 1750, rampS: 210, elapsedS: 0});
+    });
+
+    it('a ramp loaded finished is not saved again; one loaded mid-way saves after 10 s of progress, not before', () => {
+        solutionPrns = [2];
+        let writes = 0;
+        const wrap = () => {
+            const original = failures.setValues.bind(failures);
+            failures.setValues = (key, values) => {
+                writes++;
+                original(key, values);
+            };
+        };
+        wrap();
+        storeFault('{"prn":2,"biasM":1000,"rampS":100,"elapsedS":100}');
+        run(0, 50);
+        expect(writes).toBe(0);
+        build();
+        wrap();
+        solutionPrns = [2];
+        storeFault('{"prn":2,"biasM":1000,"rampS":1000,"elapsedS":500}');
+        run(0, 9);
+        expect(writes).toBe(0);
+        gf.tick(10);
+        expect(writes).toBe(1);
+        expect(storedFault().elapsedS).toBe(510);
+    });
+
+    describe('another satellite', () => {
+        beforeEach(() => {
+            sats = [sat(1, 80), sat(2, 60), sat(3, 40)];
+            solutionPrns = [1, 2, 3];
+            failures.fail('faultySatellite');
+            gf.tick(0);
+        });
+
+        it('out of the solution for 119 s with a fix keeps the satellite, 120 s switches and redraws', () => {
+            expect(gf.faultyPrn).toBe(1);
+            solutionPrns = [2, 3];
+            gf.random = () => 0;
+            run(1, 119);
+            expect(gf.faultyPrn).toBe(1);
+            gf.tick(120);
+            expect(gf.faultyPrn).toBe(2);
+            expect(storedFault()).toEqual({prn: 2, biasM: 500, rampS: 120, elapsedS: 0});
+            expect(gf.faultyBiasM).toBe(0);
+        });
+
+        it('the new draw counts again: another 120 s without it switches once more, not before', () => {
+            solutionPrns = [2, 3];
+            run(1, 120);
+            expect(gf.faultyPrn).toBe(2);
+            solutionPrns = [3];
+            run(121, 239);
+            expect(gf.faultyPrn).toBe(2);
+            gf.tick(240);
+            expect(gf.faultyPrn).toBe(3);
+        });
+
+        it('300 s out of the solution without a fix does not switch, and the count is held, not reset', () => {
+            solutionPrns = [2, 3];
+            run(1, 100);
+            valid = false;
+            run(101, 400);
+            expect(gf.faultyPrn).toBe(1);
+            valid = true;
+            run(401, 419);
+            expect(gf.faultyPrn).toBe(1);
+            gf.tick(420);
+            expect(gf.faultyPrn).toBe(2);
+        });
+
+        it('a short dropout does not switch: 60 s out, 1 s back in, 60 s out', () => {
+            solutionPrns = [2, 3];
+            run(1, 60);
+            solutionPrns = [1, 2, 3];
+            gf.tick(61);
+            solutionPrns = [2, 3];
+            run(62, 121);
+            expect(gf.faultyPrn).toBe(1);
+            run(122, 180);
+            expect(gf.faultyPrn).toBe(1);
+            gf.tick(181);
+            expect(gf.faultyPrn).toBe(2);
+        });
+
+        it('in the solution it never switches', () => {
+            run(1, 1000);
+            expect(gf.faultyPrn).toBe(1);
+        });
+
+        it('a jump of the sim clock counts nothing toward the switch', () => {
+            solutionPrns = [2, 3];
+            run(1, 60);
+            gf.tick(60 + 7200);
+            gf.tick(61 + 7200);
+            expect(gf.faultyPrn).toBe(1);
+            run(62 + 7200, 119 + 7200);
+            expect(gf.faultyPrn).toBe(1);
+            gf.tick(120 + 7200);
+            expect(gf.faultyPrn).toBe(2);
+        });
+
+        it('the count is runtime only: a reset restarts it', () => {
+            solutionPrns = [2, 3];
+            run(1, 100);
+            gf.reset();
+            run(1000, 1119);
+            expect(gf.faultyPrn).toBe(1);
+        });
+
+        it('a fix but an empty solution: the sky pick is the same satellite, so nothing is redrawn', () => {
+            solutionPrns = [];
+            gf.random = () => 0;
+            run(1, 300);
+            expect(gf.faultyPrn).toBe(1);
+            expect(storedFault().biasM).toBe(1750);
+            expect(storedFault().rampS).toBe(210);
+        });
+
+        it('a faulty satellite the solution lacks is not detected', () => {
+            solutionPrns = [2, 3, 4, 5, 6];
+            solution = good();
+            failures.repair('faultySatellite');
+            storeFault('{"prn":1,"biasM":1000,"rampS":100,"elapsedS":100}');
+            gf.tick(1000);
+            expect(gf.faultyPrn).toBe(1);
+            expect(gf.faultyBiasM).toBeGreaterThan(FAULT_DETECTION_BIAS_M);
+            expect(gf.faultDetected(2)).toBe(false);
+            solutionPrns = [1, 2, 3, 4, 5];
+            expect(gf.faultDetected(2)).toBe(true);
+        });
+    });
+
+    describe('faultDetected', () => {
+        function fault(bias: number) {
+            storeFault(`{"prn":2,"biasM":${bias},"rampS":100,"elapsedS":100}`);
+            gf.tick(0);
+        }
+
+        beforeEach(() => {
+            solutionPrns = [1, 2, 3, 4, 5];
+            solution = good();
+        });
+
+        it.each([[26.49, false], [FAULT_DETECTION_BIAS_M, true], [26.51, true], [1000, true]])('with a bias of %d m, a good geometry: %s', (bias, detected) => {
+            fault(bias);
+            expect(gf.faultDetected(2)).toBe(detected);
+        });
+
+        it('judges the ramped bias, not the final one', () => {
+            storeFault('{"prn":2,"biasM":1000,"rampS":200,"elapsedS":5.29}');
+            gf.tick(0);
+            expect(gf.faultyBiasM).toBeCloseTo(26.45, 9);
+            expect(gf.faultDetected(2)).toBe(false);
+            gf.tick(1);
+            expect(gf.faultyBiasM).toBeCloseTo(31.45, 9);
+            expect(gf.faultDetected(2)).toBe(true);
+        });
+
+        it('is false with four measurements and true with five', () => {
+            fault(1000);
+            solution = good(4);
+            expect(gf.faultDetected(2)).toBe(false);
+            solution = good(5);
+            expect(gf.faultDetected(2)).toBe(true);
+        });
+
+        it('is false when the geometry cannot protect the alert limit, true when it can', () => {
+            fault(1000);
+            //The protection level is 26.5 m per unit of slope; the limit is 3704 m at 2 NM
+            solution = good(6, 3704 / 26.5 - 0.01);
+            expect(gf.faultDetected(2)).toBe(true);
+            solution = good(6, 3704 / 26.5 + 0.01);
+            expect(gf.faultDetected(2)).toBe(false);
+            expect(gf.faultDetected(5)).toBe(true);
+        });
+
+        it('is false when the satellite is not in the solution', () => {
+            fault(1000);
+            solutionPrns = [1, 3, 4, 5];
+            expect(gf.faultDetected(2)).toBe(false);
+        });
+
+        it('is false after a repair', () => {
+            fault(1000);
+            expect(gf.faultDetected(2)).toBe(true);
+            failures.repair('faultySatellite');
+            expect(gf.faultDetected(2)).toBe(false);
+        });
+
+        it('is false in take-home mode', () => {
+            build(true);
+            failures.fail('faultySatellite');
+            storeFault('{"prn":2,"biasM":1000,"rampS":100,"elapsedS":100}');
+            gf.tick(0);
+            expect(gf.faultDetected(2)).toBe(false);
+        });
+    });
+});

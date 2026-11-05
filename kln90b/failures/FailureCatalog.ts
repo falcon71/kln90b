@@ -6,7 +6,8 @@ import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from "../
  */
 export type FailureKey = 'arinc429Out' | 'rs232Out' | 'rmiOutput' | 'obsResolver' | 'rs232In' | 'rs232Data' | 'airdata429' | 'altitude' | 'eeprom'
     | 'msgBulb' | 'wptBulb' | 'armBulb' | 'actvBulb' | 'msgWiring' | 'wptWiring' | 'armWiring' | 'actvWiring'
-    | 'msgDriver' | 'wptDriver' | 'armDriver' | 'actvDriver' | 'superflag';
+    | 'msgDriver' | 'wptDriver' | 'armDriver' | 'actvDriver' | 'superflag'
+    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'faultySatellite';
 
 /** Interconnect property names of the output ports */
 export type FailedOutputPort = 'arinc429Tx' | 'rs232Out' | 'obiBus' | 'superflag';
@@ -144,6 +145,30 @@ export const FAILURE_CATALOG: readonly FailureDefinition[] = [
         //#459: P901 pin 18, IM 1-7, 2-5
         key: 'superflag', flrName: 'SUPERFLAG', random: true, testFail: true,
         outputs: ['superflag'], inputs: [], message: ['NAV SUPER FLAG FAILURE'], detection: 'commandedOn', signal: 'superflag',
+        isEligible: () => true,
+    },
+    {
+        //#460: the antenna or its cable; the unit finds no satellite and reports a receiver hardware error
+        key: 'gpsAntenna', flrName: 'GPS ANTENNA', random: true, testFail: true,
+        outputs: [], inputs: [], message: ['RCVR HARDWARE ERROR:', '0010'], detection: 'internal',
+        isEligible: () => true,
+    },
+    {
+        //#460: the receiver board does not answer
+        key: 'gpsReceiver', flrName: 'GPS RCVR', random: true, testFail: true,
+        outputs: [], inputs: [], message: ['NO RCVR DATA'], detection: 'internal',
+        isEligible: () => true,
+    },
+    {
+        //#460: interference that raises the noise floor; the pilot starts it, the random trigger does not
+        key: 'gpsJamming', flrName: 'JAMMING', random: false, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#460: one satellite broadcasts a growing range error; the pilot starts it, the random trigger does not
+        key: 'faultySatellite', flrName: 'SATELLITE', random: false, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
         isEligible: () => true,
     },
     ...lampFailures(),

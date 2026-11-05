@@ -100,8 +100,8 @@ change what they mean; add new ones instead:
   in. The unit has its own receiver solution (`GpsSolution.ts`): a fix needs four satellites, or three with the
   altitude input, and RAIM availability follows from the slope method against the alert limit of the flight phase.
   STA 1, STA 2, the messages and the approach gate use it, and STA 5 and the gate predict it through an SDK prediction
-  context. Satellite failures (#366) are not modeled. The wrapper reaches into private SDK internals, so recheck it
-  after SDK upgrades.
+  context. `GpsFailures` (`failures/`, #460) blocks satellites for the receiver failures and jamming and puts a bias
+  on one satellite; spoofing is #465. The wrapper reaches into private SDK internals, so recheck it after SDK upgrades.
 - **Failures** (`kln90b/failures/`, #458): a stateless service over saved settings, an MTBF trigger and a detector in
   the calculation ticks, and failing `Interconnect` ports. Read `docs/failures.md` before touching them.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.

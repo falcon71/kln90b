@@ -76,8 +76,20 @@ export class GpsSearch {
     private modeStartTime = 0;
     private almanacTimeAtStart: number | undefined = undefined;
     private keptPrn: number | null = null;
+    /** The search's own choice: the PRNs the receiver may track, or null for all (#460, design "The inhibits") */
+    private allowed: Set<number> | null = null;
+    /** The inhibit last applied here, by PRN, so that applyInhibits changes only what changed */
+    private readonly applied = new Uint8Array(256);
 
-    constructor(private readonly computer: KLNGPSSatComputer, private readonly isFast: () => boolean) {
+    /**
+     * The failures' blocks (#460) are merged with the search's choice, so that a block survives every start, end and
+     * forced acquisition of the search
+     * @param blocked The failures forbid tracking this satellite
+     * @param allBlocked The failures forbid tracking any satellite (a receiver failure). Asked once per application, not
+     * per satellite: it reads the settings (the tick cost rule, CLAUDE.md)
+     */
+    constructor(private readonly computer: KLNGPSSatComputer, private readonly isFast: () => boolean, private readonly blocked: (prn: number) => boolean,
+                private readonly allBlocked: () => boolean) {
         this.prediction = computer.createPredictionContext();
         this.prediction.awaitInit().then(() => this.predictionReady = true);
     }
@@ -100,8 +112,21 @@ export class GpsSearch {
             this.inhibitAllExcept(null);
             this.computer.setAcquisitionTime(IDLE_ACQUISITION, WARM_ACQUISITION_RANGE);
             this.computer.setAcquisitionTimeWithEphemeris(HOT_ACQUISITION, HOT_ACQUISITION_RANGE);
+        } else {
+            this.allowed = null;
+            this.applyInhibits(); //Only the failures' blocks are left, and they stay
         }
         this.mode = SearchMode.Idle;
+    }
+
+    /**
+     * Applies the search's choice and the failures' blocks: a satellite is inhibited when the search does not allow it or
+     * the failures block it. GPS.tick calls it every tick, as jamming changes the blocked set. It changes only the
+     * satellites whose inhibit changed since the last call, so with no failure and no change of the choice it touches
+     * nothing. Allocates nothing
+     */
+    public applyInhibits(): void {
+        this.apply(false);
     }
 
     /** The satellites the unit predicts during ACQ, for STA 1 (#213) */
@@ -224,10 +249,27 @@ export class GpsSearch {
         }
     }
 
-    /** @param allowed The PRNs the receiver may track, or null to lift every inhibit */
+    /**
+     * Stores the search's choice and sets the inhibit of every satellite from it, the failures' blocks merged in
+     * @param allowed The PRNs the receiver may track, or null to lift every inhibit the search set
+     */
     private inhibitAllExcept(allowed: Set<number> | null): void {
-        for (const sat of this.computer.getSatellites()) {
-            this.computer.setSatelliteInhibit(sat.prn, allowed !== null && !allowed.has(sat.prn));
+        this.allowed = allowed;
+        this.apply(true);
+    }
+
+    /** @param all Sets every satellite, not only those whose inhibit changed */
+    private apply(all: boolean): void {
+        const sats = this.computer.getSatellites();
+        const allBlocked = this.allBlocked();
+        for (let i = 0; i < sats.length; i++) {
+            const prn = sats[i].prn;
+            const inhibit = allBlocked || (this.allowed !== null && !this.allowed.has(prn)) || this.blocked(prn);
+            const value = inhibit ? 1 : 0;
+            if (all || this.applied[prn] !== value) {
+                this.applied[prn] = value;
+                this.computer.setSatelliteInhibit(prn, inhibit);
+            }
         }
     }
 }

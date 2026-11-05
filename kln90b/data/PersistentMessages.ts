@@ -37,11 +37,6 @@ export const COURSE_MESSAGE_DELAY = 12_000;
  */
 export const RAIM_MESSAGE_DELAY = 10_000;
 
-/*
-Not built yet:
-- RAIM POSITION ERROR (a faulty satellite) (#366)
- */
-
 export function buildPersistentMessages(props: PageProps): Message[] {
     return [
         new AltitudeFailMessage(props.planeSettings, props.failureDetector),
@@ -61,6 +56,7 @@ export function buildPersistentMessages(props: PageProps): Message[] {
         new RaimNotAvailableMessage(props.sensors.in.gps, props.memory.navPage),
         new BadGeometryMessage(props.sensors.in.gps, props.memory.navPage),
         new BadGeometryApproachMessage(props.sensors.in.gps, props.memory.navPage),
+        new RaimPositionErrorMessage(props.sensors.in.gps, props.memory.navPage),
         new AprModeInhibitedMessage(props.memory.navPage),
         new PressGpsAprMessage(props.memory.navPage),
     ];
@@ -486,7 +482,8 @@ class SatelliteCoverageMessage implements Message {
     }
 
     public isConditionValid(): boolean {
-        return this.gps.hadFixSincePowerOn && !this.gps.isValid();
+        //#460: during a receiver failure the hardware message names the cause (design, "The #453 messages during a receiver failure")
+        return !this.gps.failures.receiverFailed && this.gps.hadFixSincePowerOn && !this.gps.isValid();
     }
 }
 
@@ -496,10 +493,11 @@ const RAIM_GEOMETRY = (r: Raim): boolean => r === Raim.Geometry;
 
 /**
  * Whether the position is valid and RAIM, for the alert limit of the mode (halForMode), fails for one of the causes. A unit
- * without a position has the coverage message instead
+ * without a position has the coverage message instead, and a failed receiver neither: its hardware message names the cause
+ * (#460)
  */
 function raimLost(gps: GPS, mode: NavMode, causes: (r: Raim) => boolean): boolean {
-    return gps.isValid() && causes(raimStatus(gps.solution, halForMode(mode)));
+    return !gps.failures.receiverFailed && gps.isValid() && causes(raimStatus(gps.solution, halForMode(mode)));
 }
 
 /**
@@ -575,6 +573,24 @@ class BadGeometryApproachMessage implements Message {
 
     public onPowerOff(): void {
         this.held.reset();
+    }
+}
+
+/**
+ * B-3: RAIM has detected a satellite whose range is wrong (the faulty satellite, #460), for the alert limit of the mode
+ * (halForMode). No delay: a detected fault is an alarm, not a dropout (design, "The faulty satellite"). The unit detects
+ * the satellite and does not exclude it, so the message stays while the fault is detected
+ */
+class RaimPositionErrorMessage implements Message {
+
+    public readonly message: string[] = ["RAIM POSITION ERROR", "CROSS CHECK POSITION"];
+    public seen: boolean = false;
+
+    constructor(private readonly gps: GPS, private readonly navState: NavPageState) {
+    }
+
+    public isConditionValid(): boolean {
+        return this.gps.isValid() && this.gps.failures.faultDetected(halForMode(this.navState.navmode));
     }
 }
 

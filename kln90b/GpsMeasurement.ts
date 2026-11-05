@@ -43,10 +43,10 @@ export interface GpsMeasurement {
 }
 
 /** The earth radius of the SDK's geo classes, in meters */
-const EARTH_RADIUS_M = 6378100;
+export const EARTH_RADIUS_M = 6378100;
 const RAD_TO_DEG = 180 / Math.PI;
 /** Near the poles the east-west scale cos(lat) goes to 0. It stays above this, so that nothing divides by zero. */
-const MIN_COS_LAT = 1e-4;
+export const MIN_COS_LAT = 1e-4;
 const MPS_PER_KNOT = 1852 / 3600;
 const METERS_PER_FOOT = 0.3048;
 /** A gap in the sim time beyond this restarts the filter, but not the error processes (design 6.7) */

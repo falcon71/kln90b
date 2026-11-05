@@ -140,7 +140,7 @@ describe('Failures', () => {
         const {failures} = build();
         failures.fail('arinc429Out');
 
-        expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude', 'eeprom', 'superflag']);
+        expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude', 'eeprom', 'superflag', 'gpsAntenna', 'gpsReceiver']);
     });
 
     it('anyTestFail needs an effective TEST FAIL failure', () => {
@@ -209,5 +209,60 @@ describe('Failures', () => {
             failures.fail('msgDriver');
             expect(failures.lampFault('wpt')).toBeNull();
         });
+    });
+});
+
+describe('Failures.values and setValues (#460)', () => {
+    it('values is {} when inactive and right after fail', () => {
+        const {failures} = build();
+        expect(failures.values('gpsJamming')).toEqual({});
+        failures.fail('gpsJamming');
+        expect(failures.values('gpsJamming')).toEqual({});
+    });
+
+    it('setValues stores JSON and values reads it back', () => {
+        const {settings, failures} = build();
+        failures.fail('gpsJamming');
+        failures.setValues('gpsJamming', {rampS: 240, finalDb: 26, elapsedS: 0});
+        expect(settings.getSetting('failure_gpsJamming').get()).toBe('{"rampS":240,"finalDb":26,"elapsedS":0}');
+        expect(failures.values('gpsJamming')).toEqual({rampS: 240, finalDb: 26, elapsedS: 0});
+    });
+
+    it('setValues on an inactive failure writes nothing', () => {
+        const {settings, failures} = build();
+        failures.setValues('gpsJamming', {rampS: 240});
+        expect(settings.getSetting('failure_gpsJamming').get()).toBe('');
+        expect(failures.isActive('gpsJamming')).toBe(false);
+    });
+
+    it('text that does not parse, or is not a plain object, gives {}', () => {
+        const {settings, failures} = build();
+        settings.getSetting('failure_gpsJamming').set('garbage');
+        expect(failures.values('gpsJamming')).toEqual({});
+        settings.getSetting('failure_gpsJamming').set('[1]');
+        expect(failures.values('gpsJamming')).toEqual({});
+        settings.getSetting('failure_gpsJamming').set('null');
+        expect(failures.values('gpsJamming')).toEqual({});
+        settings.getSetting('failure_gpsJamming').set('5');
+        expect(failures.values('gpsJamming')).toEqual({});
+    });
+
+    it('setValues publishes no failureChanged', () => {
+        const {failures} = build();
+        failures.fail('faultySatellite');
+        events.length = 0;
+        failures.setValues('faultySatellite', {biasM: 1000});
+        expect(events).toEqual([]);
+    });
+});
+
+describe('randomCandidates with the GPS entries (#460)', () => {
+    it('includes the antenna and receiver, excludes jamming and the faulty satellite', () => {
+        const {failures} = build();
+        const keys = failures.randomCandidates().map(d => d.key);
+        expect(keys).toContain('gpsAntenna');
+        expect(keys).toContain('gpsReceiver');
+        expect(keys).not.toContain('gpsJamming');
+        expect(keys).not.toContain('faultySatellite');
     });
 });

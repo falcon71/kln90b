@@ -36,6 +36,9 @@ type SatRow = {
     ele: number | null,
 };
 
+/** The rows of both pages: four each (5-29) */
+const MAX_ROWS = 8;
+
 const toElevation = (zenith: number): number | null => {
     const ele = 90 - UnitType.RADIAN.convertTo(zenith, UnitType.DEGREE);
     return ele >= 0 ? ele : null;
@@ -120,6 +123,10 @@ export class Sta1Page extends SixLineHalfPage {
 
     private stateText(rows: SatRow[]): string {
         const gps = this.props.sensors.in.gps;
+        //#460: a dead antenna or receiver (Installation Manual C-7), before every other state
+        if (gps.failures.receiverFailed) {
+            return "FAILR";
+        }
         if (gps.isValid()) {
             const solution = gps.solution;
             //5-29: DEGRD is shown when the satellite geometry is too poor for RAIM. The condition is the spec's
@@ -146,36 +153,66 @@ export class Sta1Page extends SixLineHalfPage {
             case SearchMode.SkySearch:
                 return " INIT"; //ORS 20 has no state of its own for a search of the sky (ORS 01 had SRCH)
         }
+        if (gps.failures.jamming) {
+            //#460: the unit still knows the time, the almanac and roughly where it is, and keeps searching the satellites
+            //it lost (design, "STA 1 and STA 2")
+            return "  ACQ";
+        }
         return gps.gpsSatComputer.state === GPSSystemState.Acquiring ? "  ACQ" : " INIT";
     }
 
     private getRows(): SatRow[] {
         const gps = this.props.sensors.in.gps;
+        const failures = gps.failures;
         const byPrn = (a: SatRow, b: SatRow) => a.prn - b.prn;
+
+        if (failures.receiverFailed) {
+            return []; //#460: the receiver tracks nothing
+        }
+        //#460: a satellite jamming blocked is searched and not found (*xx 00), also while the SDK still holds it in a
+        //channel until its next position update. A satellite in use loses the jamming level from its SNR
+        const jamming = failures.jamming;
+        const stateOf = (sat: GPSSatellite): GPSSatelliteState => jamming && failures.isBlocked(sat.prn) ? GPSSatelliteState.None : sat.state.get();
+        const snrOf = (sat: GPSSatellite): number => satelliteSnr(sat.position.get()[0]) - failures.jammingDb;
 
         if (gps.search.mode === SearchMode.Acquisition && !gps.isValid()) {
             //A real-unit video: during ACQ the page lists the satellites predicted for the stored position and the unit's
-            //clock, with the predicted elevation (#213)
+            //clock, with the predicted elevation (#213). Under jamming a blocked one reads *xx 00 here too (design, "STA 1
+            //and STA 2")
             return gps.search.predictedSatellites().map(p => {
                 const sat = gps.gpsSatComputer.getSatellites().find(s => s.prn === p.prn);
                 return {
                     prn: p.prn,
-                    state: sat?.state.get() ?? GPSSatelliteState.None,
+                    state: sat === undefined ? GPSSatelliteState.None : stateOf(sat),
                     //The signal comes from where the satellite really stands, not from where the unit predicts it
-                    snr: sat === undefined ? 0 : satelliteSnr(sat.position.get()[0]),
+                    snr: sat === undefined ? 0 : snrOf(sat),
                     ele: toElevation(p.position.get()[0]),
                 };
             }).sort(byPrn);
         }
 
         const sats = gps.gpsSatComputer.getChannels().filter(sat => sat !== null) as GPSSatellite[];
-        return sats.map(sat => ({
+        const rows: SatRow[] = sats.slice(0, MAX_ROWS).map(sat => ({
             prn: sat.prn,
-            state: sat.state.get(),
-            snr: satelliteSnr(sat.position.get()[0]),
+            state: stateOf(sat),
+            snr: snrOf(sat),
             //A satellite searched blindly has no known position until its orbit data is in (#213)
             ele: gps.isValid() || sat.isCachedEphemerisValid(gps.simTimeUnix) ? toElevation(sat.position.get()[0]) : null,
-        })).sort(byPrn);
+        }));
+        if (jamming) {
+            //#460: the receiver keeps searching a satellite it lost while the almanac puts it above the mask (design, "STA
+            //1 during an acquisition"): the blocked ones not in a channel, the highest first, in the rows left
+            const all = gps.gpsSatComputer.getSatellites();
+            const added = failures.jammedRows()
+                .filter(prn => !rows.some(r => r.prn === prn))
+                .map(prn => all.find(s => s.prn === prn)!)
+                .sort((a, b) => a.position.get()[0] - b.position.get()[0])
+                .slice(0, Math.max(0, MAX_ROWS - rows.length));
+            for (const sat of added) {
+                rows.push({prn: sat.prn, state: GPSSatelliteState.None, snr: 0, ele: toElevation(sat.position.get()[0])});
+            }
+        }
+        return rows.sort(byPrn);
     }
 
     private drawSat(row: SatRow | undefined): string{
