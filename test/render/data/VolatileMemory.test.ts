@@ -1427,7 +1427,7 @@ describe('the page states over a power-on (#192)', () => {
         const memory = unit.props.memory;
         const p = unit.props;
         // The initial values: a state as the constructor leaves it. On a bus of its own: on the unit's it would be reset at once, by the last power event the bus replays
-        const fresh = new VolatileMemory(new EventBus(), p.userSettings, p.facilityLoader, p.sensors, p.scanLists, memory.fplPage.flightplans, null);
+        const fresh = new VolatileMemory(new EventBus(), p.userSettings, p.facilityLoader, p.sensors, p.scanLists, memory.fplPage.flightplans, null, p.failures);
         const pagesOf = (m: VolatileMemory) => Object.entries(m)
             .filter(([name]) => name.endsWith('Page'))
             .map(([name, page]) => [name, page as Record<string, unknown>] as const);
@@ -1492,5 +1492,30 @@ describe('the failure detection over a power-on (#458)', () => {
         expect(detection.pendingS.size).toBe(0);
         expect(detection.detected.size).toBe(0);
         expect(detection.noticed.size).toBe(0);
+    });
+
+    // #459: every power-on reads the EEPROM again (docs/failures.md, "EEPROM"): the read result is what the failure is at
+    // that moment, also at a short power-on
+    it('failedAtPowerOn is read again at every power-on (#459)', async () => {
+        const unit = await bootUnit();
+        await settle(unit);
+        const memory = unit.props.memory;
+        const failures = unit.props.failures;
+        expect([...memory.failureDetection.failedAtPowerOn]).toEqual([]); // Precondition: nothing failed at the boot
+
+        memory.failureDetection.failedAtPowerOn.add('eeprom');
+        memory.reset({isPowered: true, timeSincePowerChange: 1000}); // A short power cycle, under RESET_TIME
+        expect([...memory.failureDetection.failedAtPowerOn]).toEqual([]);
+
+        failures.fail('eeprom');
+        failures.fail('arinc429Out'); // Not read at power-on: it acts as it is now and is not kept here
+        memory.reset({isPowered: true, timeSincePowerChange: 1000});
+        expect([...memory.failureDetection.failedAtPowerOn]).toEqual(['eeprom']);
+
+        failures.repair('eeprom');
+        memory.reset({isPowered: false, timeSincePowerChange: 1000}); // A power-off reads nothing
+        expect([...memory.failureDetection.failedAtPowerOn]).toEqual(['eeprom']);
+        memory.reset({isPowered: true, timeSincePowerChange: 6 * 60 * 1000}); // A long one, over RESET_TIME
+        expect([...memory.failureDetection.failedAtPowerOn]).toEqual([]);
     });
 });

@@ -27,6 +27,8 @@ import {PowerEvent, PowerEventData} from "../PowerSupply";
 import {Sensors} from "../Sensors";
 import {SustainedCondition} from "./SustainedCondition";
 import type {FailureDetectionState} from "../failures/FailureDetector";
+import type {Failures} from "../failures/Failures";
+import {FAILURE_CATALOG} from "../failures/FailureCatalog";
 
 /**
  * The state of a waypoint page type (APT, VOR, NDB, INT, SUP). The waypoint it shows is kept over a power cycle (KLN 89
@@ -367,7 +369,7 @@ export class VolatileMemory {
      * unit looks at its parts and inputs again. It is no `*Page` state, so the guard test of the page states does not
      * see it; its own test does
      */
-    public readonly failureDetection: FailureDetectionState = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set(), noticed: new Set()};
+    public readonly failureDetection: FailureDetectionState = {mainPageShown: false, powerOnScheduled: false, pendingS: new Map(), detected: new Set(), noticed: new Set(), failedAtPowerOn: new Set()};
 
     /**
      * #458: the boot of this power-on is over (TransmitterStatus): the Self Test page has shown, or the main page at an
@@ -384,7 +386,10 @@ export class VolatileMemory {
     /** #416: the number of the current power-on. A step of the reset of an earlier one changes nothing (spec 4.3) */
     private powerOnCount = 0;
 
-    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null) {
+    /**
+     * @param failures Read at every power-on for the parts the unit reads only then (#459)
+     */
+    public constructor(bus: EventBus, userSettings: KLN90BUserSettings, private facilityLoader: FacilityClient, sensors: Sensors, private scanlists: Scanlists, flightplans: Flightplan[], lastactiveWaypoint: Facility | null, private readonly failures: Failures) {
         this.aptPage = new WaypointPageState("0   ", new SavedWaypoint(userSettings.getSetting("aptPageWpt"), [FacilityType.Airport]));
         this.vorPage = new WaypointPageState("0  ", new SavedWaypoint(userSettings.getSetting("vorPageWpt"), [FacilityType.VOR]));
         this.ndbPage = new WaypointPageState("0  ", new SavedWaypoint(userSettings.getSetting("ndbPageWpt"), [FacilityType.NDB]));
@@ -403,6 +408,25 @@ export class VolatileMemory {
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));
     }
 
+    /**
+     * #459: the unit reads its EEPROM (every part marked readAtPowerOn) at a power-on and works from that read until the
+     * next one (docs/failures.md, "EEPROM"). The read is here, in the reset of the power event, and not in a power-event
+     * handler of its own: clearing the result of the last power-on and reading the new one are then one step, which no
+     * order of the handlers can split, and the display, calculation and signal ticks, which run later on their timers,
+     * see the new result from their first tick of this power-on. A unit that is already on when VolatileMemory is built
+     * (an engine-running start) is read when the bus hands it the last power event at the subscription. The battery's
+     * ride-through and the hot-swap disable publish no power event, so they read nothing
+     */
+    private readAtPowerOn(): void {
+        const failed = this.failureDetection.failedAtPowerOn;
+        failed.clear();
+        for (const d of FAILURE_CATALOG) {
+            if (d.readAtPowerOn === true && this.failures.isEffective(d.key)) {
+                failed.add(d.key);
+            }
+        }
+    }
+
     public reset(evt: PowerEventData): void {
         if (!evt.isPowered) {
             return;
@@ -418,6 +442,7 @@ export class VolatileMemory {
         this.failureDetection.pendingS.clear();
         this.failureDetection.detected.clear();
         this.failureDetection.noticed.clear();
+        this.readAtPowerOn();
         this.transmittersStarted = false;
         this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry

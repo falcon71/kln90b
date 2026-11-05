@@ -28,7 +28,10 @@ export interface FailureDetectionState {
      * the trigger counts it, so a jump of the sim clock neither hides nor hurries a detection
      */
     pendingS: Map<FailureKey, number>;
-    /** The failures the unit has noticed. A failure stays detected until it is repaired or no longer effective */
+    /**
+     * The failures the unit has noticed. A failure stays detected until it is repaired or no longer effective; a part
+     * read only at a power-on (failedAtPowerOn) until the next power-on, whatever its repair (#459)
+     */
     detected: Set<FailureKey>;
     /**
      * The commanded failures (lamps, superflag) whose wrong signal the unit has seen in this power-on, also before the
@@ -36,6 +39,12 @@ export interface FailureDetectionState {
      * page (#459, docs/superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md, "Detection")
      */
     noticed: Set<FailureKey>;
+    /**
+     * The parts read only at a power-on (FailureDefinition.readAtPowerOn) whose read failed at this power-on. Filled by
+     * VolatileMemory.reset; the unit works from that read until the next power-on, whatever the failure does meanwhile
+     * (#459, docs/failures.md, "EEPROM")
+     */
+    failedAtPowerOn: Set<FailureKey>;
 }
 
 /**
@@ -68,12 +77,12 @@ export class FailureDetector implements CalcTickable {
         const state = this.state();
 
         for (const key of Array.from(state.pendingS.keys())) {
-            if (!this.failures.isEffective(key)) {
+            if (!this.actsOnUnit(key)) {
                 state.pendingS.delete(key);
             }
         }
         for (const key of Array.from(state.detected)) {
-            if (!this.failures.isEffective(key)) {
+            if (!this.actsOnUnit(key)) {
                 state.detected.delete(key);
             }
         }
@@ -88,7 +97,7 @@ export class FailureDetector implements CalcTickable {
             }
         }
         for (const key of Array.from(state.noticed)) {
-            if (!this.failures.isEffective(key)) {
+            if (!this.actsOnUnit(key)) {
                 state.noticed.delete(key);
             }
         }
@@ -108,7 +117,7 @@ export class FailureDetector implements CalcTickable {
         const atPowerOn = !state.powerOnScheduled;
         state.powerOnScheduled = true;
         for (const d of FAILURE_CATALOG) {
-            if (d.detection === null || state.pendingS.has(d.key) || state.detected.has(d.key) || !this.failures.isEffective(d.key)) {
+            if (d.detection === null || state.pendingS.has(d.key) || state.detected.has(d.key) || !this.actsOnUnit(d.key)) {
                 continue;
             }
             if (d.detection === 'commandedOn' || d.detection === 'commandedOff') {
@@ -139,11 +148,37 @@ export class FailureDetector implements CalcTickable {
         return OPERATION_DELAY_MIN_S + this.random() * (OPERATION_DELAY_MAX_S - OPERATION_DELAY_MIN_S);
     }
 
-    /** Effective and noticed by a tick of this run of the ticks; it stays so until the repair */
+    /**
+     * Acting on the unit and noticed by a tick of this run of the ticks; it stays so until the repair, for a part read at
+     * a power-on until the next power-on
+     */
     public isDetected(key: FailureKey): boolean {
-        if (this.lastTimeS === null || !this.failures.isEffective(key)) {
+        if (this.lastTimeS === null || !this.actsOnUnit(key)) {
             return false;
         }
         return this.state().detected.has(key);
+    }
+
+    /**
+     * Whether the failure acts on the unit now (#459): a part the unit reads only at a power-on (readAtPowerOn) as that
+     * read found it, so that a failure or a repair since shows at the next power-on; every other part as it is now
+     * (Failures.isEffective). The calibration asks it on every 16 Hz D-bar write (EepromCalibration), so it allocates
+     * nothing
+     */
+    public actsOnUnit(key: FailureKey): boolean {
+        if (this.failures.definition(key).readAtPowerOn === true) {
+            return this.state().failedAtPowerOn.has(key);
+        }
+        return this.failures.isEffective(key);
+    }
+
+    /** TEST FAIL on the Self Test page (3-4, #458): a failure marked so in the catalog acts on the unit */
+    public anyTestFail(): boolean {
+        for (let i = 0; i < FAILURE_CATALOG.length; i++) {
+            if (FAILURE_CATALOG[i].testFail && this.actsOnUnit(FAILURE_CATALOG[i].key)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

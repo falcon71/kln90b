@@ -1,32 +1,13 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {beforeEach, describe, expect, it} from 'vitest';
 import {DefaultUserSettingManager, EventBus} from '@microsoft/msfs-sdk';
-import {Failures} from '../../../kln90b/failures/Failures';
 import {EepromCalibration} from '../../../kln90b/failures/EepromCalibration';
-import {KLN90BFailureSettings} from '../../../kln90b/settings/KLN90BFailureSettings';
 import {KLN90BEepromSettings, KLN90BEepromTypes} from '../../../kln90b/settings/KLN90BEepromSettings';
-import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from '../../../kln90b/settings/KLN90BPlaneSettings';
 import {clearStatic} from '../../harness/singletons';
-
-function plane(): KLN90PlaneSettings {
-    return {
-        takeHomeMode: false, basePath: '', debugMode: false, vfrOnly: false,
-        input: {
-            altimeterInterfaced: true, obsSource: 1, headingInput: false, headingSimVar: '', electricitySimVar: '',
-            airdata: {isInterfaced: false, baroSource: 0, interface: DataInterface.RS232},
-            obsInterface: ObsInterface.ANALOG, headingInterface: DataInterface.ARINC429,
-            fuelComputer: {isInterfaced: false} as KLN90PlaneSettings['input']['fuelComputer'],
-            externalSwitches: {legObsSwitchInstalled: false, appArmSwitchInstalled: false},
-        },
-        output: {
-            obsTarget: 0, altitudeAlertEnabled: false, writeGPSSimVars: true, rmiInterface: RmiInterface.OBI, rmiInstalled: false,
-            dataInterface: DataInterface.ARINC429,
-            externalAnnunciators: {msgInstalled: false, wptInstalled: false, armInstalled: false, actvInstalled: false},
-        },
-    };
-}
+import {countAllocations, noAllocations} from '../../harness/allocation';
 
 let settings: DefaultUserSettingManager<KLN90BEepromTypes>;
-let failures: Failures;
+/** The result of the power-on read the calibration is built with (VolatileMemory, #459) */
+let readFailed: boolean;
 
 /** A random source that hands out the queue in order and counts the reads; reading past its end fails the test */
 function queue(values: number[]): { random: () => number, reads: () => number } {
@@ -53,10 +34,8 @@ function store(x: number, y: number, plus: number, minus: number) {
 
 beforeEach(() => {
     clearStatic(KLN90BEepromSettings, 'INSTANCE', false);
-    clearStatic(KLN90BFailureSettings, 'INSTANCE', false);
-    const bus = new EventBus();
-    settings = KLN90BEepromSettings.getManager(bus);
-    failures = new Failures(bus, KLN90BFailureSettings.getManager(bus), plane());
+    settings = KLN90BEepromSettings.getManager(new EventBus());
+    readFailed = false;
 });
 
 describe('EepromCalibration.drawMissing', () => {
@@ -129,20 +108,24 @@ describe('EepromCalibration.drawMissing', () => {
     });
 });
 
+// #459: the unit reads the calibration at a power-on only, so the calibration follows the result of that read, which
+// VolatileMemory keeps, and not the failure as it stands now (docs/failures.md, "EEPROM")
 describe('EepromCalibration', () => {
-    it('working EEPROM changes nothing', () => {
+    const build = () => new EepromCalibration(settings, () => readFailed);
+
+    it('a good read changes nothing', () => {
         store(3, -5, 200, -300);
-        const calibration = new EepromCalibration(settings, failures);
+        const calibration = build();
 
         expect(calibration.screenShiftXPx()).toBe(0);
         expect(calibration.screenShiftYPx()).toBe(0);
         expect(calibration.dbarDeviation(0.7, 5)).toBe(0.7);
     });
 
-    it('failed EEPROM applies the calibration', () => {
+    it('a failed read applies the calibration', () => {
         store(3, -5, 200, -300);
-        const calibration = new EepromCalibration(settings, failures);
-        failures.fail('eeprom');
+        const calibration = build();
+        readFailed = true;
 
         // The uncorrected image is off by the opposite of the stored centering, times ZOOM_FACTOR 4
         expect(calibration.screenShiftXPx()).toBe(-12);
@@ -153,8 +136,8 @@ describe('EepromCalibration', () => {
     });
 
     it('a stored 0 reads as neutral', () => {
-        const calibration = new EepromCalibration(settings, failures);
-        failures.fail('eeprom');
+        const calibration = build();
+        readFailed = true;
 
         expect(calibration.screenShiftXPx()).toBe(0);
         expect(calibration.screenShiftYPx()).toBe(0);
@@ -162,24 +145,19 @@ describe('EepromCalibration', () => {
     });
 
     // The D-bar write runs at 16 Hz (SensorsOut.setFilteredOutputs), and port writes allocate nothing (#459, the Task 1
-    // review): the catalog is searched with loops, without find or filter and their closures and arrays
+    // review): no array method that builds an array or takes a closure, and no iterator of an array, set or map
+    // (test/harness/allocation.ts). The read result comes through FailureDetector.actsOnUnit in the unit, whose own test
+    // holds the same
     describe('the 16 Hz path', () => {
-        afterEach(() => {
-            vi.restoreAllMocks();
-        });
-
-        it('dbarDeviation calls no find or filter while failed', () => {
+        it('dbarDeviation calls no allocating built-in while failed', () => {
             store(3, -5, 200, -300);
-            const calibration = new EepromCalibration(settings, failures);
-            failures.fail('eeprom');
-            const find = vi.spyOn(Array.prototype, 'find');
-            const filter = vi.spyOn(Array.prototype, 'filter');
+            const calibration = build();
+            readFailed = true;
 
-            const deviation = calibration.dbarDeviation(0.7, 5);
+            const {result: deviation, counts} = countAllocations(() => calibration.dbarDeviation(0.7, 5));
 
             expect(deviation).toBeCloseTo(2.84, 9); // Precondition: the failed path ran
-            expect(find).not.toHaveBeenCalled();
-            expect(filter).not.toHaveBeenCalled();
+            expect(counts).toEqual(noAllocations());
         });
     });
 });

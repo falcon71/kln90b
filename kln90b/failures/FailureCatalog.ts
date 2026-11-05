@@ -40,6 +40,12 @@ export interface FailureDefinition {
     readonly signal?: CommandedSignal;
     /** Set for the lamp failures (#459) */
     readonly lamp?: { lamp: Lamp, kind: LampFaultKind };
+    /**
+     * The unit reads the part only at a power-on and works from that read until the next one (#459, docs/failures.md,
+     * "EEPROM"). The failure acts, is detected and fails the self-test as that read found it
+     * (FailureDetectionState.failedAtPowerOn), so a failure or a repair in operation shows at the next power-on
+     */
+    readonly readAtPowerOn?: boolean;
 
     /** Whether the aircraft's wiring has the part. Evaluated at every call, as the settings can change */
     isEligible(settings: KLN90PlaneSettings): boolean;
@@ -135,10 +141,11 @@ export const FAILURE_CATALOG: readonly FailureDefinition[] = [
         isEligible: s => s.input.altimeterInterfaced && !s.input.airdata.isInterfaced,
     },
     {
-        //#459: the unit falls back to nominal values, so the screen is off center and the D-bar is off (EepromCalibration)
+        //#459: the unit falls back to nominal values, so the screen is off center and the D-bar is off (EepromCalibration).
+        //The calibration is read at a power-on only
         key: 'eeprom', flrName: 'EEPROM', random: true, testFail: true,
         outputs: [], inputs: [], message: ['EEPROM FAILURE: IC1045', 'EXTERNAL D-BAR INVALID'], detection: 'internal',
-        isEligible: () => true,
+        readAtPowerOn: true, isEligible: () => true,
     },
     {
         //#459: P901 pin 18, IM 1-7, 2-5

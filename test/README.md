@@ -398,6 +398,15 @@ what one test of the file wrote for the next. A unit test that writes either res
 manager and the repository are singletons bound to the first bus that reaches them, so a unit file that needs both uses
 one `EventBus` for all its tests (`UserWaypointPersistor.test.ts`).
 
+**A path that must allocate nothing** (the 16 Hz D-bar write, #459) is held with `countAllocations(fn)`
+(`test/harness/allocation.ts`). It runs `fn` and returns `{result, counts}`: the calls of the built-ins that build an
+array, take a closure or iterate (`Array.prototype` `find`, `filter`, `map`, `slice`, `concat`, `some`, `forEach`,
+`Array.from`, and the iterators of arrays, sets and maps, so a spread or a `for…of` counts too). Assert
+`expect(counts).toEqual(noAllocations())`, every count 0, after the call, as `EepromCalibration.test.ts` and
+`FailureDetector.test.ts` do. The counters are plain wrappers, not `vi.spyOn`, which uses these built-ins itself; they
+count none of their own calls, and the originals are put back in a `finally`, also when `fn` throws.
+`test/unit/harness/allocation.test.ts` holds this.
+
 ## Render
 
 Boot, let the page settle, read the screen.

@@ -21,7 +21,7 @@ export class Failures {
     constructor(private readonly bus: EventBus, private readonly settings: DefaultUserSettingManager<KLN90BFailureTypes>, private readonly planeSettings: KLN90PlaneSettings) {
     }
 
-    //A loop, not find: isEffective asks it from the 16 Hz D-bar write (EepromCalibration), which allocates nothing
+    //A loop, not find: FailureDetector.actsOnUnit asks it from the 16 Hz D-bar write (EepromCalibration), which allocates nothing
     public definition(key: FailureKey): FailureDefinition {
         for (let i = 0; i < FAILURE_CATALOG.length; i++) {
             if (FAILURE_CATALOG[i].key === key) {
@@ -41,10 +41,6 @@ export class Failures {
 
     public isEffective(key: FailureKey): boolean {
         return this.isActive(key) && this.isEligible(key);
-    }
-
-    private effective(): FailureDefinition[] {
-        return FAILURE_CATALOG.filter(d => this.isEffective(d.key));
     }
 
     //The ports ask these on every write, so they allocate nothing. Eligibility is evaluated at every call, never cached
@@ -97,10 +93,6 @@ export class Failures {
 
     public randomCandidates(): FailureDefinition[] {
         return FAILURE_CATALOG.filter(d => d.random && !this.isActive(d.key) && this.isEligible(d.key));
-    }
-
-    public anyTestFail(): boolean {
-        return this.effective().some(d => d.testFail);
     }
 
     public fail(key: FailureKey): void {

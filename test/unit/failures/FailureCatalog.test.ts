@@ -82,6 +82,20 @@ describe('FAILURE_CATALOG', () => {
         expect(d.detection).toBe('internal');
     });
 
+    // #459: the unit reads the EEPROM at a power-on only; every other part acts as it is now
+    it('only the EEPROM is read at power-on (#459)', () => {
+        expect(FAILURE_CATALOG.filter(d => d.readAtPowerOn === true).map(d => d.key)).toEqual(['eeprom']);
+    });
+
+    // The detector's tests of a part read at power-on assume a detection without delay: a part with a delayed one would
+    // need tests of its own, as a part dropped from `detected` would then not come back in the same tick (#459, the M7
+    // mutation of the review)
+    it('every part read at power-on is detected internally (#459)', () => {
+        const parts = FAILURE_CATALOG.filter(d => d.readAtPowerOn === true);
+        expect(parts.length).toBeGreaterThan(0); // Precondition: there is one
+        expect(parts.filter(d => d.detection !== 'internal').map(d => d.key)).toEqual([]);
+    });
+
     it('rs232In needs a device on RS-232, and the heading input counts', () => {
         expect(def('rs232In').isEligible(plane())).toBe(false);
         expect(def('rs232In').isEligible(plane(s => { s.input.headingInput = true; s.input.headingInterface = DataInterface.RS232; }))).toBe(true);

@@ -1,6 +1,5 @@
 import {DefaultUserSettingManager} from '@microsoft/msfs-sdk';
 import {KLN90BEepromTypes} from "../settings/KLN90BEepromSettings";
-import {Failures} from "./Failures";
 import {ZOOM_FACTOR} from "../data/Constants";
 
 /**
@@ -24,11 +23,19 @@ const ZERO_RANGE_MV = 90;
  * output with these values, so nothing shows. A failed EEPROM falls back to the nominal values and the uncorrected errors
  * show: the screen is off center and the D-bar is off by the calibration's gain and zero point.
  *
+ * The unit reads the EEPROM at a power-on only and works from that read until the next one (docs/failures.md, "EEPROM"),
+ * so the errors follow the result of that read, not the failure as it stands now.
+ *
  * Reading the four number settings allocates nothing, so the 16 Hz deviation write needs no cache. A stored 0 reads as
  * neutral: no shift, and a D-bar point of 0 as its nominal +-300 mV.
  */
 export class EepromCalibration {
-    constructor(private readonly settings: DefaultUserSettingManager<KLN90BEepromTypes>, private readonly failures: Failures) {
+    /**
+     * @param settings The EEPROM's contents
+     * @param readFailed Whether the read of this power-on failed (FailureDetector.actsOnUnit, which reads
+     * VolatileMemory). Asked on every 16 Hz D-bar write, so it must allocate nothing
+     */
+    constructor(private readonly settings: DefaultUserSettingManager<KLN90BEepromTypes>, private readonly readFailed: () => boolean) {
     }
 
     /**
@@ -61,25 +68,25 @@ export class EepromCalibration {
         return random() < 0.5 ? -magnitude : magnitude;
     }
 
-    /** Screen pixels the unit's screen is shifted to the right; 0 while the EEPROM works */
+    /** Screen pixels the unit's screen is shifted to the right; 0 while the read of this power-on was good */
     public screenShiftXPx(): number {
         return this.screenShift('eepromCrtCenterX');
     }
 
-    /** Screen pixels the unit's screen is shifted down; 0 while the EEPROM works */
+    /** Screen pixels the unit's screen is shifted down; 0 while the read of this power-on was good */
     public screenShiftYPx(): number {
         return this.screenShift('eepromCrtCenterY');
     }
 
     /**
-     * The D-bar deviation the pin puts out for the filtered one, in the same unit. While the EEPROM works it is the
-     * filtered value; a failed EEPROM commands nominal values, so the output follows the line through the two
+     * The D-bar deviation the pin puts out for the filtered one, in the same unit. After a good read it is the filtered
+     * value; after a failed one the unit commands nominal values, so the output follows the line through the two
      * calibration points.
      * @param filtered The deviation the unit means to put out
      * @param fullScale The deviation of full scale in the same unit (the CDI scaling of the moment)
      */
     public dbarDeviation(filtered: number, fullScale: number): number {
-        if (!this.failures.isEffective('eeprom')) {
+        if (!this.readFailed()) {
             return filtered;
         }
         const plus = this.settings.getSetting('eepromDbarCalPlus').get() || DBAR_CAL_MV;
@@ -91,7 +98,7 @@ export class EepromCalibration {
 
     //The calibration moves the image by the stored centering, so the uncorrected image is off by its opposite
     private screenShift(key: 'eepromCrtCenterX' | 'eepromCrtCenterY'): number {
-        if (!this.failures.isEffective('eeprom')) {
+        if (!this.readFailed()) {
             return 0;
         }
         const center = this.settings.getSetting(key).get();

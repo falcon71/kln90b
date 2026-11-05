@@ -37,9 +37,9 @@ describe('EEPROM settings', () => {
         expect(storedSetting(unit, 'eepromCrtCenterX')).toBe(4.5);
     });
 
+    // The boot's power-on reads the failure stored by an earlier session (#459: the EEPROM is read at a power-on only)
     it('the pages get the calibration', async () => {
-        const unit = await bootUnit({storage: {eepromCrtCenterX: 3, eepromCrtCenterY: -5, eepromDbarCalPlus: 200, eepromDbarCalMinus: -300}});
-        unit.props.failures.fail('eeprom');
+        const unit = await bootUnit({storage: {eepromCrtCenterX: 3, eepromCrtCenterY: -5, eepromDbarCalPlus: 200, eepromDbarCalMinus: -300, failure_eeprom: '{}'}});
 
         expect(unit.props.eepromCalibration.screenShiftXPx()).toBe(-12);
     });
