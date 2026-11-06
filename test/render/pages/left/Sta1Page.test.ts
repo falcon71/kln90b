@@ -29,11 +29,11 @@ async function almanacSearch(): Promise<HeadlessUnit> {
     return unit;
 }
 
-/** The satellite rows of both STA 1 pages (four on the first page, below the state and the header; the rest on the second) */
+/** The satellite rows of both STA 1 pages (four on the first page, below the state and the header; the rest on the second, below its header) */
 async function satelliteRows(unit: HeadlessUnit): Promise<string[]> {
     const first = Screen.read().rows('L').slice(2);
     await unit.panel.inner('L', 1);
-    const second = Screen.read().rows('L').filter(r => r.trim() !== '');
+    const second = Screen.read().rows('L').slice(1).filter(r => r.trim() !== '');
     await unit.panel.inner('L', -1);
     return [...first, ...second];
 }
@@ -65,6 +65,14 @@ describe('STA 1 page during an almanac search', () => {
 
         expect(Screen.read().status().left).toBe('STA+1');
         expect((await satelliteRows(unit)).map(r => prnAndEle(r)[0])).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    });
+
+    // A photo of a real unit shows the header on the second page too; the Pilot's Guide and the ORS 1 manual show none
+    it('shows the column header on the second page, as the photo of a real unit does', async () => {
+        const unit = await almanacSearch();
+        await unit.panel.inner('L', 1);
+
+        expect(Screen.read().rows('L')[0]).toBe(' SV SNR ELE');
     });
 
     // The precondition of the #213 pin below, on the same sequence: during an almanac search with no fix the receiver

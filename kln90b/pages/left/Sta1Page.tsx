@@ -104,18 +104,20 @@ export class Sta1Page extends SixLineHalfPage {
             this.children.get("line4").text = this.drawSat(rows[2]);
             this.children.get("line5").text = this.drawSat(rows[3]);
         } else {
+            //The photo of a real unit shows the header on this page too, although the Pilot's Guide (5-29) and the ORS 1
+            //manual show none. The four satellites follow it
+            this.children.get("line0").text = " SV SNR ELE";
             //No more than 8
-            this.children.get("line0").text = this.drawSat(rows[4]);
-            this.children.get("line1").text = this.drawSat(rows[5]);
-            this.children.get("line2").text = this.drawSat(rows[6]);
-            this.children.get("line3").text = this.drawSat(rows[7]);
+            this.children.get("line1").text = this.drawSat(rows[4]);
+            this.children.get("line2").text = this.drawSat(rows[5]);
+            this.children.get("line3").text = this.drawSat(rows[6]);
+            this.children.get("line4").text = this.drawSat(rows[7]);
             if (this.props.planeSettings.debugMode) {
-                this.children.get("line4").text = "ALM:" + (this.props.sensors.in.gps.gpsSatComputer.isAlmanacValid() ? "Y" : "N") + " " + Math.round((this.props.sensors.in.gps.gpsSatComputer as any).almanacProgress * 100);
+                //Only one line is left, so the almanac and the time to fix share it
                 const sats = this.props.sensors.in.gps.gpsSatComputer.getChannels().filter(sat => sat !== null) as GPSSatellite[];
                 const ttf = Math.max(...sats.map(sat => (sat as any).data.timeToAcquire / 1000).filter(ttf => !Number.isNaN(ttf)));
-                this.children.get("line5").text = `TTF:${Math.round(ttf)}`;
+                this.children.get("line5").text = `A:${this.props.sensors.in.gps.gpsSatComputer.isAlmanacValid() ? "Y" : "N"}${Math.round((this.props.sensors.in.gps.gpsSatComputer as any).almanacProgress * 100)} T:${Math.round(ttf)}`;
             } else {
-                this.children.get("line4").text = "";
                 this.children.get("line5").text = "";
             }
         }

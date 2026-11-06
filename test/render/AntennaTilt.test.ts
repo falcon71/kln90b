@@ -65,7 +65,7 @@ async function satelliteRows(unit: HeadlessUnit): Promise<string[]> {
         return first.filter(r => r.trim() !== '');
     }
     await unit.panel.inner('L', 1);
-    const second = Screen.read().rows('L').filter(r => r.trim() !== '');
+    const second = Screen.read().rows('L').slice(1).filter(r => r.trim() !== '');
     await unit.panel.inner('L', -1);
     return [...first, ...second];
 }

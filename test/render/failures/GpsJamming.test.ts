@@ -59,14 +59,14 @@ async function jammedFlight(storage: Record<string, unknown> = JAMMING): Promise
     return unit;
 }
 
-/** The satellite rows of both STA 1 pages (four on the first page, below the state and the header; the rest on the second) */
+/** The satellite rows of both STA 1 pages (four on the first page, below the state and the header; the rest on the second, below its header) */
 async function satelliteRows(unit: HeadlessUnit): Promise<string[]> {
     const first = Screen.read().rows('L').slice(2);
     if (Screen.read().status().left !== 'STA+1') {
         return first.filter(r => r.trim() !== '');
     }
     await unit.panel.inner('L', 1);
-    const second = Screen.read().rows('L').filter(r => r.trim() !== '');
+    const second = Screen.read().rows('L').slice(1).filter(r => r.trim() !== '');
     await unit.panel.inner('L', -1);
     return [...first, ...second];
 }
