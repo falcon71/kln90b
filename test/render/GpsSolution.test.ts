@@ -114,8 +114,8 @@ describe('the GPS solution (5-29, #453)', () => {
     // The worst geometry of the real constellation (design section 2): near 64.5°S 52°W a tracked satellite sets at
     // 01:50:35Z, and the HDOP jumps from about 1 to about 4.6 with six satellites in use, until a rising satellite is
     // acquired about 50 s later. The fix stays valid. The SDK reduces time to the time of week, so the case repeats
-    // every week. It comes from the unit's ephemeris file (resources/.../Assets/gps_ephemeris.json): a changed
-    // ephemeris file must fail here, and the case must then be found again.
+    // every week. It comes from the unit's ephemeris file (generated from ephemeris/ by tools/ephemeris): changed
+    // ephemeris sources must fail here, and the case must then be found again.
     // The date lies outside the harness navdata cycle (BootOptions.start), so the data base is out of date; nothing here
     // reads the MSG page
     it('the bad-geometry case of the real constellation (spec 2)', async () => {

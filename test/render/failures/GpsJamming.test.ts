@@ -10,6 +10,7 @@ import {Raim, raimStatus} from '../../../kln90b/GpsSolution';
 import {halForMode} from '../../../kln90b/services/ModeController';
 import {SearchMode} from '../../../kln90b/GpsSearch';
 import {GPS} from '../../../kln90b/Gps';
+import {sdkBlockOf} from '../../../kln90b/GpsSignal';
 
 /**
  * #460: jamming over time and what STA 1 shows of it (the design docs/superpowers/specs/2026-11-05-failures-gps-receiver-design.md,
@@ -27,13 +28,14 @@ const JAMMING = {failure_gpsJamming: JSON.stringify({rampS: RAMP_S, finalDb: FIN
 
 /** The satellites in use after an engine-running boot at 47/8 (the STA 1 snapshot in GpsAcquisition.test.ts) */
 const IN_VIEW = [1, 8, 10, 14, 16, 21, 23, 27];
-/** The two lowest of them, both at 10 degrees with an SNR of 41 */
+/** The two lowest of them, both at 10 degrees: 39.4 at the antenna for 14 (a GPS IIIA), 39.9 for 16 (a GPS IIR-A) */
 const LOWEST = [14, 16];
 
 /** The stored data of a unit last used here yesterday (GpsAcquisition.test.ts): the start model runs a warm start */
 const WARM_START = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 60 * 60 * 1000};
 
 const byNumber = (a: number, b: number) => a - b;
+const TRACKED = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -41,13 +43,17 @@ afterEach(() => {
 
 /**
  * An engine-running unit at KAAA, 3000 ft, flying FPL 0 KAAA, ABC, KBBB, with the jamming ramp stored. The position is the
- * one stored at the last power-off, so the boot posts no POSITION DIFFERS message. STA 1 is on the left
+ * one stored at the last power-off, so the boot posts no POSITION DIFFERS message. STA 1 is on the left.
+ *
+ * The receiver runs the REAL timings (#467): a satellite whose signal is lost stays in its channel, searched, until the
+ * SDK's acquisition timeout makes it Unreachable. FAST's timeout of 1 s (Gps.ts) would turn the searched rows into
+ * Unreachable ones and give their channels away within seconds
  */
 async function jammedFlight(storage: Record<string, unknown> = JAMMING): Promise<HeadlessUnit> {
     const r = standardRoute();
     const unit = await bootUnit({
         facilities: [r.kaaa, r.abc, r.kbbb], position: {lat: r.kaaa.lat, lon: r.kaaa.lon}, altitudeFt: 3000,
-        storage: {lastLatitude: r.kaaa.lat, lastLongitude: r.kaaa.lon, ...savedFlightplan(0, [r.kaaa, r.abc, r.kbbb]), ...storage},
+        storage: {fastGpsAcquisition: false, lastLatitude: r.kaaa.lat, lastLongitude: r.kaaa.lon, ...savedFlightplan(0, [r.kaaa, r.abc, r.kbbb]), ...storage},
     });
     await unit.panel.selectPage('L', 'STA 1');
     return unit;
@@ -85,9 +91,12 @@ const searchedRow = (unit: HeadlessUnit, prn: number) => `*${String(prn).padStar
 const inhibited = (unit: HeadlessUnit) => [...unit.props.sensors.in.gps.gpsSatComputer.inhibitedSatellitePrnCodes.get()].sort(byNumber);
 
 describe('jamming over time and STA 1 (#460)', () => {
+    // The fade and the estimate noise are pinned (#467): the SNR then moves with the jamming level alone
     it('after 60 s every satellite in use shows its SNR lowered by the jamming level', async () => {
         const unit = await jammedFlight();
         const failures = unit.props.sensors.in.gps.failures;
+        unit.props.sensors.in.gps.signals.fadeScale = 0;
+        unit.props.sensors.in.gps.signals.jitterScale = 0;
         await afterCalcTick(unit);
         const unjammedLevel = failures.jammingDb;
         const unjammed = new Map((await satelliteRows(unit)).map(r => [prnOf(r), snrOf(r)]));
@@ -102,7 +111,7 @@ describe('jamming over time and STA 1 (#460)', () => {
 
         expect(level).toBeGreaterThan(3); // Precondition: a level the rounding cannot hide
         expect(state).toBe('STATE NAV A'); // Jamming with a fix keeps the state of the fix
-        expect(rows.map(prnOf)).toEqual([1, 8, 10, 21, 27]); // The ones still in use with the seeded wander
+        expect(rows.map(prnOf)).toEqual([1, 8, 10, 21, 23, 27]); // The ones still in use with the seeded wander
         // Each lowered by the rise of the level since the first reading, within the rounding of the two readings
         const rise = level - unjammedLevel;
         const lowered = rows.map(r => ({prn: prnOf(r), by: unjammed.get(prnOf(r))! - snrOf(r)}));
@@ -110,20 +119,19 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    // A satellite jamming blocked that the SDK still holds in a channel is listed once, from its channel, also while
-    // fewer than eight channels are filled and the blocked satellites not in a channel are added
+    // A satellite whose signal is lost stays in its channel, searched (#467), and is listed once, from its channel
     it('no satellite is listed twice while the satellites are lost and searched', async () => {
         const unit = await jammedFlight();
         const gps = unit.props.sensors.in.gps;
         await vi.advanceTimersByTimeAsync(30_000);
 
         const repeated: string[] = [];
-        let blockedInChannel = 0;
+        let lostInChannel = 0;
         for (let s = 30; s < 90; s++) {
             await afterCalcTick(unit);
             const channels = gps.gpsSatComputer.getChannels().filter(sat => sat !== null) as GPSSatellite[];
-            if (channels.length < 8 && channels.some(sat => gps.failures.isBlocked(sat.prn))) {
-                blockedInChannel++;
+            if (channels.some(sat => gps.signals.isLost(sat.prn))) {
+                lostInChannel++;
             }
             const prns = (await satelliteRows(unit)).map(prnOf);
             if (new Set(prns).size !== prns.length) {
@@ -131,24 +139,26 @@ describe('jamming over time and STA 1 (#460)', () => {
             }
         }
 
-        expect(blockedInChannel).toBeGreaterThan(0); // Precondition: the case of a duplicate came up
+        expect(lostInChannel).toBeGreaterThan(0); // Precondition: lost satellites were searched in their channels
         expect(repeated).toEqual([]);
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
+    // #467: the losses spread over the satellites' own differences, so the two lowest need not go in the same tick; both
+    // go before any higher satellite
     it('the first satellites lost are the two lowest; each stays on STA 1 as searched, not found', async () => {
         const unit = await jammedFlight();
-        const failures = unit.props.sensors.in.gps.failures;
+        const signals = unit.props.sensors.in.gps.signals;
 
         let lost: number[] = [];
-        for (let t = 0; t < RAMP_S * 4 && lost.length === 0; t++) {
+        for (let t = 0; t < RAMP_S * 4 && !LOWEST.every(prn => lost.includes(prn)); t++) {
             await vi.advanceTimersByTimeAsync(250);
-            lost = IN_VIEW.filter(prn => failures.isJammed(prn));
+            lost = IN_VIEW.filter(prn => signals.isLost(prn));
         }
         expect(lost).toEqual(LOWEST);
         await vi.advanceTimersByTimeAsync(250); // A display tick after the calculation tick of the loss
 
-        // The SDK still has both in a channel, up to its next position update; the unit draws them as searched
+        // The SDK keeps both in their channels, searched (the SDK's None state), and the unit draws them so
         const channels = unit.props.sensors.in.gps.gpsSatComputer.getChannels().filter(s => s !== null).map(s => s!.prn).sort(byNumber);
         expect(channels).toEqual(IN_VIEW); // Precondition
         const rows = await satelliteRows(unit);
@@ -188,6 +198,37 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
+    // #467: with one common jamming level the satellites were once lost strictly from the lowest up. Now each one's own SNR
+    // decides. The seeded default run loses them in the order 14, 16, 23, 1, 21, 8, 10, 27 (at 25, 47, 59, 110, 129, 157,
+    // 159 and 159 s), against the elevation order 14, 16, 23, 1, 10, 27, 21, 8. PRN 21 is a GPS-IIR-A (-1 dB) at 55.7 degrees
+    // and goes before PRN 10 and PRN 27, both GPS-IIF (+1 dB) at 47.3 and 55.4 degrees, lower or level with it: the block's
+    // offset outweighs the few degrees of elevation. The blocks are those of the generated ephemeris
+    it('a weaker, higher satellite is lost before a stronger, lower one: the order follows each satellite SNR, not the elevation', async () => {
+        const unit = await jammedFlight();
+        const signals = unit.props.sensors.in.gps.signals;
+        const lostAt = new Map<number, number>();
+        for (let s = 1; s <= RAMP_S + 60 && lostAt.size < IN_VIEW.length; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            for (const prn of IN_VIEW) {
+                if (signals.isLost(prn) && !lostAt.has(prn)) {
+                    lostAt.set(prn, s);
+                }
+            }
+        }
+
+        expect(lostAt.size).toBe(IN_VIEW.length); // Precondition: every one of them is lost by the end of the ramp
+        expect(sdkBlockOf(satellite(unit, 21))).toBe('GPS-IIR-A'); // Preconditions: the blocks
+        expect(sdkBlockOf(satellite(unit, 10))).toBe('GPS-IIF');
+        expect(sdkBlockOf(satellite(unit, 27))).toBe('GPS-IIF');
+        const exact = (prn: number) => 90 - satellite(unit, prn).position.get()[0] * 180 / Math.PI;
+        expect(exact(21)).toBeGreaterThan(exact(10) + 5); // Preconditions: 21 is higher than 10 and level with 27, so the elevation order puts 21 after 10
+        expect(Math.abs(exact(21) - exact(27))).toBeLessThan(1);
+        expect(lostAt.get(21)!).toBeLessThan(lostAt.get(10)!);
+        expect(lostAt.get(21)!).toBeLessThan(lostAt.get(27)!);
+        expect([...lostAt.entries()].sort((x, y) => x[1] - y[1] || x[0] - y[0]).map(e => e[0])).toEqual([14, 16, 23, 1, 21, 8, 10, 27]);
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
     it('after the ramp STA 1 shows ACQ', async () => {
         const unit = await jammedFlight();
         const gps = unit.props.sensors.in.gps;
@@ -203,12 +244,13 @@ describe('jamming over time and STA 1 (#460)', () => {
     }, 60_000);
 
     // The forced acquisition of an engine-running start runs before the first calculation tick: the stored, finished ramp
-    // blocks the satellites before it, so nothing is acquired (design, "Jamming": a power-on while jammed acquires nothing)
+    // loses the satellites in it, so nothing is acquired (design, "Jamming": a power-on while jammed acquires nothing).
+    // #467: the forced path makes a lost satellite Unreachable, so the tracked states are what counts
     it('an engine-running start with a finished ramp stored: no satellite acquired, no fix, no coverage message, ACQ', async () => {
         const atForced: number[][] = [];
         const original = GPS.prototype.acceptForcedSolution;
         vi.spyOn(GPS.prototype, 'acceptForcedSolution').mockImplementation(function (this: GPS) {
-            atForced.push(this.gpsSatComputer.getSatellites().filter(s => s.state.get() !== GPSSatelliteState.None).map(s => s.prn));
+            atForced.push(this.gpsSatComputer.getSatellites().filter(s => TRACKED.has(s.state.get())).map(s => s.prn));
             original.call(this);
         });
         const unit = await jammedFlight({failure_gpsJamming: JSON.stringify({rampS: RAMP_S, finalDb: FINAL_DB, elapsedS: RAMP_S})});
@@ -230,18 +272,19 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    it('after the ramp STA 1 shows every satellite above the mask as searched, not found', async () => {
+    // #467: a lost satellite keeps its channel and is searched there (the SDK's None state); the receiver lost all eight
+    it('after the ramp STA 1 shows the satellites of the channels as searched, not found', async () => {
         const unit = await jammedFlight();
         const gps = unit.props.sensors.in.gps;
 
         await vi.advanceTimersByTimeAsync((RAMP_S + 20) * 1000);
         await afterCalcTick(unit);
 
-        expect(gps.gpsSatComputer.getChannels().filter(s => s !== null)).toEqual([]); // Precondition: no satellite left in a channel
+        const channels = gps.gpsSatComputer.getChannels().filter(s => s !== null).map(s => s!.prn).sort(byNumber);
+        expect(channels).toEqual(IN_VIEW); // Preconditions: the eight keep their channels, all lost
+        expect(channels.filter(prn => !gps.signals.isLost(prn))).toEqual([]);
         const rows = await satelliteRows(unit);
-        // The eight highest satellites above the 5 degree mask: 14 and 16 at 10 degrees give way to 22 and 32, which the
-        // receiver never had in a channel
-        expect(rows.map(prnOf)).toEqual([1, 8, 10, 21, 22, 23, 27, 32]);
+        expect(rows.map(prnOf)).toEqual(IN_VIEW);
         expect(rows).toEqual(rows.map(r => searchedRow(unit, prnOf(r))));
         expect(unit.errors).toEqual([]);
     }, 60_000);
@@ -260,13 +303,16 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    // The start model's acquisition lists the satellites predicted for the stored position (#213). Under jamming a blocked
+    // The start model's acquisition lists the satellites predicted for the stored position (#213). Under jamming a lost
     // one reads *xx 00 and one in use loses the jamming level from its SNR, as in the channel list (design, "STA 1 and STA 2")
-    it("jamming during the start model's acquisition: the predicted list shows the blocked satellites searched and the SNRs lowered", async () => {
-        // A finished ramp of 8 dB with the wander pinned: the level is exactly 8 dB from the first calculation tick on
+    it("jamming during the start model's acquisition: the predicted list shows the lost satellites searched and the SNRs lowered", async () => {
+        // A finished ramp of 8 dB with the wander pinned: the level is exactly 8 dB from the first calculation tick on. The
+        // fade and the estimate noise are pinned too (#467), so the SNR is the antenna's curve, the block offset and the level
         const unit = await bootUnit({engineRunning: false, storage: {...WARM_START, failure_gpsJamming: JSON.stringify({rampS: 100, finalDb: 8, elapsedS: 100})}});
         const gps = unit.props.sensors.in.gps;
         gps.failures.wanderSigmaDb = 0;
+        gps.signals.fadeScale = 0;
+        gps.signals.jitterScale = 0;
         await unit.panel.powerOn();
         await vi.advanceTimersByTimeAsync(19_000);
         await unit.panel.approveSelfTest();
@@ -282,17 +328,14 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(gps.isValid()).toBe(false);
         expect(gps.failures.jammingDb).toBe(8);
         expect(inUse()).toEqual([1, 21]);
-        // 21 still in use in the SDK while jamming blocks it: the SDK releases it only at its next position update
-        vi.spyOn(gps.failures, 'isBlocked').mockImplementation(prn => prn === 21 || gps.failures.isJammed(prn));
-        await vi.advanceTimersByTimeAsync(250);
-        expect(inUse()).toEqual([1, 21]); // Precondition: no update of the SDK in between
 
-        // 01 at 25 degrees has an SNR of 46 without jamming (50 + 12 x log10(sin 25 degrees), #464), 38 with 8 dB. 14 at
-        // 10 degrees, 33 with the jamming, is below the acquire level of 35 and blocked
-        expect(gps.failures.isJammed(14)).toBe(true); // Precondition
+        // 01 at 25 degrees, a GPS IIF, is 46.5 at the antenna (50 + 12 x log10(sin 25 degrees) + 1, #464, #467) and 38.5
+        // with 8 dB, shown as 39; 21 at 55 degrees, a GPS IIR-A, is 48 and 40. 14 at 10 degrees, a GPS IIIA, is 39.4 at the antenna (the
+        // curve less 1.5) and 31.4 with the jamming: below the acquire level of 35, lost and searched
+        expect(gps.signals.isLost(14)).toBe(true); // Precondition
         expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
         expect(await satelliteRows(unit)).toEqual([
-            ' 01  38 25°', '*08  00 76°', '*10  00 48°', '*14  00 10°', '*16  00 10°', '*21  00 55°', '*23  00 18°', '*27  00 57°',
+            ' 01  39 25°', '*08  00 76°', '*10  00 48°', '*14  00 10°', '*16  00 10°', ' 21  40 55°', '*23  00 18°', '*27  00 57°',
         ]);
         expect(unit.errors).toEqual([]);
     }, 60_000);
@@ -345,16 +388,20 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    it('the repair: the level 0, the inhibits lifted, a fix again within 120 s, the SNRs unjammed', async () => {
+    // The fade and the estimate noise are pinned (#467), so the SNRs are the antenna's curve and the block offsets
+    it('the repair: the level 0, no satellite lost, a fix again within 120 s, the SNRs unjammed', async () => {
         const unit = await jammedFlight();
         const gps = unit.props.sensors.in.gps;
+        gps.signals.fadeScale = 0;
+        gps.signals.jitterScale = 0;
         await vi.advanceTimersByTimeAsync((RAMP_S + 20) * 1000);
         expect(gps.isValid()).toBe(false); // Precondition: the total loss
-        expect(inhibited(unit).length).toBeGreaterThan(0);
+        expect(IN_VIEW.filter(prn => gps.signals.isLost(prn))).toEqual(IN_VIEW);
 
         unit.props.failures.repair('gpsJamming');
         await untilCalcTick(unit);
         expect(gps.failures.jammingDb).toBe(0);
+        expect(IN_VIEW.filter(prn => gps.signals.isLost(prn))).toEqual([]);
         expect(inhibited(unit)).toEqual([]);
         for (let s = 0; s < 120 && !gps.isValid(); s++) {
             await vi.advanceTimersByTimeAsync(1000);
@@ -363,9 +410,11 @@ describe('jamming over time and STA 1 (#460)', () => {
         await afterCalcTick(unit);
 
         // The eight of the boot, in use again, about six minutes on. The SNRs follow 50 + 12 x log10(sin(elevation)) (#464)
-        // with nothing taken off: 41 at 11 degrees, 40 at 8, 46 at 26, 50 at 78
+        // plus the block offset (#467) with nothing taken off: 01, 08, 10 and 27 are GPS IIF (+1), 16 and 21 GPS IIR-A (-1),
+        // 14 and 23 GPS IIIA (-1.5 below 30 degrees). 14 at 11 degrees is 41.4 - 1.5, 16 at 8 is 39.7 - 1, 08 at 78 is
+        // 49.9 + 1
         expect(await satelliteRows(unit)).toEqual([
-            ' 01  46 26°', ' 08  50 78°', ' 10  48 47°', ' 14  41 11°', ' 16  40 08°', ' 21  49 57°', ' 23  43 16°', ' 27  49 54°',
+            ' 01  47 26°', ' 08  51 78°', ' 10  49 47°', ' 14  40 11°', ' 16  39 08°', ' 21  48 57°', ' 23  42 16°', ' 27  50 54°',
         ]);
         expect(unit.errors).toEqual([]);
     }, 60_000);

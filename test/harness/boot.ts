@@ -19,6 +19,7 @@ import {resetSingletons} from './singletons';
 import {pointFrom} from './flight/geo';
 import {defaultNavdata} from './fixtures';
 import {SimulatedMeasurement} from '../../kln90b/GpsMeasurement';
+import {SimVarAntennaAttitude} from '../../kln90b/AntennaAttitude';
 
 /**
  * How long a test advances the clock for the nearest lists to search and show their result. The nearest lists
@@ -79,6 +80,11 @@ export interface BootOptions {
      * position (#402). Its errors draw from the seeded Math.random. A createGpsMeasurement in platform wins. Default false
      */
     simulatedGps?: boolean;
+    /**
+     * Reads the antenna's attitude from the SimVars (SimVarAntennaAttitude) instead of a level antenna. A
+     * createAntennaAttitude in platform wins. Default false
+     */
+    antennaAttitude?: boolean;
 }
 
 export interface HeadlessUnit {
@@ -281,9 +287,11 @@ function prepareBoot(opts: BootOptions): PreparedBoot {
     };
 
     const efb = opts.efb ? new FakeRouteManager() : undefined;
-    const platform: Partial<KLN90BPlatform> = opts.simulatedGps
-        ? {createGpsMeasurement: () => new SimulatedMeasurement(), ...opts.platform}
-        : opts.platform ?? {};
+    const platform: Partial<KLN90BPlatform> = {
+        ...(opts.simulatedGps ? {createGpsMeasurement: () => new SimulatedMeasurement()} : {}),
+        ...(opts.antennaAttitude ? {createAntennaAttitude: () => new SimVarAntennaAttitude()} : {}),
+        ...opts.platform,
+    };
     const core: KLN90BCore = new KLN90BCore(new FakePlatform(navdata, efb, platform), args => core.onInteractionEvent(args));
     // The constructor built the user settings, and the SDK's UserSetting draws Math.random once per setting. Starting
     // the sequence again here keeps every later draw (the GPS jitter and start times) independent of the number of

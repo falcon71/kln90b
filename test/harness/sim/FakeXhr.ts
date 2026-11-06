@@ -2,11 +2,23 @@
 
 import fs from 'fs';
 import path from 'path';
+import {EPHEMERIS_SOURCE_DIR, generateEphemerisJson} from '../../../tools/ephemeris/ephemeris.mjs';
 
 /** rollup copies resources/ into the package root, which is where coui:// URLs point. */
 const RESOURCES = path.resolve(process.cwd(), 'resources');
 
-/** XMLHttpRequest for coui:// URLs, served from resources/. Used by GPSSatComputer (ephemeris) and MSA. */
+let ephemerisJson: string | undefined;
+
+/** The build generates the ephemeris file from ephemeris/; the harness does the same, once per process. */
+function ephemeris(): string {
+    ephemerisJson ??= generateEphemerisJson(EPHEMERIS_SOURCE_DIR);
+    return ephemerisJson;
+}
+
+/**
+ * XMLHttpRequest for coui:// URLs, served from resources/. The ephemeris file is not in resources/: it is generated
+ * from ephemeris/ as the build does. Used by GPSSatComputer (ephemeris) and MSA.
+ */
 export class FakeXhr {
     public readonly requests: string[] = [];
 
@@ -44,7 +56,8 @@ export class FakeXhr {
                 setTimeout(() => {
                     const file = path.join(RESOURCES, this.url.replace(/^coui:\/\//, ''));
                     try {
-                        this.responseText = fs.readFileSync(file, 'utf8');
+                        this.responseText = this.url.endsWith('Assets/gps_ephemeris.json')
+                            ? ephemeris() : fs.readFileSync(file, 'utf8');
                         this.response = this.responseText;
                         this.status = 200;
                     } catch {

@@ -16,6 +16,7 @@
   "include": [
     "kln90b/**/*",
     "test/**/*",
+    "tools/**/*",
     "node_modules/@microsoft/msfs-types/js/**/*.d.ts",
     "node_modules/@microsoft/msfs-types/pages/**/*.d.ts",
     "node_modules/@microsoft/msfs-types/coherent/**/*.d.ts"

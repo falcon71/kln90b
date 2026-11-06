@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import '../../kln90b/KLN90B';
 import {SIM_PLATFORM} from '../../kln90b/KLN90BPlatform';
 import {SimulatedMeasurement} from '../../kln90b/GpsMeasurement';
+import {SimVarAntennaAttitude} from '../../kln90b/AntennaAttitude';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -70,5 +71,14 @@ describe('KLN90B adapter (public contract)', () => {
 describe('SIM_PLATFORM', () => {
     it('creates the simulated GPS measurement', () => {
         expect(SIM_PLATFORM.createGpsMeasurement()).toBeInstanceOf(SimulatedMeasurement);
+    });
+
+    // #467: in the sim the antenna tilts with the airframe, and the signals draw from the real random
+    it('creates the antenna attitude from the SimVars', () => {
+        expect(SIM_PLATFORM.createAntennaAttitude()).toBeInstanceOf(SimVarAntennaAttitude);
+    });
+
+    it('gives the signals Math.random', () => {
+        expect(SIM_PLATFORM.createSignalRandom()).toBe(Math.random);
     });
 });

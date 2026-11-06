@@ -81,35 +81,31 @@ beforeEach(() => {
 });
 
 describe('GpsFailures receiver failures', () => {
-    it('nothing failed: nothing blocked', () => {
+    it('nothing failed: no receiver failure and no jamming', () => {
         gf.tick(0);
         gf.tick(1);
-        for (let prn = 0; prn < 256; prn++) {
-            expect(gf.isBlocked(prn)).toBe(false);
-        }
         expect(gf.jammingDb).toBe(0);
         expect(gf.receiverFailed).toBe(false);
         expect(gf.jamming).toBe(false);
-        expect(gf.jammedRows()).toEqual([]);
     });
 
-    it('an antenna failure blocks every PRN', () => {
+    it('gpsAntenna is a receiver failure', () => {
         failures.fail('gpsAntenna');
         expect(gf.receiverFailed).toBe(true);
-        for (let prn = 0; prn < 256; prn++) {
-            expect(gf.isBlocked(prn)).toBe(true);
-        }
     });
 
-    it('with both receiver failures, repairing one leaves every PRN blocked; repairing both frees them', () => {
+    it('gpsReceiver is a receiver failure', () => {
+        failures.fail('gpsReceiver');
+        expect(gf.receiverFailed).toBe(true);
+    });
+
+    it('with both receiver failures, repairing one leaves the receiver failed; repairing both ends it', () => {
         failures.fail('gpsAntenna');
         failures.fail('gpsReceiver');
         failures.repair('gpsAntenna');
         expect(gf.receiverFailed).toBe(true);
-        expect(gf.isBlocked(7)).toBe(true);
         failures.repair('gpsReceiver');
         expect(gf.receiverFailed).toBe(false);
-        expect(gf.isBlocked(7)).toBe(false);
     });
 
     it('take-home mode has no receiver failures', () => {
@@ -120,7 +116,6 @@ describe('GpsFailures receiver failures', () => {
         expect(gf.jamming).toBe(false);
         gf.tick(0);
         gf.tick(1);
-        expect(gf.isBlocked(1)).toBe(false);
         expect(gf.jammingDb).toBe(0);
     });
 });
@@ -145,87 +140,6 @@ describe('GpsFailures jamming', () => {
         gf.wanderSigmaDb = 0;
         run(0, 100);
         expect(gf.jammingDb).toBeCloseTo(13, 9);
-    });
-
-    //A satellite whose SNR the test sets directly: the zenith angle that gives it on the curve of GpsSignal
-    function snrSat(prn: number, snr: number, state: GPSSatelliteState = GPSSatelliteState.InUse) {
-        const s = {zenith: 0};
-        const set = (v: number) => s.zenith = Math.acos(Math.pow(10, (v - 50) / 12));
-        set(snr);
-        sats = [{prn, position: {get: () => Float64Array.of(s.zenith, 0)}, state: {get: () => state}} as unknown as GPSSatellite];
-        return set;
-    }
-
-    //SNR 50 exactly at the zenith (log10(1) = 0), so a whole-number level gives a jammed SNR of exactly that level below 50
-    it('a tracked satellite at exactly 30 is not lost; just below 30 it is', () => {
-        storeJamming('{"rampS":100,"finalDb":20,"elapsedS":100}');
-        gf.wanderSigmaDb = 0;
-        const set = snrSat(1, 50);
-        gf.tick(0);
-        expect(gf.jammingDb).toBe(20); // Precondition: the jammed SNR is exactly 30
-        expect(gf.isBlocked(1)).toBe(false);
-        set(49.99);
-        gf.tick(1);
-        expect(gf.isBlocked(1)).toBe(true);
-    });
-
-    it('a blocked satellite stays blocked just below 35 and is free at exactly 35', () => {
-        storeJamming('{"rampS":100,"finalDb":15,"elapsedS":100}');
-        gf.wanderSigmaDb = 0;
-        const set = snrSat(1, 41);
-        gf.tick(0);
-        expect(gf.isBlocked(1)).toBe(true);
-        set(49.99);
-        gf.tick(1);
-        expect(gf.isBlocked(1)).toBe(true);
-        set(50);
-        gf.tick(2);
-        expect(gf.jammingDb).toBe(15); // Precondition: the jammed SNR is exactly 35
-        expect(gf.isBlocked(1)).toBe(false);
-        //Free and tracked again: it holds on down to 30, not 35
-        set(46);
-        gf.tick(3);
-        expect(gf.isBlocked(1)).toBe(false);
-    });
-
-    //Tracked is any state from Acquired on (the SDK's own tracked states), not only in use
-    it('acquired and ephemeris-collected satellites at a jammed SNR of 32 stay unblocked; an untracked one is blocked', () => {
-        storeJamming('{"rampS":100,"finalDb":12,"elapsedS":100}');
-        gf.wanderSigmaDb = 0;
-        snrSat(1, 44, GPSSatelliteState.Acquired);
-        const acquired = sats[0];
-        snrSat(2, 44, GPSSatelliteState.DataCollected);
-        const collected = sats[0];
-        snrSat(3, 44, GPSSatelliteState.None);
-        sats = [acquired, collected, sats[0]];
-        gf.tick(0);
-        expect(gf.jammingDb).toBe(12); // Precondition: a jammed SNR of 32, between the loss and the acquire level
-        expect(gf.isBlocked(1)).toBe(false);
-        expect(gf.isBlocked(2)).toBe(false);
-        expect(gf.isBlocked(3)).toBe(true);
-    });
-
-    it('the 10 degree satellite is not lost at 10.8 dB of jamming and lost at 10.9 dB', () => {
-        //SNR 40.876 at 10 degrees; the ramp climbs 0.1 dB a second
-        storeJamming('{"rampS":1000,"finalDb":100,"elapsedS":0}');
-        gf.wanderSigmaDb = 0;
-        run(0, 108);
-        expect(gf.jammingDb).toBeCloseTo(10.8, 9);
-        expect(gf.isBlocked(1)).toBe(false);
-        gf.tick(109);
-        expect(gf.isBlocked(1)).toBe(true);
-    });
-
-    it('an untracked satellite is blocked while the level is above its acquire margin', () => {
-        //Satellite 2 at 30 degrees, SNR 46.39, untracked: blocked above 11.39 dB
-        sats = [sat(2, 30, GPSSatelliteState.None)];
-        storeJamming('{"rampS":100,"finalDb":12,"elapsedS":0}');
-        gf.wanderSigmaDb = 0;
-        run(0, 90);
-        expect(gf.jammingDb).toBeCloseTo(10.8, 9);
-        expect(gf.isBlocked(2)).toBe(false);
-        run(91, 100);
-        expect(gf.isBlocked(2)).toBe(true);
     });
 
     it('saves the progress every 10 s and once at the end', () => {
@@ -307,8 +221,9 @@ describe('GpsFailures jamming', () => {
         expect(gf.jammingDb).toBeCloseTo(26 * 52 / 200, 9);
     });
 
-    //The forced acquisition of an engine-running start runs before the first tick after the reset of the power-on
-    it('refreshBlocks after a reset blocks from the stored ramp without a tick, counting no time and drawing nothing', () => {
+    //The forced acquisition of an engine-running start runs before the first tick after the reset of the power-on; the
+    //values are loaded here, as no tick has cached them yet
+    it('refreshLevel after a reset sets the level from the stored ramp without a tick, counting no time and drawing nothing', () => {
         storeJamming('{"rampS":200,"finalDb":28,"elapsedS":100}');
         let draws = 0;
         gf.random = () => {
@@ -316,25 +231,24 @@ describe('GpsFailures jamming', () => {
             return 0.5;
         };
         gf.reset();
-        gf.refreshBlocks();
+        gf.refreshLevel();
         expect(gf.jammingDb).toBe(14);
-        //SNR 40.9, 46.4 and 30 at the antenna, 26.9, 32.4 and 16 with the jamming: 1 and 2 are tracked, so 1 is lost
-        //below 30 and 2 holds on; 3 is untracked and under the acquire level of 35
-        expect(gf.isBlocked(1)).toBe(true);
-        expect(gf.isBlocked(2)).toBe(false);
-        expect(gf.isBlocked(3)).toBe(true);
-        gf.refreshBlocks();
+        gf.refreshLevel();
         expect(gf.jammingDb).toBe(14);
         expect(draws).toBe(0);
         expect(stored()).toEqual({rampS: 200, finalDb: 28, elapsedS: 100});
     });
 
-    it('refreshBlocks with nothing failed blocks nothing', () => {
-        gf.refreshBlocks();
+    it('refreshLevel with nothing failed leaves the level at 0 and draws and stores nothing', () => {
+        let draws = 0;
+        gf.random = () => {
+            draws++;
+            return 0.5;
+        };
+        gf.refreshLevel();
         expect(gf.jammingDb).toBe(0);
-        expect(gf.isBlocked(1)).toBe(false);
-        expect(gf.isBlocked(2)).toBe(false);
-        expect(gf.isBlocked(3)).toBe(false);
+        expect(draws).toBe(0);
+        expect(settings.getSetting('failure_gpsJamming').get()).toBe('');
     });
 
     it('the first tick of a new instance counts nothing', () => {
@@ -405,29 +319,15 @@ describe('GpsFailures jamming', () => {
         settings.getSetting('failure_gpsJamming').set('');
         gf.tick(1);
         expect(gf.jammingDb).toBe(0);
-        expect(gf.isBlocked(1)).toBe(false);
     });
 
-    it('a repair clears the level and the blocks before the next tick', () => {
+    it('a repair clears the level before the next tick', () => {
         storeJamming('{"rampS":100,"finalDb":28,"elapsedS":100}');
         gf.wanderSigmaDb = 0;
         gf.tick(0);
         expect(gf.jammingDb).toBe(28);
-        expect(gf.isBlocked(1)).toBe(true);
         failures.repair('gpsJamming');
         expect(gf.jammingDb).toBe(0);
-        expect(gf.isBlocked(1)).toBe(false);
-        expect(gf.isBlocked(2)).toBe(false);
-    });
-
-    it('jammedRows lists the blocked satellites above 5 degrees and not one at 3 degrees', () => {
-        storeJamming('{"rampS":100,"finalDb":28,"elapsedS":100}');
-        gf.wanderSigmaDb = 0;
-        gf.tick(0);
-        expect(gf.isBlocked(1)).toBe(true);
-        expect(gf.isBlocked(2)).toBe(true);
-        expect(gf.isBlocked(3)).toBe(true);
-        expect(gf.jammedRows()).toEqual([1, 2]);
     });
 });
 

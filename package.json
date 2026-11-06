@@ -3,6 +3,9 @@
   "//": "6 chars maximum for the version!",
   "version": "2.3B1",
   "description": "",
+  "engines": {
+    "node": ">=22.18"
+  },
   "main": "index.ts",
   "scripts": {
     "build": "npx rollup -c",
