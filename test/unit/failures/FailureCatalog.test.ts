@@ -196,3 +196,45 @@ describe('the lamp and superflag entries (#459)', () => {
         expect(def('wptDriver').isEligible(s)).toBe(true);
     });
 });
+
+describe('the GPS receiver entries (#460)', () => {
+    it('the four entries', () => {
+        const antenna = def('gpsAntenna');
+        expect(antenna.flrName).toBe('GPS ANTENNA');
+        expect(antenna.random).toBe(true);
+        expect(antenna.testFail).toBe(true);
+        expect(antenna.message).toEqual(['RCVR HARDWARE ERROR:', '0010']);
+        expect(antenna.detection).toBe('internal');
+        const rcvr = def('gpsReceiver');
+        expect(rcvr.flrName).toBe('GPS RCVR');
+        expect(rcvr.random).toBe(true);
+        expect(rcvr.testFail).toBe(true);
+        expect(rcvr.message).toEqual(['NO RCVR DATA']);
+        expect(rcvr.detection).toBe('internal');
+        const jam = def('gpsJamming');
+        expect(jam.flrName).toBe('JAMMING');
+        expect(jam.random).toBe(false);
+        expect(jam.testFail).toBe(false);
+        expect(jam.message).toBeNull();
+        expect(jam.detection).toBeNull();
+        const sat = def('faultySatellite');
+        expect(sat.flrName).toBe('SATELLITE');
+        expect(sat.random).toBe(false);
+        expect(sat.testFail).toBe(false);
+        expect(sat.message).toBeNull();
+        expect(sat.detection).toBeNull();
+        for (const d of [antenna, rcvr, jam, sat]) {
+            expect(d.outputs).toEqual([]);
+            expect(d.inputs).toEqual([]);
+            expect(d.isEligible(plane())).toBe(true);
+        }
+    });
+
+    it('only the antenna and the receiver are random candidates', () => {
+        const keys = FAILURE_CATALOG.filter(d => d.random).map(d => d.key);
+        expect(keys).toContain('gpsAntenna');
+        expect(keys).toContain('gpsReceiver');
+        expect(keys).not.toContain('gpsJamming');
+        expect(keys).not.toContain('faultySatellite');
+    });
+});

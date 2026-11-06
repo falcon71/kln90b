@@ -12,8 +12,10 @@ the interface failures (`arinc429Out`, `rs232Out`, `rmiOutput`, `obsResolver`, `
 [superpowers/specs/2026-11-04-failures-framework-design.md](superpowers/specs/2026-11-04-failures-framework-design.md)).
 The annunciator lamps (`…Driver`, `…Wiring`, `…Bulb`), the NAV superflag and the EEPROM are built too (#459, design
 [superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md](superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md)).
-The other failures of the catalog are specified here and built by the later parts of #366 (#460, #461). The source of
-truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
+The GPS receiver failures (`gpsAntenna`, `gpsReceiver`), jamming and the faulty satellite are built (#460, design
+[superpowers/specs/2026-11-05-failures-gps-receiver-design.md](superpowers/specs/2026-11-05-failures-gps-receiver-design.md)).
+The other failures of the catalog are specified here and built by the later parts of #366: the battery by #461, spoofing
+by #465. The source of truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
 
 Page numbers without a prefix are the KLN 90B Pilot's Guide (006-08773-0000). "IM" is the Installation Manual
 (006-10521-0005 Rev 5), "CMM" the Component Maintenance Manual (006-15521-0003 Rev 3) by its printed page numbers.
@@ -77,7 +79,7 @@ FLR 3). The FLR names are fictional. The table lists every failure; the sections
 | `gpsAntenna` | `GPS ANTENNA` | `RCVR HARDWARE ERROR:` / `0010` | always | yes | yes |
 | `gpsReceiver` | `GPS RCVR` | `NO RCVR DATA` | always | yes | yes |
 | `gpsJamming` | `JAMMING` | none (the #453 messages follow) | always | no | no |
-| `gpsSpoofing` | `SPOOFING` | none (`SYSTEM TIME UPDATED` / `TO GPS TIME`) | always | no | no |
+| `gpsSpoofing` (#465, not built yet) | `SPOOFING` | none (`SYSTEM TIME UPDATED` / `TO GPS TIME`) | always | no | no |
 | `faultySatellite` | `SATELLITE` | `RAIM POSITION ERROR` / `CROSS CHECK POSITION` while detectable | always | no | no |
 | `eeprom` | `EEPROM` | `EEPROM FAILURE: IC1045` / `EXTERNAL D-BAR INVALID` | always | yes | yes |
 | `arinc429Out` | `429 OUTPUT` | `ARINC 429 OUTPUT FAIL` | always | yes | yes |
@@ -200,24 +202,48 @@ A failed output port sends nothing, so the receiving equipment loses its data, f
 
 A loose or shorted antenna coax, the RF failure of IM C-4. The receiver sees no satellites. The unit:
 
-- loses every satellite at once (inhibited in the SDK), and the navigation flags as with any loss of the fix;
-- shows `FAILR` as the STA 1 state (5-29) with no satellite rows, and dashes for the EPE on STA 2;
-- runs its clock on, as without a fix.
+- loses every satellite at once (inhibited in the SDK, and skipped by the unit's own solution in the same tick), and
+  the navigation flags as with any loss of the fix;
+- shows `FAILR` as the STA 1 state (5-29) with no satellite rows on either page, and dashes for the EPE on STA 2;
+- runs its clock on, as without a fix;
+- posts none of the #453 signal and RAIM messages (see "Detection, messages and TEST FAIL"); the hardware message
+  names the cause.
 
 ### GPS receiver (`gpsReceiver`)
 
 The receiver module stops talking to the host (`NO RCVR DATA`, B-3: no navigation at all). The effect on the screen is
 the same as `gpsAntenna`: STA 1 shows `FAILR` with no satellite rows. The guide describes `FAILR` simply as a receiver
-failure (5-29), which covers this case too, and documents no other state for it.
+failure (5-29), which covers this case too, and documents no other state for it. With both receiver failures active,
+repairing one leaves the unit in `FAILR`: every satellite stays blocked until both are repaired. After the repair the
+receiver reacquires as after any loss of signal.
 
 ### GPS jamming (`gpsJamming`)
 
-Triggered manually only. Regional triggers from real-world jamming areas are a later issue. Every
-satellite is lost, so the unit shows exactly what a loss of signal shows (#453): satellites drop off STA 1, then `RAIM
-NOT AVAILABLE`, then `SATELLITE COVERAGE INADEQUATE FOR NAV` and the NAV flag. There is no message of its own. After
-the repair the receiver acquires again as after any loss of signal.
+Triggered manually only. Regional triggers from real-world jamming areas are a later issue; the manual toggle stands for
+flying into a jammer's range. It is a ramp, not a switch, so that it looks different from the receiver failures: the
+satellites go weakest first and some come back, and the unit shows the states of a loss of signal on its own.
+
+- **The level** rises linearly in dB over a ramp of 180 to 360 s up to 24 to 28 dB (drawn at the failure, guesses),
+  with a wander of sigma 3 dB and a correlation time of 10 s on top (guesses; it starts at 0 at every power-on and is
+  not saved). The ramp progress is saved, so a power cycle or a new session continues it and a finished ramp stays
+  finished. A power-on while jammed after the ramp starts at the final level, also the forced acquisition of an
+  engine-running start, which runs before the first calculation tick and acquires no satellite the level blocks.
+- **Every satellite's SNR** drops by the level (the SNR curve is #464's), so STA 1 shows the lowered values.
+- **Lock** (IM C-7: 30 and below unusable, 30 to 35 marginal): a satellite the receiver tracks is lost below SNR 30; one
+  it does not track is acquired only at SNR 35 or more. The gap keeps a satellite from flickering, and the wander makes
+  the losses intermittent near the thresholds. A reacquired satellite takes the SDK's normal acquisition time.
+- **STA 1.** A satellite jamming took stays on the page as `*xx 00` with its elevation, as a satellite still being
+  searched does (guess from the real-unit video cited in `Sta1Page.tsx`). A total loss shows every row so, with the
+  state ACQ.
+- **What follows** is what any loss of signal shows (#453): the EPE grows, RAIM is lost while the fix holds, and finally
+  the fix goes with `SATELLITE COVERAGE INADEQUATE FOR NAV` and the NAV flag. `RAIM NOT AVAILABLE` shows only if RAIM
+  stays lost for more than 10 s before the fix goes, which depends on the sky. There is no message of its own.
+- The repair sets the level to 0 and lifts the blocks at once; the receiver acquires again.
 
 ### GPS spoofing (`gpsSpoofing`)
+
+Not built yet. Issue #465 rewrites this section with a realistic spoofer (a fake sky, capture and recovery) and takes the
+general `SYSTEM TIME UPDATED` check while a fix is held. What follows is the earlier specification, kept until then.
 
 Triggered manually only. It follows the pattern airline crews report from area spoofing (for
 example over the eastern Mediterranean, OPSGROUP 2023): **the position jumps to a fixed false location and the GPS
@@ -244,19 +270,28 @@ until the control segment flags the satellite unhealthy, about an hour on averag
 simulated fault is that unflagged window; the satellite is never flagged (the SDK's `GPSSatelliteState.Faulty` is not
 used), because a flagged satellite is simply excluded and has no measurable effect.
 
-- At the failure, pick one satellite in use (guess: the highest one) and persist its PRN.
-- While that satellite is in use, its pseudorange carries a bias (guess: growing over a few minutes to a drawn 500 to
-  3000 m, as a clock jump does). The position error follows from the bias through the geometry of the solution
+- At the failure, pick one satellite (guess: the highest one in the solution, or with none in use the highest one above
+  the 5-degree mask) and persist its PRN.
+- While that satellite is in use, its pseudorange carries a bias (guess: growing over a drawn 120 to 300 s to a drawn
+  500 to 3000 m, as a clock jump does). The position error follows from the bias through the geometry of the solution
   (the coefficients `GpsSolution` computes, which its header anticipates for this), so it depends on the satellites in
   use and can be larger than the bias.
 - While it is in use **and RAIM is available** (the existing availability of `GpsSolution`, which says whether a fault
   could be detected), the unit shows `RAIM POSITION ERROR` / `CROSS CHECK POSITION` (B-3). The KLN 90B detects the
   fault but does not exclude the satellite (guess: the manuals describe only detection). Without RAIM the error is
-  undetected.
+  undetected. The detection threshold is the smallest bias the protection level is built to catch,
+  `RAIM_K × SIGMA_UERE_M` (`FAULT_DETECTION_BIAS_M`, about 27 m): during the ramp the fault is detected only once
+  the bias has grown to it.
 - A detected fault has the consequences of a loss of RAIM (#453; guess, the manuals give only the message):
   `L:KLN90B_IntegrityWarn` is true, approach active cannot be entered, and in approach active the NAV flag and `PRESS
   GPS APR FOR NAV` follow (6-20). En route the navigation stays valid.
+- The bias is added by `FailingMeasurement` to whichever measurement strategy runs; velocity and track are not touched.
+  A satellite jamming blocks is not in the solution, so it adds no error and is not detected.
 - When the satellite sets or leaves the solution, the error and the message go. The repair ends it.
+- **The fault moves on** (guess): after the faulty satellite has been out of the solution for 120 s of sim time while
+  the unit has a fix, a new satellite is picked by the same rule with a new bias and ramp. A short dropout or the
+  reacquisition after a power-on never switches. So a long flight keeps a faulty satellite as the constellation moves,
+  and a session far from the stored satellite's view gets a new one 2 minutes after its fix.
 
 ### Other GPS units
 
@@ -500,9 +535,10 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
 
 - The failure state is persisted per aircraft model, under the same profile key as the user settings
   (`"<ATC MODEL>.profile_1"`): the MTBF, the active failures with their drawn values (spoofing position and time
-  shift, faulty PRN and error), and the battery state (the health and the latest sim date seen). The EEPROM's
-  calibration values are properties of the unit, not of a failure, and have a settings category of their own (see the
-  EEPROM).
+  shift; the jamming ramp: its length `rampS`, its final level `finalDb` and its progress `elapsedS`; the faulty
+  satellite: its PRN `prn`, its bias `biasM` and its ramp `rampS` and `elapsedS`), and the battery state (the health
+  and the latest sim date seen). The EEPROM's calibration values are properties of the unit, not of a failure, and
+  have a settings category of their own (see the EEPROM).
 - **It lives in its own settings manager**, added to `KLN90BSettingSaveManager`, so that the battery's wipe of the
   user memory leaves it alone.
 - New keys only, with defaults that mean "nothing failed, MTBF off, new battery". Changes are saved when they happen.
@@ -608,27 +644,18 @@ This section describes the code that #458 did not change and the later parts of 
 implemented. These changes come before the failures that need them. The ports, the nullable values, `ALTITUDE FAIL`
 as a detected failure, TEST FAIL for an active failure and the injectable randomness are settled by #458.
 
-1. **No runtime wipe of the user memory.** User data is restored only in `KLN90BCore.asyncInit`. A dead battery at a
+1. **No runtime wipe of the user memory** (it belongs to #461). User data is restored only in `KLN90BCore.asyncInit`. A dead battery at a
    power-on within a session needs a path that resets the flight plans, the user waypoints in the facility
    repository, the remarks, the user settings and the clock in memory, and through them in storage. The restore error
    path (empty plans and `USER DATA LOST`) is the closest existing code. The receiver's memory is private SDK state:
    the almanac time (`lastAlamanacTime`) and each satellite's `data.lastEphemerisTime`, which `GPS` sets only at
    construction from the stored settings (`Gps.ts`). The clock has no stored value at all: `GPS` takes it from
    `E:ABSOLUTE TIME` at construction. The wipe needs a way to erase the first and to set the second at a power-on.
-2. **Satellite inhibits have one owner.** `GpsSearch` sets the inhibits when its search changes mode, and `end()`
-   lifts them all: at every power-on through `start()`, and through `acquireAndUseSatellites` (SET 10 FAST, an
-   engine-running start, `WelcomePage.leaveFailed`). With FAST it never inhibits anything. The receiver failures and
-   jamming need an "inhibit all" that survives all of these, merged with the search's own choice.
-3. **RAIM has no fault model.** `GpsSolution` judges the geometry only. The faulty satellite uses its availability as
-   "a fault would be detected" (see above), so no residual model is needed, but the satellite's bias must be mapped
-   into a position error through the solution's coefficients and added to the measurement (`GpsMeasurement`), as
-   spoofing's false position is. The detected fault also feeds the integrity output and the approach gate, which
-   today read only the RAIM availability.
-4. **`SYSTEM TIME UPDATED` is checked only at acquisition** (`GPS.gpsAcquired`); spoofing needs the check while a fix
-   is held (see spoofing).
+2. **`SYSTEM TIME UPDATED` is checked only at acquisition** (`GPS.gpsAcquired`); spoofing needs the check while a fix
+   is held (see spoofing). It belongs to #465.
 
-Already possible without new structure: the screen shift (a style change in a display tick) and spoofing (the
-measurement strategy). The FLR pages exist (#458).
+Already possible without new structure: the screen shift (a style change in a display tick). Spoofing builds on the
+measurement decorator of #460. The FLR pages exist (#458).
 
 ## Public contract
 
@@ -657,8 +684,8 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
 - Render: FLR 1 to 3 (fields, prompts, lists, SERVICED), SET 10's button, the messages and TEST FAIL, OTH 9/10 dashes,
   the screen shift.
 - Flight: each failure's effect on the outputs (`test/render/Interconnect.test.ts` holds the SimVar-to-port table; a
-  failed port must drop exactly its SimVars), the receiver failures, jamming, spoofing and the faulty satellite
-  against the receiver model, the battery wipe at a power-on.
+  failed port must drop exactly its SimVars), the receiver failures, jamming and the faulty satellite against the
+  receiver model (spoofing is #465), the battery wipe at a power-on.
 - With MTBF off and nothing failed, the whole existing suite stays green unchanged, except the tests that pin the
   planner across a power-off with `Output.WriteGPSSimVars` set (the exception of the anti-goals).
 - Sim, before release: the failed ports with a hot swap to another GPS unit (the zeroing itself was tested on
@@ -680,5 +707,4 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
 Like "What the code needs first", this section is removed once #366 is implemented.
 
 - The order of the work of the later parts and how it is split into commits (CLAUDE.md wants one commit per issue).
-- How jamming's loss looks over the first seconds (all at once, or the satellites dropping over a few seconds).
 - The default clock date after a battery wipe.

@@ -154,7 +154,7 @@ describe('the heading input before the first calculation tick', () => {
         unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
         const p = unit.props;
         const sensorsIn = new SensorsIn(new EventBus(), p.userSettings, p.planeSettings, new Interconnect(p.planeSettings, p.failures),
-            new MessageHandler(), new ExactMeasurement());
+            new MessageHandler(), new ExactMeasurement(), p.failures);
         return {unit, sensorsIn};
     }
 

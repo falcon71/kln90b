@@ -29,7 +29,7 @@ function plane(): KLN90PlaneSettings {
 
 const ALWAYS_HIT = () => 0;
 /** The eligible random failures of plane(): ARINC 429 output, OBS resolver, altitude, EEPROM and the superflag */
-const ELIGIBLE: FailureKey[] = ['arinc429Out', 'obsResolver', 'altitude', 'eeprom', 'superflag'];
+const ELIGIBLE: FailureKey[] = ['arinc429Out', 'obsResolver', 'altitude', 'eeprom', 'superflag', 'gpsAntenna', 'gpsReceiver'];
 
 let events: { key: FailureKey, active: boolean }[];
 let now: number;
@@ -127,6 +127,8 @@ describe('FailureTrigger', () => {
         failures.fail('altitude');
         failures.fail('eeprom');
         failures.fail('superflag');
+        failures.fail('gpsAntenna');
+        failures.fail('gpsReceiver');
         events.length = 0;
         // rs232Out is ineligible on this plane and stays out; only arinc429Out is left, and it is active too
         failures.fail('arinc429Out');

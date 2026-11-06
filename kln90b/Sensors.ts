@@ -32,6 +32,7 @@ import {
 } from "./LVars";
 import {GPS} from "./Gps";
 import {GpsMeasurement} from "./GpsMeasurement";
+import {Failures} from "./failures/Failures";
 import {Hardware} from "./Hardware";
 import {SignalOutputFilter} from "./services/SignalOutputFilter";
 import {Interconnect} from "./Interconnect";
@@ -326,10 +327,10 @@ export class SensorsIn implements CalcTickable {
 
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, private readonly options: KLN90PlaneSettings, private readonly interconnect: Interconnect,
-                messageHandler: MessageHandler, gpsMeasurement: GpsMeasurement) {
+                messageHandler: MessageHandler, gpsMeasurement: GpsMeasurement, failures: Failures) {
         this.airdata = new Airdata(userSettings, options, interconnect);
         //5-29: the altitude input is a measurement of the GPS solution. Airdata reports none until its first tick
-        this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.getIndicatedAlt(), gpsMeasurement);
+        this.gps = new GPS(bus, userSettings, options, messageHandler, () => this.airdata.getIndicatedAlt(), gpsMeasurement, failures);
         this.fuelComputer = new FuelComputer(options, interconnect);
         //Pages and selectors built before the first tick (a force-ready start) see the heading input already (#458)
         this.headingAvailable = this.readHeading();
@@ -1032,8 +1033,9 @@ export class Sensors implements CalcTickable {
 
 
     constructor(bus: EventBus, userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, public readonly interconnect: Interconnect, audioGenerator: AudioGenerator,
-                messageHandler: MessageHandler, hardware: Hardware, gpsMeasurement: GpsMeasurement, dbar: DbarOutput = EXACT_DBAR) {
-        this.in = new SensorsIn(bus, userSettings, options, interconnect, messageHandler, gpsMeasurement);
+                messageHandler: MessageHandler, hardware: Hardware, gpsMeasurement: GpsMeasurement, failures: Failures,
+                dbar: DbarOutput = EXACT_DBAR) {
+        this.in = new SensorsIn(bus, userSettings, options, interconnect, messageHandler, gpsMeasurement, failures);
         this.out = new SensorsOut(options, interconnect, audioGenerator, hardware, dbar);
 
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));

@@ -13,7 +13,7 @@ describe('FLR 3 (#458)', () => {
         await openFlr3(unit);
 
         expect(Screen.read().status().left).toBe('FLR 3');
-        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'ALTITUDE', 'EEPROM', 'OBS INPUT', 'SUPERFLAG']);
+        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'ALTITUDE', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR']);
         expect(unit.errors).toEqual([]);
     });
 
@@ -32,7 +32,7 @@ describe('FLR 3 (#458)', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(unit.props.failures.isActive('altitude')).toBe(true);
         expect(unit.props.failures.mtbfHours).toBe(0); // Also with the random failures off
-        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'EEPROM', 'OBS INPUT', 'SUPERFLAG', '']);
+        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR', 'JAMMING']);
 
         await unit.panel.cursor('L'); // Off, so that the inner knob turns the pages
         await unit.panel.inner('L', -1);
@@ -65,12 +65,12 @@ describe('FLR 3 (#458)', () => {
         unit.props.failures.fail('arinc429Out');
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'EEPROM', 'OBS INPUT', 'SUPERFLAG', '']);
+        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR', 'JAMMING']);
         // The cursor keeps its position and stands on the entry that moved up into it
         expect(unit.panel.focused('L').text.trim()).toBe('EEPROM');
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
-        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'FAIL      ?', 'OBS INPUT', 'SUPERFLAG', '']);
+        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'FAIL      ?', 'GPS ANTENNA', 'GPS RCVR', 'JAMMING']);
         expect(unit.errors).toEqual([]);
     });
 
@@ -95,7 +95,7 @@ describe('FLR 3 (#458)', () => {
             }),
         });
         await openFlr3(unit);
-        expect(rows().slice(1)).toEqual(['429 AIRDATA', '429 OUTPUT', 'EEPROM', 'OBS INPUT', 'RMI OUTPUT']);
+        expect(rows().slice(1)).toEqual(['429 AIRDATA', '429 OUTPUT', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR']);
 
         await unit.panel.cursor('L');
         await unit.panel.cursorTo('L', 'RS-232 OUT');

@@ -2,7 +2,7 @@ import {DefaultUserSettingManager, EventBus, UserSettingDefinition} from '@micro
 import {FAILURE_CATALOG, FailureKey, failureSettingName} from "../failures/FailureCatalog";
 
 /**
- * failure_<key>: "" = working, anything else = failed (the stored text is "{}", room for later fields). failureMtbf: the
+ * failure_<key>: "" = working, anything else = failed (the stored text is "{}" until a failure stores values, #460). failureMtbf: the
  * mean time between random failures in hours, 0 = off (#458)
  */
 export type KLN90BFailureTypes = { failureMtbf: number } & { [K in `failure_${FailureKey}`]: string };

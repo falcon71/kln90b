@@ -22,6 +22,9 @@ import {TICK_TIME_CALC} from "./TickController";
 import {GPS_ERA_DURATION, GpsSearch, HOT_ACQUISITION, HOT_ACQUISITION_RANGE, IDLE_ACQUISITION, SearchMode, WARM_ACQUISITION_RANGE} from "./GpsSearch";
 import {computeGeometry, GpsGeometry, hasFiniteAngles, MAX_ROWS, SIGMA_UERE_M} from "./GpsSolution";
 import {GpsMeasurement, MeasurementInputs} from "./GpsMeasurement";
+import {Failures} from "./failures/Failures";
+import {GpsFailures, ReceiverView} from "./failures/GpsFailures";
+import {FailingMeasurement} from "./failures/FailingMeasurement";
 
 const SAVE_INTERVALL = 60000;
 const MIN_GROUND_SPEED_FOR_TRACK = 2; //3-35
@@ -63,6 +66,7 @@ export class KLNGPSSatComputer extends GPSSatComputer {
 
     public internalTime: number = 0;
     public search: GpsSearch | undefined = undefined; //Set by GPS after construction
+    public failures: GpsFailures | undefined = undefined; //Set by GPS after construction
     /** Called after a forced acquisition, which the unit accepts at once (#215) */
     public onForcedAcquisition: (() => void) | undefined = undefined;
 
@@ -88,9 +92,16 @@ export class KLNGPSSatComputer extends GPSSatComputer {
         }
     }
 
-    /** The forced acquisition of an engine-running start or of SET 10 FAST ends the start model */
+    /**
+     * The forced acquisition of an engine-running start or of SET 10 FAST ends the start model. The failures' blocks are
+     * applied first: the SDK's forced channel assignment skips inhibited satellites (#460, GPSSat.ts
+     * losSatelliteFilterOmniscient). The jamming blocks are brought up to date before: at power-on reset() emptied them,
+     * and no calculation tick has run yet to refill them
+     */
     public acquireAndUseSatellites(): void {
+        this.failures?.refreshBlocks();
         this.search?.end();
+        this.search?.applyInhibits(); //A deliberate guard: end() applies too, but this path must never run unblocked
         super.acquireAndUseSatellites();
         this.onForcedAcquisition?.();
     }
@@ -149,6 +160,8 @@ export class GPS {
     public readonly search: GpsSearch;
     /** STA 5 predicts the satellite geometry at the destination and ETA through this context (6-20, #214) */
     public readonly raimPrediction: GPSPredictionContext;
+    /** The receiver failures, jamming and the faulty satellite (#460) */
+    public readonly failures: GpsFailures;
     /** The simulator's UNIX time of the last tick, for what the receiver reads from its satellites (STA 1) */
     public simTimeUnix: number = 0;
     private intSaveCount = 0;
@@ -170,15 +183,31 @@ export class GPS {
     private readonly measurementInputs: MeasurementInputs;
     /** The measured position of a new fix, before it replaces coords */
     private readonly acquiredPosition = new GeoPoint(0, 0);
+    /** The given measurement strategy with the faulty satellite's error added (#460) */
+    private readonly measurement: GpsMeasurement;
     private lastPowerOffTime: number = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds); //Sim time (s) of construction or the last power-off. The battery clock runs on while the unit is off (3-53)
 
     /**
      * @param indicatedAltitude the altitude input, null when there is none. The solution uses it as a measurement (5-29)
      * @param measurement where the position, the ground speed and the track come from while the unit has a fix (#402)
+     * @param failures the failure service; the receiver failures, jamming and the faulty satellite act here (#460)
      */
     constructor(private bus: EventBus, private userSettings: KLN90BUserSettings, options: KLN90PlaneSettings, private readonly messageHandler: MessageHandler,
-                private readonly indicatedAltitude: () => Feet | null, private readonly measurement: GpsMeasurement) {
+                private readonly indicatedAltitude: () => Feet | null, measurement: GpsMeasurement, failures: Failures) {
         this.takeHomeMode = options.takeHomeMode;
+        //Before the receiver and the search, which read it from their callbacks: the search's blocks and the solution
+        //(updateSolution, also from acceptForcedSolution after a forced acquisition)
+        const gps = this;
+        const view: ReceiverView = {
+            satellites: () => gps.gpsSatComputer.getSatellites(),
+            solutionPrns: () => gps.solutionPrns,
+            get solution(): GpsGeometry {
+                return gps._solution;
+            },
+            isValid: () => gps.isValid(),
+        };
+        this.failures = new GpsFailures(bus, failures, view, this.takeHomeMode);
+        this.measurement = new FailingMeasurement(measurement, this.failures);
         this._solution = this.takeHomeMode ? {...TAKE_HOME_SOLUTION} : computeGeometry([], false, this.solutionCoefficients);
         this.measurementInputs = {geometry: this._solution, prns: this.solutionPrns, coefficients: this.solutionCoefficients, indicatedAltitudeFt: null};
         const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
@@ -215,8 +244,9 @@ export class GPS {
         //Before the power event subscription, so that powerChanged always finds the search. PowerSupply publishes no power
         //event before Sensors exists, so powerChanged never runs before the end of this constructor
         //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
-        this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get());
+        this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get(), prn => this.failures.isJammed(prn), () => this.failures.receiverFailed);
         this.gpsSatComputer.search = this.search;
+        this.gpsSatComputer.failures = this.failures;
         this.raimPrediction = this.gpsSatComputer.createPredictionContext(); //STA 5 (6-20): one context for the life of the unit; pages are rebuilt on every knob step
         this.gpsSatComputer.onForcedAcquisition = () => this.acceptForcedSolution();
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
@@ -266,7 +296,10 @@ export class GPS {
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
             this.updateSolution();
         } else {
+            //#460, design "GpsFailures": the failures first, then the search, then their inhibits for the channel assignment
+            this.failures.tick(simTime);
             this.search.tick(actualUnixTime, {lat, lon}, this.gpsSatComputer.internalTime);
+            this.search.applyInhibits();
             this.gpsSatComputer.onUpdate();
             this.updateSolution();
 
@@ -378,6 +411,11 @@ export class GPS {
             const position = sat.position.get();
             if (!hasFiniteAngles(position)) {
                 continue; //Left out here, not in computeGeometry, so that the PRNs and the coefficients stay row by row (#456)
+            }
+            if (this.failures.isBlocked(sat.prn)) {
+                //#460: the SDK releases an inhibited satellite only at its next position update, up to 5 s later. The unit
+                //does not wait (design, "Blocked satellites leave the unit's solution at once")
+                continue;
             }
             if (n >= this.solutionPrns.length
                 || this.solutionPrns[n] !== sat.prn
@@ -498,6 +536,7 @@ export class GPS {
     }
 
     private powerChanged(evt: PowerEventData) {
+        this.failures.reset(); //#460: the jamming fluctuation and the blocked set restart; the stored failures stay
         if (evt.isPowered) {
             //Ticks are not running, when we are powered off. The battery clock counts the off time itself:
             //PowerSupply's timeSincePowerChange is shaped for the CRT warm-up and is about 0 on a forced start (#328).

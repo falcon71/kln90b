@@ -35,6 +35,34 @@ export class Failures {
         return this.settings.getSetting(SETTING_NAMES.get(key)!).get() !== "";
     }
 
+    /**
+     * The values a failure keeps in its setting text (#460): the parsed object, {} when the failure is inactive or the text
+     * is not a plain object (an older session, a hand-edited profile)
+     */
+    public values(key: FailureKey): Record<string, number> {
+        const text = this.settings.getSetting(SETTING_NAMES.get(key)!).get();
+        if (text === "") {
+            return {};
+        }
+        try {
+            const parsed: unknown = JSON.parse(text);
+            if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                return parsed as Record<string, number>;
+            }
+        } catch (e) {
+            //Falls through to {}
+        }
+        return {};
+    }
+
+    /** Stores values while the failure is active. Publishes nothing: the failure itself did not change */
+    public setValues(key: FailureKey, values: Record<string, number>): void {
+        if (!this.isActive(key)) {
+            return;
+        }
+        this.settings.getSetting(SETTING_NAMES.get(key)!).set(JSON.stringify(values));
+    }
+
     public isEligible(key: FailureKey): boolean {
         return this.definition(key).isEligible(this.planeSettings);
     }
