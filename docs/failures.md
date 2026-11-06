@@ -227,18 +227,23 @@ satellites go weakest first and some come back, and the unit shows the states of
   with a wander of sigma 3 dB and a correlation time of 10 s on top (guesses; it starts at 0 at every power-on and is
   not saved). The ramp progress is saved, so a power cycle or a new session continues it and a finished ramp stays
   finished. A power-on while jammed after the ramp starts at the final level, also the forced acquisition of an
-  engine-running start, which runs before the first calculation tick and acquires no satellite the level blocks.
-- **Every satellite's SNR** drops by the level (the SNR curve is #464's), so STA 1 shows the lowered values.
-- **Lock** (IM C-7: 30 and below unusable, 30 to 35 marginal): a satellite the receiver tracks is lost below SNR 30; one
-  it does not track is acquired only at SNR 35 or more. The gap keeps a satellite from flickering, and the wander makes
-  the losses intermittent near the thresholds. A reacquired satellite takes the SDK's normal acquisition time.
-- **STA 1.** A satellite jamming took stays on the page as `*xx 00` with its elevation, as a satellite still being
-  searched does (guess from the real-unit video cited in `Sta1Page.tsx`). A total loss shows every row so, with the
-  state ACQ.
+  engine-running start, which runs before the first calculation tick and acquires no satellite the level takes.
+- **Every satellite's SNR** drops by the level; the SNR itself, with its per-satellite differences, belongs to the
+  receiver's signal model (`GpsSignal.ts`, #467, `docs/architecture.md`). Jamming is only one more cause that lowers
+  the signal: the satellites it takes spread out by those differences, weakest first.
+- **Lock** is the receiver's normal rule for every cause, not a jamming rule (IM C-7: 30 and below unusable, 30 to 35
+  marginal): a satellite the receiver tracks is lost below SNR 30; one it does not track is acquired only at SNR 35 or
+  more. The gap keeps a satellite from flickering, and the wander makes the losses intermittent near the thresholds. A
+  reacquired satellite takes the SDK's normal acquisition time. A lost satellite sets no inhibit: it is unreachable for
+  the SDK, so it keeps its channel and is searched.
+- **STA 1.** A satellite jamming took stays in its channel and shows `*xx 00` with its elevation, as a satellite still
+  being searched does (guess from the real-unit video cited in `Sta1Page.tsx`). A total loss shows every row so, with
+  the state ACQ. With FAST timings (#46, acquisition timeout 1 s) the lost satellite becomes `Unreachable` after a
+  second, shows `*xx-` and its channel moves on.
 - **What follows** is what any loss of signal shows (#453): the EPE grows, RAIM is lost while the fix holds, and finally
   the fix goes with `SATELLITE COVERAGE INADEQUATE FOR NAV` and the NAV flag. `RAIM NOT AVAILABLE` shows only if RAIM
   stays lost for more than 10 s before the fix goes, which depends on the sky. There is no message of its own.
-- The repair sets the level to 0 and lifts the blocks at once; the receiver acquires again.
+- The repair sets the level to 0; the satellites come back by the lock rule and the receiver acquires again.
 
 ### GPS spoofing (`gpsSpoofing`)
 
@@ -286,7 +291,7 @@ used), because a flagged satellite is simply excluded and has no measurable effe
   `L:KLN90B_IntegrityWarn` is true, approach active cannot be entered, and in approach active the NAV flag and `PRESS
   GPS APR FOR NAV` follow (6-20). En route the navigation stays valid.
 - The bias is added by `FailingMeasurement` to whichever measurement strategy runs; velocity and track are not touched.
-  A satellite jamming blocks is not in the solution, so it adds no error and is not detected.
+  A satellite the receiver has lost is not in the solution, so it adds no error and is not detected.
 - When the satellite sets or leaves the solution, the error and the message go. The repair ends it.
 - **The fault moves on** (guess): after the faulty satellite has been out of the solution for 120 s of sim time while
   the unit has a fix, a new satellite is picked by the same rule with a new bias and ramp. A short dropout or the

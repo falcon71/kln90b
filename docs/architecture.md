@@ -312,7 +312,7 @@ prediction context of the main computer.
       inhibited while the SDK collects the almanac from it (12.5 min). Then ACQ with the right time. If the kept
       satellite is lost first, the inhibits are lifted and the blind search resumes.
     - **Idle**: the first fix (`gpsAcquired`), a forced acquisition (`acquireAndUseSatellites`: engine-running start,
-      SET 10 FAST) and power-off end the model: the search's inhibits are lifted (the failures' blocks stay, see the
+      SET 10 FAST) and power-off end the model: the search's inhibits are lifted (the receiver failures' inhibits stay, see the
       failures below) and the acquisition time returns to `IDLE_ACQUISITION` (40 s). With `fastGpsAcquisition` the
       model never starts, nor in a session whose computer was built FAST (the SDK timings are fixed at construction).
     - `KLNGPSSatComputer.isAlmanacValid` reports the decision: ACQ true, almanac and sky search false, Idle the SDK's
@@ -341,29 +341,54 @@ prediction context of the main computer.
   ephemeris download 30 s (one data frame) and expiry 2 h, acquisition with a current ephemeris 9 ± 3 s (a hot start
   has its fix before the 17 s self-test ends), almanac download 12.5 min, almanac expiry six months (3-17), timeout
   4 min. With `fastGpsAcquisition` all of these drop to about 1 to 10 s.
+- **Satellite signal** (`kln90b/GpsSignal.ts`, `AntennaAttitude.ts`, #467; design in
+  `docs/superpowers/specs/2026-11-06-satellite-signal-design.md`). `GPS.signals` (`SatelliteSignals`) holds one SNR per
+  satellite and is ticked in `GPS.tick` after `GpsFailures.tick` and before the search and the SDK's update. The SNR is
+  the sum of the antenna's gain toward the satellite (the SNR curve evaluated at the elevation above the antenna's plane,
+  which tilts with the aircraft), an offset by the satellite's block, a slow fade, the receiver's estimate jitter, minus
+  the jamming level. The antenna's attitude comes from the platform (`createAntennaAttitude`): `SimVarAntennaAttitude`
+  in the sim (heading, pitch, bank and `SIM ON GROUND`, with the MSFS signs flipped there), a level antenna in the tests
+  unless a boot opts in (`antennaAttitude`).
+    - **One lock rule for every cause**: a tracked satellite is lost below SNR 30, a lost one comes back at 35 or more
+      (Installation Manual C-7). Nothing in the receiver, the solution or STA 1 is keyed on jamming; it only lowers the
+      SNR.
+    - **Reachability, not inhibits.** A lost satellite acts on the SDK through `KLNGPSSatComputer.wrapReachability`: each
+      satellite's `updateState` is wrapped once so that a lost satellite is seen with a signal strength of 0 during that
+      call only. The SDK then does what a missing signal does: a tracked satellite falls back to `None` and stays in
+      its channel, searched; a searched one is not acquired and becomes `Unreachable` after the acquisition timeout. The
+      channel assignment keeps the geometric value, so channels still follow the almanac's prediction. The wrapper reads
+      a private SDK field; a test holds it. A forced acquisition (engine-running start, SET 10 FAST) refreshes the
+      signals at its first reachability query, because the SDK computes the satellite positions inside that update.
+    - **The block** of each PRN comes from `block` in `gps_ephemeris.json`, read from the SDK satellite's private
+      ephemeris entry; the offset per block is in `GpsSignal.ts`. A satellite without a known block gets 0.
+    - **The ephemeris is generated.** `gps_ephemeris.json` is no committed file: the build generates it from the RINEX
+      navigation file and the IGS satellite metadata in `ephemeris/` (`tools/ephemeris/`, see `ephemeris/README.md`),
+      adds each PRN's block and writes its exact byte size into the package's `layout.json`. `FakeXhr` serves the same
+      generated JSON to the tests.
+    - **FAST timings** (#46, acquisition timeout 1 s): a lost satellite becomes `Unreachable` after a second, STA 1
+      shows `*xx-` and its channel moves on to another satellite. With the real timings it stays in its channel,
+      searched, and reads `*xx  00`.
+    - **STA 1** reads `signals.snr(prn)`; its state is the SDK's own channel state, and without a fix it shows `ACQ`
+      while a lost satellite above the mask holds a channel.
 - **Receiver failures** (`kln90b/failures/GpsFailures.ts`, #460; specification in `docs/failures.md`). `GPS` builds
   `GpsFailures` from `Failures` (passed through `Sensors`) and ticks it first in `GPS.tick`, outside take-home mode. It
-  owns the jamming level, the set of blocked satellites, the values drawn for the failures, the faulty satellite's bias
-  and its detection, and holds no state `VolatileMemory` would reset: the persistent part is the failure's stored values
-  (the ramp progress is saved at most every 10 s), the rest restarts at every power-on.
-    - **Inhibit ownership.** `GpsSearch` keeps its own choice (the allowed PRNs) and is given two callbacks:
-      `GpsFailures.isJammed(prn)`, asked per satellite, and `GpsFailures.receiverFailed`, asked once per application
-      because it reads the settings. One method applies both: the SDK inhibit is set when the search does not allow the
-      satellite, the receiver has failed or jamming blocks it, and `GPS.tick` applies it once per tick after
-      `GpsFailures.tick`. `end()` clears only the search's choice, so the blocks survive a power-on, the first fix,
-      `acquireAndUseSatellites` and a power-off. `acquireAndUseSatellites` calls `GpsFailures.refreshBlocks()` first:
-      at power-on the blocked set is empty until the first calculation tick, and an engine-running start forces its
-      acquisition before that tick. With nothing failed the inhibits are the search's alone. Only the public
-      `setSatelliteInhibit` is used.
-    - **A blocked satellite leaves the unit's solution at once.** The SDK releases an inhibited satellite from its channel
-      only at its next position update (every 5 s), so `GPS.updateSolution` skips blocked satellites itself. The SDK's
-      states and the unit's solution may disagree for up to 5 s.
+  owns the jamming level, the values drawn for the failures, the faulty satellite's bias and its detection, and holds
+  no state `VolatileMemory` would reset: the persistent part is the failure's stored values (the ramp progress is saved
+  at most every 10 s), the rest restarts at every power-on.
+    - **Inhibit ownership.** `GpsSearch` keeps its own choice (the allowed PRNs) and is given one callback,
+      `GpsFailures.receiverFailed`, asked once per application because it reads the settings. The SDK inhibit is set
+      when the search does not allow the satellite or the receiver has failed; `GPS.tick` applies it once per tick.
+      `end()` clears only the search's choice. Signal loss, jamming included, sets no inhibit (see the satellite signal
+      above). Only the public `setSatelliteInhibit` is used.
+    - **A lost satellite leaves the unit's solution at once.** The SDK releases a satellite from its channel only at its
+      next position update (every 5 s), so `GPS.updateSolution` skips satellites with `receiverFailed ||
+      signals.isLost(prn)` itself, which covers the moment between the signals' tick and the SDK's update.
     - **`FailingMeasurement`** decorates the measurement strategy `GPS` was given (exact in tests, simulated in the sim).
       It always updates the inner strategy and passes its outputs through, adding only the faulty satellite's position
       error from the solution's coefficients. Velocity and track are not touched.
     - **Readers.** `receiverFailed` (antenna or receiver) makes `Sta1Page` show `FAILR` with no rows and silences the
-      #453 signal and RAIM messages; `jammingDb` lowers the SNR of every satellite and `jammedRows()` gives the lingering
-      `*xx 00` rows; `faultDetected(halNm)` feeds `RaimPositionErrorMessage`, `NavCalculator`'s integrity output and
+      #453 signal and RAIM messages; `jammingDb` is given to the signals, which lower every SNR by it;
+      `faultDetected(halNm)` feeds `RaimPositionErrorMessage`, `NavCalculator`'s integrity output and
       `ModeController`'s approach gate.
 - **The receiver model** (`kln90b/GpsSolution.ts`, #453, design in
   `docs/superpowers/specs/2026-11-01-gps-signal-loss-design.md` 5.1). `GPS.solution` is a `GpsGeometry` computed by

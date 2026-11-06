@@ -2,6 +2,7 @@ import {EventBus, FacilityLoader, FacilityRepository, FlightPlanRouteManager} fr
 import {KLNFacilityRepository} from "./data/navdata/KLNFacilityRepository";
 import {ActualFacilityClient} from "./data/navdata/KLNFacilityLoader";
 import {GpsMeasurement, SimulatedMeasurement} from "./GpsMeasurement";
+import {AntennaAttitudeSource, SimVarAntennaAttitude} from "./AntennaAttitude";
 
 /**
  * What KLN90BCore needs from its environment that is not reached through the sim's global APIs (SimVar, Coherent,
@@ -29,6 +30,16 @@ export interface KLN90BPlatform {
      * Where the GPS takes its position, ground speed and track from while it has a fix (#402)
      */
     createGpsMeasurement(): GpsMeasurement;
+
+    /**
+     * Where the attitude of the GPS antenna comes from, which tilts the satellites' signals (#467)
+     */
+    createAntennaAttitude(): AntennaAttitudeSource;
+
+    /**
+     * The random source of the satellites' signal fades and estimate noise (#467)
+     */
+    createSignalRandom(): () => number;
 }
 
 export const SIM_PLATFORM: KLN90BPlatform = {
@@ -36,4 +47,6 @@ export const SIM_PLATFORM: KLN90BPlatform = {
     getFacilityRepository: (bus: EventBus) => KLNFacilityRepository.getRepository(bus),
     getRouteManager: () => FlightPlanRouteManager.getManager(),
     createGpsMeasurement: () => new SimulatedMeasurement(),
+    createAntennaAttitude: () => new SimVarAntennaAttitude(),
+    createSignalRandom: () => Math.random,
 };

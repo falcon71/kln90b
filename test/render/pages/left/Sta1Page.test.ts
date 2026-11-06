@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {GPSSatellite, GPSSatelliteState} from '@microsoft/msfs-sdk';
+import {GPSSatellite, GPSSatelliteState, GPSSystemState} from '@microsoft/msfs-sdk';
 import {bootToSelfTest, bootUnit, HeadlessUnit, moveAircraft, settle} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {DEFAULT_START} from '../../../harness/sim/clock';
@@ -9,6 +9,7 @@ import {approachWorld} from '../../../harness/fixtures';
 import {savedFlightplan} from '../../../harness/storage';
 import {GpsGeometry} from '../../../../kln90b/GpsSolution';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
+import {SearchMode} from '../../../../kln90b/GpsSearch';
 
 // The STA 1 snapshot of a unit with a fix is in GpsAcquisition.test.ts (describe 'STA 1 page with a fix'); the INIT
 // state of an almanac search is below. The decisions of #215: INIT covers the almanac and the sky searches (ORS 20 has
@@ -364,5 +365,72 @@ describe('STA 1 page count follows the satellites (5-29, #466)', () => {
         expect(Screen.read().rows('L')[0]).toMatch(/^STATE /);
         expect(Screen.read().rows('L')[1]).toBe(' SV SNR ELE');
         expect(Screen.read().status().left).toBe('STA 1');
+    }, 60_000);
+});
+
+// #467: without a fix and with the start model idle, STA 1 shows ACQ while the receiver searches a satellite whose signal
+// it lost, in a channel and above the 5 degree mask, whatever the cause; otherwise the SDK's own state decides. The SDK's
+// state is spied as Searching (which alone gives INIT), so the lost satellite is the only reason for ACQ
+describe('STA 1 ACQ while the receiver searches a satellite it lost (#467, characterization)', () => {
+    async function withoutFix(): Promise<{ unit: HeadlessUnit, target: GPSSatellite }> {
+        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        await settle(unit);
+        await unit.panel.selectPage('L', 'STA 1');
+        const gps = unit.props.sensors.in.gps;
+        vi.spyOn(gps, 'isValid').mockReturnValue(false);
+        vi.spyOn(gps, 'isTransition').mockReturnValue(false);
+        vi.spyOn(gps.gpsSatComputer, 'state', 'get').mockReturnValue(GPSSystemState.Searching);
+        const target = gps.gpsSatComputer.getChannels().find(s => s !== null && s.position.get()[0] < 80 * Math.PI / 180)!;
+        return {unit, target};
+    }
+
+    it('shows ACQ with a lost satellite in a channel above the mask', async () => {
+        const {unit, target} = await withoutFix();
+        vi.spyOn(unit.props.sensors.in.gps.signals, 'isLost').mockImplementation(prn => prn === target.prn);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(unit.props.sensors.in.gps.search.mode).toBe(SearchMode.Idle); // Precondition
+        expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
+    }, 60_000);
+
+    it('shows INIT, the SDK\'s state, with no satellite lost', async () => {
+        const {unit} = await withoutFix();
+        vi.spyOn(unit.props.sensors.in.gps.signals, 'isLost').mockReturnValue(false);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
+    }, 60_000);
+
+    it('shows INIT with the lost satellite in its channel below the mask', async () => {
+        const {unit, target} = await withoutFix();
+        vi.spyOn(unit.props.sensors.in.gps.signals, 'isLost').mockImplementation(prn => prn === target.prn);
+        vi.spyOn(target.position, 'get').mockReturnValue(Float64Array.of(86 * Math.PI / 180, 0));
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
+    }, 60_000);
+
+    // An untracked satellite below the acquire level is lost too, but the receiver searches only its channels
+    it('shows INIT with a lost satellite above the mask that is not in a channel', async () => {
+        const {unit} = await withoutFix();
+        const computer = unit.props.sensors.in.gps.gpsSatComputer;
+        const channels = computer.getChannels();
+        const outside = computer.getSatellites().find(s => !channels.includes(s) && s.position.get()[0] < 80 * Math.PI / 180)!;
+        expect(outside).toBeDefined(); // Precondition: a satellite above the mask that has no channel
+        vi.spyOn(unit.props.sensors.in.gps.signals, 'isLost').mockImplementation(prn => prn === outside.prn);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[0]).toBe('STATE  INIT');
+    }, 60_000);
+
+    it('shows ACQ past an empty channel', async () => {
+        const {unit, target} = await withoutFix();
+        const computer = unit.props.sensors.in.gps.gpsSatComputer;
+        vi.spyOn(computer, 'getChannels').mockReturnValue([null, target]);
+        vi.spyOn(unit.props.sensors.in.gps.signals, 'isLost').mockImplementation(prn => prn === target.prn);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
+        expect(unit.errors).toEqual([]);
     }, 60_000);
 });

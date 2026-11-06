@@ -16,6 +16,8 @@ import {ActualFacilityClient} from '../../kln90b/data/navdata/KLNFacilityLoader'
 import {KLNFacilityRepository} from '../../kln90b/data/navdata/KLNFacilityRepository';
 import {MemoryFacilityClient} from './navdata/MemoryFacilityClient';
 import {ExactMeasurement, GpsMeasurement} from '../../kln90b/GpsMeasurement';
+import {AntennaAttitudeSource, LEVEL_ANTENNA} from '../../kln90b/AntennaAttitude';
+import {mulberry32} from './sim/random';
 
 /**
  * The EFB side of FlightPlanRouteManager as the unit uses it (KlnEfbLoader, KlnEfbSaver): a synced route, and route
@@ -136,6 +138,12 @@ export function efbRoute(spec: EfbRouteSpec): FlightPlanRoute {
 
 export class FakePlatform implements KLN90BPlatform {
     /**
+     * The signals' own generator (#467), started per platform and apart from the seeded Math.random, so that the signal
+     * model does not shift the SDK's seeded draws (acquisition times, channel choices)
+     */
+    private readonly signalRandom = mulberry32(7);
+
+    /**
      * @param navdata the facilities the unit sees
      * @param routeManager the EFB; without one getRouteManager never resolves, like a sim with no EFB attached
      * @param overrides replace methods of this platform, for example a facility client that fails (bootUnitExpectingError)
@@ -166,5 +174,17 @@ export class FakePlatform implements KLN90BPlatform {
     /** The exact sim position, so that the tests read exact values; bootUnit's simulatedGps replaces it (#402) */
     public createGpsMeasurement(): GpsMeasurement {
         return new ExactMeasurement();
+    }
+
+    /**
+     * A level antenna whatever the SimVars say (#467): the tests not about the GPS keep every satellite's signal
+     * independent of the attitude. A test of the tilt opts into SimVarAntennaAttitude through the platform overrides
+     */
+    public createAntennaAttitude(): AntennaAttitudeSource {
+        return LEVEL_ANTENNA;
+    }
+
+    public createSignalRandom(): () => number {
+        return this.signalRandom;
     }
 }

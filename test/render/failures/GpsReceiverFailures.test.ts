@@ -278,13 +278,10 @@ describe('the receiver failures in the receiver (#460)', () => {
 });
 
 
-// The wiring around the receiver: the tick order, the per-satellite skip, take-home mode, and what jamming does not
-// suppress (design, "GpsFailures", "Blocked satellites leave the unit's solution at once", "The #453 messages during a
-// receiver failure")
+// The wiring around the receiver: the tick order, take-home mode, and what jamming does not suppress (design, "GpsFailures",
+// "Blocked satellites leave the unit's solution at once", "The #453 messages during a receiver failure"). The per-satellite
+// skip of a satellite whose signal is lost is in SatelliteReachability.test.ts (#467)
 describe('the wiring of the failures into the receiver (#460)', () => {
-    /** The unit's solution in row order (GPS.solutionPrns, read for the test) */
-    const solutionPrns = (unit: HeadlessUnit) => [...unit.props.sensors.in.gps['solutionPrns']];
-
     // Tick order: GpsFailures.tick, GpsSearch.tick, the inhibits, then the receiver's update. A block set between two
     // ticks reaches the receiver in the next tick's update, not one tick later
     it('a receiver failure is inhibited when the receiver updates in the next tick', async () => {
@@ -305,16 +302,19 @@ describe('the wiring of the failures into the receiver (#460)', () => {
         expect(atUpdate).toEqual([all]);
     }, 30_000);
 
-    // A jamming block set in a tick's GpsFailures.tick is inhibited by the time the receiver updates in that same tick
-    it('a satellite jamming blocks in a tick is inhibited when the receiver updates in that tick', async () => {
+    // #467: tick order GpsFailures.tick (the level), the signals' tick, then the receiver's update. A tracked satellite
+    // whose signal is lost in a tick has left the tracked states when the receiver's update of that same tick returns
+    // (through its reachability, Gps.ts wrapReachability). The per-satellite skip of the unit's solution is in
+    // SatelliteReachability.test.ts
+    it('a tracked satellite lost under jamming in a tick is no longer tracked after the receiver updates in that tick', async () => {
         const unit = await bootUnit({storage: HOME});
         await settle(unit);
         const gps = unit.props.sensors.in.gps;
         const sdk = computer(unit);
-        const failures = gps.failures;
-        failures.wanderSigmaDb = 0; // The level rises with the ramp alone
+        gps.failures.wanderSigmaDb = 0; // The level rises with the ramp alone
         const all = allPrns(unit);
-        const blocked = () => all.filter(prn => failures.isBlocked(prn));
+        const lost = () => all.filter(prn => gps.signals.isLost(prn));
+        const isTracked = (prn: number) => TRACKED.has(sdk.getSatellites().find(s => s.prn === prn)!.state.get());
 
         let tick = 0;
         const gpsTick = gps.tick.bind(gps);
@@ -322,54 +322,35 @@ describe('the wiring of the failures into the receiver (#460)', () => {
             tick++;
             gpsTick();
         });
-        const newlyBlocked = new Map<number, number[]>();
-        const failuresTick = failures.tick.bind(failures);
-        vi.spyOn(failures, 'tick').mockImplementation((t: number) => {
-            const before = blocked();
-            failuresTick(t);
-            const added = blocked().filter(prn => !before.includes(prn));
+        const newlyLostTracked = new Map<number, number[]>();
+        const signalsTick = gps.signals.tick.bind(gps.signals);
+        vi.spyOn(gps.signals, 'tick').mockImplementation((t, attitude, jammingDb) => {
+            const before = lost();
+            signalsTick(t, attitude, jammingDb);
+            const added = lost().filter(prn => !before.includes(prn) && isTracked(prn));
             if (added.length > 0) {
-                newlyBlocked.set(tick, added);
+                newlyLostTracked.set(tick, added);
             }
         });
-        const atUpdate = new Map<number, number[]>();
+        const trackedAfterUpdate = new Map<number, number[]>();
         const onUpdate = sdk.onUpdate.bind(sdk);
         vi.spyOn(sdk, 'onUpdate').mockImplementation(() => {
-            atUpdate.set(tick, inhibited(unit));
             onUpdate();
+            trackedAfterUpdate.set(tick, all.filter(isTracked));
         });
 
         unit.props.failures.fail('gpsJamming');
         await vi.advanceTimersByTimeAsync(240_000);
 
-        expect(newlyBlocked.size).toBeGreaterThan(1); // Precondition: the blocks came over several ticks
-        const missing: string[] = [];
-        for (const [t, prns] of newlyBlocked) {
-            const at = atUpdate.get(t) ?? [];
-            missing.push(...prns.filter(prn => !at.includes(prn)).map(prn => `tick ${t}: PRN ${prn}`));
+        expect(newlyLostTracked.size).toBeGreaterThan(1); // Precondition: the losses came over several ticks
+        const stillTracked: string[] = [];
+        for (const [t, prns] of newlyLostTracked) {
+            const after = trackedAfterUpdate.get(t) ?? [];
+            stillTracked.push(...prns.filter(prn => after.includes(prn)).map(prn => `tick ${t}: PRN ${prn}`));
         }
-        expect(missing).toEqual([]);
+        expect(stillTracked).toEqual([]);
         expect(unit.errors).toEqual([]);
     }, 60_000);
-
-    // The skip is per satellite: one blocked satellite leaves the solution, the others stay
-    it('one blocked satellite leaves the unit\'s solution at the next calculation tick, while the SDK still uses it', async () => {
-        const unit = await bootUnit({storage: HOME});
-        await settle(unit);
-        const gps = unit.props.sensors.in.gps;
-        const before = solutionPrns(unit);
-        const satellites = gps.solution.satellites;
-        expect(before.length).toBe(satellites); // Precondition: one row per satellite
-        const target = before[0];
-        vi.spyOn(gps.failures, 'isBlocked').mockImplementation(prn => prn === target);
-
-        await untilCalcTick(unit);
-
-        expect(gps.gpsSatComputer.getSatellites().find(s => s.prn === target)!.state.get()).toBe(GPSSatelliteState.InUse); // Precondition
-        expect(solutionPrns(unit)).toEqual(before.filter(prn => prn !== target));
-        expect(gps.solution.satellites).toBe(satellites - 1);
-        expect(gps.isValid()).toBe(true);
-    }, 30_000);
 
     // Take-home mode has no receiver failures (GpsFailures), also with one stored by an earlier session
     it('take-home mode ignores a stored gpsAntenna: no inhibit, a valid position', async () => {

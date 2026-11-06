@@ -3,11 +3,15 @@ import resolve from '@rollup/plugin-node-resolve';
 import scss from "rollup-plugin-scss";
 import versionInjector from "rollup-plugin-version-injector";
 import fs from "fs";
+import {EPHEMERIS_SOURCE_DIR, generateEphemerisJson} from "./tools/ephemeris/ephemeris.mts";
+import {writePackagedEphemeris} from "./tools/ephemeris/layout.mts";
 
 const buildTargetDir = process.env.buildTargetDir ?? 'build';
 
 /**
- * Copies all resources to the build directory and inserts the version number from the package.json into the manifest
+ * Copies all resources to the build directory and inserts the version number from the package.json into the manifest.
+ * It also generates the ephemeris file from the sources in ephemeris/ and enters its byte size into the packaged
+ * layout.json.
  * @param userConfig
  * @returns {{generateBundle(*, *): void}}
  */
@@ -21,6 +25,8 @@ function copyResourcesAndUpdateManifest(userConfig) {
 			let content = fs.readFileSync('resources/manifest.json', 'utf8');
 			content = content.replace('[VI]{version}[/VI]', version);
 			fs.writeFileSync(`${userConfig.outputPath}/manifest.json`, content);
+
+			writePackagedEphemeris(userConfig.outputPath, generateEphemerisJson(EPHEMERIS_SOURCE_DIR));
 		}
 	}
 }

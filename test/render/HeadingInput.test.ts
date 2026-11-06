@@ -13,6 +13,7 @@ import {mount} from '../harness/render/mount';
 import {SensorsIn} from '../../kln90b/Sensors';
 import {Interconnect} from '../../kln90b/Interconnect';
 import {MessageHandler} from '../../kln90b/data/MessageHandler';
+import {LEVEL_ANTENNA} from '../../kln90b/AntennaAttitude';
 import {ExactMeasurement} from '../../kln90b/GpsMeasurement';
 import {Cal3Page} from '../../kln90b/pages/left/Cal3Page';
 
@@ -154,7 +155,7 @@ describe('the heading input before the first calculation tick', () => {
         unit.env.sim.set('PLANE HEADING DEGREES GYRO', 'degrees', 123);
         const p = unit.props;
         const sensorsIn = new SensorsIn(new EventBus(), p.userSettings, p.planeSettings, new Interconnect(p.planeSettings, p.failures),
-            new MessageHandler(), new ExactMeasurement(), p.failures);
+            new MessageHandler(), new ExactMeasurement(), LEVEL_ANTENNA, () => 0.5, p.failures);
         return {unit, sensorsIn};
     }
 

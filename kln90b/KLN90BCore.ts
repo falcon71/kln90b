@@ -298,7 +298,7 @@ export class KLN90BCore {
 
 
         this.audioGenerator = new AudioGenerator(this.bus, this.planeSettings, this.userSettings);
-        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, interconnect, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement(), failures, eepromCalibration);
+        const sensors = new Sensors(this.bus, this.userSettings, this.planeSettings, interconnect, this.audioGenerator, this.messageHandler, this.hardware, this.platform.createGpsMeasurement(), this.platform.createAntennaAttitude(), this.platform.createSignalRandom(), failures, eepromCalibration);
         const failureOutputs = new FailureOutputs(this.bus, failures, interconnect, sensors.out);
         //The boot's own null-state pass (SensorsOut.reset) does not write the flag LVar L:KLN90B_HSI_TF_FLAGS, so a
         //superflag failed in an earlier session would leave what the LVar held, after an instrument reload say. This

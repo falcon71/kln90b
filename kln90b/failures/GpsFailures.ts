@@ -1,13 +1,9 @@
-import {EventBus, GPSSatellite, GPSSatelliteState} from '@microsoft/msfs-sdk';
+import {EventBus, GPSSatellite} from '@microsoft/msfs-sdk';
 import {Failures, FailureChangedEvents} from "./Failures";
 import {MAX_TRIGGER_STEP_S} from "./FailureTrigger";
-import {MIN_SNR, satelliteSnr} from "../GpsSignal";
+import {MASK_ZENITH_RAD} from "../GpsSignal";
 import {GpsGeometry, Raim, RAIM_K, raimStatus, SIGMA_UERE_M} from "../GpsSolution";
 
-/** A tracked satellite is lost below this SNR; Installation Manual C-7 calls 30 and below unusable */
-export const LOCK_LOSS_SNR = MIN_SNR;
-/** A lost satellite is acquired again at this SNR or more. Our own choice; the gap to LOCK_LOSS_SNR is the hysteresis */
-export const ACQUIRE_SNR = 35;
 /** Short-term variation of the jamming level around its ramp, in dB. Our own choice */
 export const JAMMING_WANDER_SIGMA_DB = 3;
 /** Correlation time of that variation, in seconds. Our own choice */
@@ -28,21 +24,14 @@ const BIAS_M_MIN = 500;
 const BIAS_M_MAX = 3000;
 const FAULT_RAMP_S_MIN = 120;
 const FAULT_RAMP_S_MAX = 300;
-/** Satellites at a zenith angle of 85 degrees or more are below the 5 degree elevation mask and not listed in STA 1 */
-const MASK_ZENITH_RAD = 85 * Math.PI / 180;
 
 /** What GpsFailures needs from the receiver; the GPS class implements it, tests fake it */
 export interface ReceiverView {
     satellites(): readonly GPSSatellite[];
-    /** The unit's solution in row order, blocked satellites already left out */
+    /** The unit's solution in row order, lost satellites already left out */
     solutionPrns(): readonly number[];
     readonly solution: GpsGeometry;
     isValid(): boolean;
-}
-
-function isTracked(state: GPSSatelliteState): boolean {
-    return state === GPSSatelliteState.Acquired || state === GPSSatelliteState.DataCollected
-        || state === GPSSatelliteState.InUse || state === GPSSatelliteState.InUseDiffApplied;
 }
 
 /** The progress of a ramp in sim time and when it was last saved; the one rule for jamming and the faulty satellite */
@@ -88,14 +77,12 @@ function finiteField(values: Record<string, number>, key: string): boolean {
 
 /**
  * The failures of the GPS receiver (#460): a dead antenna or receiver blocks every satellite, jamming raises the noise
- * floor so that satellites lose lock from the horizon up, the lowest first (Installation Manual C-7, Pilot's Guide 5-29).
- * It holds the blocked set and a cache of the stored values; the failure state itself is the saved settings.
+ * floor (Installation Manual C-7, Pilot's Guide 5-29). Jamming only gives the level: the receiver's signal model
+ * (SatelliteSignals, #467) takes it off every satellite's SNR, and its lock rule loses the satellites, the weakest first.
+ * It holds a cache of the stored values; the failure state itself is the saved settings.
  */
 export class GpsFailures {
     public wanderSigmaDb: number = JAMMING_WANDER_SIGMA_DB;
-
-    /** Blocked by jamming, by PRN */
-    private readonly jamBlocked = new Uint8Array(256);
 
     private lastTimeS: number | null = null;
     private wander = 0;
@@ -145,17 +132,7 @@ export class GpsFailures {
         this.wander = 0;
         this.hasSpare = false;
         this.level = 0;
-        this.jamBlocked.fill(0);
         this.outOfSolutionS = 0;
-    }
-
-    public isBlocked(prn: number): boolean {
-        return this.receiverFailed || this.jamBlocked[prn] === 1;
-    }
-
-    /** Jamming blocks this satellite. With receiverFailed, which blocks all, it is isBlocked for a loop that asks receiverFailed once */
-    public isJammed(prn: number): boolean {
-        return this.jamBlocked[prn] === 1;
     }
 
     /** Take-home mode has no receiver failures */
@@ -203,19 +180,6 @@ export class GpsFailures {
         return false;
     }
 
-    /** The PRNs jamming blocks that are above the elevation mask, for STA 1 */
-    public jammedRows(): number[] {
-        const rows: number[] = [];
-        const sats = this.receiver.satellites();
-        for (let i = 0; i < sats.length; i++) {
-            const sat = sats[i];
-            if (this.jamBlocked[sat.prn] === 1 && sat.position.get()[0] < MASK_ZENITH_RAD) {
-                rows.push(sat.prn);
-            }
-        }
-        return rows;
-    }
-
     /** @param simTimeS The sim clock in seconds */
     public tick(simTimeS: number): void {
         const last = this.lastTimeS;
@@ -244,27 +208,27 @@ export class GpsFailures {
 
         this.jamRamp.advance(dt, this.saveJammingFn);
         this.advanceWander(dt);
-        this.updateLevelAndBlocks();
+        this.updateLevel();
     }
 
-    private updateLevelAndBlocks(): void {
+    private updateLevel(): void {
         this.level = Math.max(0, this.finalDb * this.jamRamp.share + this.wander);
-        this.updateBlocks();
     }
 
     /**
-     * Brings the jamming blocks up to date outside the calculation tick, for the forced acquisition of an engine-running
-     * start or of SET 10 FAST: reset() empties the blocked set at power-on, and the forced acquisition runs before the
-     * first tick refills it. Counts no time and draws no wander. Allocates nothing once the values are cached
+     * Brings the jamming level up to date outside the calculation tick, for the forced acquisition of an engine-running
+     * start or of SET 10 FAST: reset() sets the level to 0 at power-on, and the forced acquisition runs before the first
+     * tick sets it again. Loads the stored values when they are not cached. Counts no time and draws no wander. Allocates
+     * nothing once the values are cached
      */
-    public refreshBlocks(): void {
+    public refreshLevel(): void {
         if (!this.jamming) {
             return;
         }
         if (!this.cacheValid) {
             this.loadJamming();
         }
-        this.updateLevelAndBlocks();
+        this.updateLevel();
     }
 
     private advanceWander(dt: number): void {
@@ -273,25 +237,6 @@ export class GpsFailures {
         }
         const a = Math.exp(-dt / JAMMING_WANDER_TAU_S);
         this.wander = a * this.wander + this.wanderSigmaDb * Math.sqrt(1 - a * a) * this.normal();
-    }
-
-    private updateBlocks(): void {
-        const sats = this.receiver.satellites();
-        for (let i = 0; i < sats.length; i++) {
-            const sat = sats[i];
-            const snr = satelliteSnr(sat.position.get()[0]) - this.level;
-            if (this.jamBlocked[sat.prn] === 1) {
-                if (snr >= ACQUIRE_SNR) {
-                    this.jamBlocked[sat.prn] = 0;
-                }
-            } else if (isTracked(sat.state.get())) {
-                if (snr < LOCK_LOSS_SNR) {
-                    this.jamBlocked[sat.prn] = 1;
-                }
-            } else if (snr < ACQUIRE_SNR) {
-                this.jamBlocked[sat.prn] = 1;
-            }
-        }
     }
 
     /** Takes the stored values into the cache; draws new ones when they are missing or unusable (an older session, a hand-edited profile) */
@@ -323,7 +268,6 @@ export class GpsFailures {
         this.cacheValid = false;
         this.level = 0;
         this.wander = 0;
-        this.jamBlocked.fill(0);
     }
 
     private tickFault(dt: number): void {

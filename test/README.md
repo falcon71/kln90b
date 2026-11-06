@@ -112,7 +112,7 @@ The sim globals are installed once per test file by the setup files `test/harnes
 - **`FakeStorage`** implements `GetStoredData` and friends. **A missing key returns `""`, not `null`.** The sim does the
   same: `DataStore.get` fails to parse it and the setting keeps its default. Returning `null` would set every setting to
   null.
-- **`FakeXhr`** serves `coui://` URLs from `resources/` (ephemeris, MSA grid).
+- **`FakeXhr`** serves `coui://` URLs from `resources/` (MSA grid) and the generated ephemeris JSON.
 - **Magnetic variation:** `env.magvar(lat, lon)` answers `Facilities.getMagVar`. `bootUnit` sets it from the `magvar`
   option, a number for the whole world or a function.
 - **Static globals** (`sim/staticGlobals.ts`): `BaseInstrument`, `KeyCode`, `RunwayDesignator`, `Utils` and the like.
@@ -465,6 +465,10 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   `simulatedGps`, which is how a test records or replaces the strategy. Its flights are in
   `test/flight/flights/simulatedGps.test.ts`; its standard-route flights fly on `navModeAutopilot()` (below) as well
   as on the coupled autopilot, since most pilots fly the sim's autopilot.
+- **The antenna's attitude.** The unit boots with a level antenna in flight (`LEVEL_ANTENNA`), whatever the SimVars
+  say. `bootUnit({antennaAttitude: true})` reads heading, pitch, bank and `SIM ON GROUND` from the SimVars instead
+  (`SimVarAntennaAttitude`, MSFS signs: pitch positive nose down, bank positive left); `Aircraft.writeTo` writes them
+  that way. A `createAntennaAttitude` in `platform` wins.
 - **Losing satellites.** `inhibitAllBut(unit, n)` (`gps.ts`) keeps the first `n` satellites the SDK has in use (PRN
   order) and inhibits every other one on `gpsSatComputer` and on `raimPrediction`; it returns the PRNs kept and throws
   when fewer than `n` are in use. The inhibited satellites leave the solution at the SDK's next position update (every

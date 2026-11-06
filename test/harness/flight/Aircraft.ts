@@ -23,7 +23,7 @@ export interface AircraftOptions {
 
 /**
  * A point mass flying coordinated turns at constant ground speed and altitude, with no wind. Bank is positive to the
- * right.
+ * right here; writeTo turns it into the MSFS sign (positive left wing down).
  */
 export class Aircraft {
     public lat: number;
@@ -90,7 +90,10 @@ export class Aircraft {
         sim.set('AIRSPEED TRUE', 'knots', this.groundspeedKt);
         sim.set('PLANE HEADING DEGREES TRUE', 'degrees', this.trackTrue);
         sim.set('PLANE HEADING DEGREES GYRO', 'degrees', norm360(this.trackTrue - magvar));
-        sim.set('PLANE BANK DEGREES', 'degrees', this.bankDeg);
+        //MSFS gives the bank positive for the left wing down, so a right bank is negative
+        sim.set('PLANE BANK DEGREES', 'degrees', -this.bankDeg);
+        sim.set('PLANE PITCH DEGREES', 'degrees', 0);
+        sim.set('SIM ON GROUND', 'bool', false);
         sim.set('GPS DRIVES NAV1', 'bool', true);
     }
 }
