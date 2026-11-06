@@ -10,6 +10,9 @@ import {APR_ARM_SWITCH, NO_ALTIMETER, panelXml} from '../../../harness/panelXml'
 import {messages} from '../../../harness/readers';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 /** One search period of the alert (AirspaceAlert.ts, ALERT_TICK_TIME): the wait for the next search */
 const ALERT_PERIOD_MS = 10_000;
 
@@ -123,7 +126,7 @@ describe('AIRSPACE ALERT ahead on the track', () => {
 
     // 30 NM ahead at 120 kt: 15 minutes, and far beyond 2 NM
     it('does not alert 15 minutes before the boundary (3-40, B-1)', async () => {
-        const unit = await flying(0, [airspace('R-FAR', BoundaryType.Restricted, box(47.5, 47.7, 7.9, 8.1), LIMITS)]);
+        const unit = await flying(0, [airspace('R-FAR', BoundaryType.Restricted, box(47.5, 47.7, 7.9, 8.1), LIMITS)], {storage: REAL});
 
         expect(sua(unit)).toEqual([]);
         // The list is the live one: the empty storage has no last position, so the first fix differs from it
@@ -157,7 +160,7 @@ describe('AIRSPACE ALERT ahead on the track', () => {
     // 3-39: the alert is three-dimensional. The same area 5 minutes ahead, but from 5000 ft up: the aircraft at 1200 ft
     // passes below it and its 500 ft buffer
     it('does not alert for an area ahead whose floor is above the aircraft (3-39)', async () => {
-        const unit = await flying(0, [airspace('R-HIGH', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), {minFt: 5000, maxFt: 18000})]);
+        const unit = await flying(0, [airspace('R-HIGH', BoundaryType.Restricted, box(47 + 10 * NM_LAT, 47.4, 7.9, 8.1), {minFt: 5000, maxFt: 18000})], {storage: REAL});
 
         expect(sua(unit)).toEqual([]);
         // The list is the live one: the empty storage has no last position, so the first fix differs from it

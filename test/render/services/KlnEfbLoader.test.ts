@@ -894,7 +894,8 @@ describe('EFB route import over open pages (#395)', () => {
     const NAV1_ROWS = ['KAAA ›KBBB ', 'ηηηηηΟηηηηη', 'DIS  24.0nm', 'GS      0kt', 'ETE   --:--', 'BRG    000°'];
 
     async function boot(extra: Facility[] = []): Promise<HeadlessUnit> {
-        const unit = await bootUnit({facilities: [kaaa, kbbb, ...extra], efb: true});
+        // REAL: the status lines below show the msg of POSITION DIFFERS, which a FAST boot no longer posts (#468)
+        const unit = await bootUnit({facilities: [kaaa, kbbb, ...extra], efb: true, storage: {fastGpsAcquisition: false}});
         await settle(unit);
         return unit;
     }

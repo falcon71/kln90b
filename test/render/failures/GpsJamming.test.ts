@@ -31,7 +31,10 @@ const IN_VIEW = [1, 8, 10, 14, 16, 21, 23, 27];
 /** The two lowest of them, both at 10 degrees: 39.4 at the antenna for 14 (a GPS IIIA), 39.9 for 16 (a GPS IIR-A) */
 const LOWEST = [14, 16];
 
-/** The stored data of a unit last used here yesterday (GpsAcquisition.test.ts): the start model runs a warm start */
+/**
+ * The stored data of a unit last used here yesterday (GpsAcquisition.test.ts): the start model runs a warm start. REAL,
+ * because FAST would make it a hot start from the true state (#468), with its fix before the self-test is approved
+ */
 const WARM_START = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: DEFAULT_START.getTime() - 24 * 60 * 60 * 1000};
 
 const byNumber = (a: number, b: number) => a - b;
@@ -44,16 +47,12 @@ afterEach(() => {
 /**
  * An engine-running unit at KAAA, 3000 ft, flying FPL 0 KAAA, ABC, KBBB, with the jamming ramp stored. The position is the
  * one stored at the last power-off, so the boot posts no POSITION DIFFERS message. STA 1 is on the left.
- *
- * The receiver runs the REAL timings (#467): a satellite whose signal is lost stays in its channel, searched, until the
- * SDK's acquisition timeout makes it Unreachable. FAST's timeout of 1 s (Gps.ts) would turn the searched rows into
- * Unreachable ones and give their channels away within seconds
  */
 async function jammedFlight(storage: Record<string, unknown> = JAMMING): Promise<HeadlessUnit> {
     const r = standardRoute();
     const unit = await bootUnit({
         facilities: [r.kaaa, r.abc, r.kbbb], position: {lat: r.kaaa.lat, lon: r.kaaa.lon}, altitudeFt: 3000,
-        storage: {fastGpsAcquisition: false, lastLatitude: r.kaaa.lat, lastLongitude: r.kaaa.lon, ...savedFlightplan(0, [r.kaaa, r.abc, r.kbbb]), ...storage},
+        storage: {lastLatitude: r.kaaa.lat, lastLongitude: r.kaaa.lon, ...savedFlightplan(0, [r.kaaa, r.abc, r.kbbb]), ...storage},
     });
     await unit.panel.selectPage('L', 'STA 1');
     return unit;
@@ -272,6 +271,23 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
+    // #468: FAST initializes the memory from the truth and runs the search as REAL does, so a cold power-on with the
+    // finished ramp stored has no forced acquisition to skip: the search finds nothing (design, non-goals)
+    it('a FAST power-on with a finished ramp stored acquires nothing', async () => {
+        const unit = await bootToSelfTest({storage: {fastGpsAcquisition: true, lastLatitude: 47, lastLongitude: 8, failure_gpsJamming: JSON.stringify({rampS: RAMP_S, finalDb: FINAL_DB, elapsedS: RAMP_S})}});
+        await unit.panel.approveSelfTest();
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.failures.jamming).toBe(true); // Precondition
+
+        for (let s = 0; s < 120; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(gps.gpsSatComputer.getSatellites().filter(sat => TRACKED.has(sat.state.get())).map(sat => sat.prn)).toEqual([]);
+        }
+        expect(gps.hadFixSincePowerOn).toBe(false);
+        expect(gps.isValid()).toBe(false);
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
     // #467: a lost satellite keeps its channel and is searched there (the SDK's None state); the receiver lost all eight
     it('after the ramp STA 1 shows the satellites of the channels as searched, not found', async () => {
         const unit = await jammedFlight();
@@ -289,7 +305,8 @@ describe('jamming over time and STA 1 (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    // The start model's own states come first: jamming makes ACQ only of a unit whose start model is idle
+    // The start model's own states come first: jamming makes ACQ only of a unit whose start model is idle. REAL, because
+    // FAST completes the almanac at power-on (#468)
     it('jamming during an almanac search: STA 1 shows INIT', async () => {
         const unit = await bootToSelfTest({
             storage: {...JAMMING, fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8, lastAlmanacDownload: DEFAULT_START.getTime() - 200 * 24 * 3600 * 1000},

@@ -78,8 +78,9 @@ manager. The sim uses `SIM_PLATFORM`; tests use `FakePlatform` (`test/harness/pl
 
 By default the engine is running, so the unit skips the welcome and self-test pages (`isForceReadyToUse`). Pass
 `engineRunning: false` to see the cold-and-dark start. Pass `coldGps: true` for an engine-running boot whose GPS has no
-fix yet (the boot resets the GPS after `propsReady` and erases the cached ephemeris); it acquires on its own, fast or
-slow per the `fastGpsAcquisition` setting, and `settle` waits for it.
+fix yet (the boot resets the GPS after `propsReady` and erases the cached ephemeris); it acquires on its own
+with the REAL timings (about 70 s) in FAST too: the boot's power-on wrote the truth, but the reset is no power-on, so
+nothing is written again after the ephemeris is erased. `settle` waits for it.
 
 ## The global fakes
 
@@ -448,13 +449,15 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   12 s leaves one search and the time its result needs; a wait below one search interval reads an empty list. Its
   harness test covers the nearest airport list.
 - **Time to first fix.** `bootUnit({coldGps: true})` resets the GPS after a forced acquisition and erases the cached
-  ephemeris, without a power-on, so the start model (`GpsSearch.ts`) does not run: it acquires in about 70 s (slow;
-  `IDLE_ACQUISITION` plus 30 s of ephemeris) whatever the almanac, the stored position or the clock, and cannot measure
-  a hot, warm or cold start. Nor is its fix the first since the power-on: it is never compared with the stored
-  position for `POSITION DIFFERS FROM LAST POSITION BY >2NM` (B-3, #454). For hot, warm, ACQ-give-up and
+  ephemeris, without a power-on, so the start model (`GpsSearch.ts`) does not run and `initializeFromTruth` writes nothing again, in
+  FAST either: it acquires in about 70 s (`IDLE_ACQUISITION` plus 30 s of ephemeris) whatever the almanac, the stored
+  position or the clock, and cannot measure a hot, warm or cold start. Nor is its fix the first since the power-on: it
+  is never compared with the stored position for `POSITION DIFFERS FROM LAST POSITION BY >2NM` (B-3, #454). For hot, warm, ACQ-give-up and
   almanac-search starts, and for that message, boot with `engineRunning: false` and
-  the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition` in `storage`, then `powerOn()`; the GPS
-  acquires while the welcome and self-test pages run. A warm start's time is drawn per power-on, so pass `seed` for
+  the stored position, almanac time, `lastEphemeris` and `fastGpsAcquisition: false` in `storage`, then `powerOn()`;
+  the GPS acquires while the welcome and self-test pages run. With `fastGpsAcquisition` true (the default) every
+  power-on writes the true state first (#468), which makes it a hot start whatever `storage` holds and posts neither
+  `POSITION DIFFERS` nor `SYSTEM TIME UPDATED`. A warm start's time is drawn per power-on, so pass `seed` for
   the spread (`powerOnCold` in `GpsAcquisition.test.ts`).
 - **The simulated receiver.** The unit boots with `ExactMeasurement` (`GpsMeasurement.ts`): after a fix `coords` equals
   the sim position exactly, so existing tests read exact values. `bootUnit({simulatedGps: true})` (and `Flight.start`
@@ -475,6 +478,7 @@ expect(screen.half('L').split('\n')).toEqual([ 'PRESENT POS', /* ... */ ]);
   5 s), so advance the clock at least that long before asserting. `liftInhibits(unit)` lifts them all again, and the prediction context follows
   the computer's inhibits once more. Three satellites with the default altimeter input are a valid unit solution with no
   SDK solution (`GpsSolution.test.ts`). `test/render/harness/gps.test.ts` holds both helpers.
+  `holdInhibits(unit, kept)` keeps those inhibits through a power cycle's start model, which would otherwise lift them.
 - **A predicted geometry.** `stubSatellites(skyDeg)` (`predictionStub.ts`) builds stub prediction satellites in use at
   fixed [zenith, azimuth] degrees, for `vi.spyOn(gps.raimPrediction, 'getSatellites').mockReturnValue(...)`.
   `RAIM_ENROUTE_NOT_APPROACH` is a geometry whose RAIM passes the 2 NM and 1 NM alert limits but not the 0.3 NM of the
@@ -879,11 +883,12 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
   in), read `L:KLN90B_XTK` or `navPage.xtkToActive`, which are not smoothed, or test the filter itself at the unit
   stage, as `test/unit/services/SignalOutputFilter.test.ts` does: only `Date` is faked
   (`vi.useFakeTimers({toFake: ['Date']})`), a value is set every 1000 ms and the output sampled every 62 ms.
-- **A booted engine-running unit starts with the MSG annunciator lit.** Empty storage means the last position is 0/0, so
-  `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts; that is a fact of the harness, and the NAV 2 screens of the
-  harness tests show its `msg`. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. A
+- **A booted engine-running unit starts with the MSG annunciator lit only with `fastGpsAcquisition: false`.** Empty
+  storage means the last position is 0/0, so `POSITION DIFFERS FROM LAST POSITION BY >2NM` posts, but only with
+  `fastGpsAcquisition: false`: FAST writes the true position at power-on, so the default boot posts no message and the
+  MSG annunciator stays dark. Seeding a last position in `storage` (`lastLatitude`, `lastLongitude`) removes it. A
   test that needs a message in the live list as a guard (that the list is read at all) uses `POSITION DIFFERS` with
-  empty storage, or posts a message of its own with
+  `fastGpsAcquisition: false` and empty storage, or posts a message of its own with
   `unit.props.messageHandler.addMessage(new OneTimeMessage([...]))` when its storage holds the position
   (`Set1Page.test.ts`).
 - **Long render tests need their own timeout.** The render stage keeps Vitest's 5 s default. A test that advances
@@ -951,7 +956,7 @@ recording (an `it.fails` until #100 was fixed), so a broken flight cannot be mis
 - **`Screen.read()` throws on a visible character, or an inverted cell, past column 11 of a half page.** A row
   that pushes its type letter off the half page is a rendering bug. Blank cells past the edge, such as the trailing
   blanks of the nearest selector on APT 1, VOR and NDB, are tolerated.
-- **A booted engine-running unit has a GPS fix at once**, in the slow acquisition mode too (the force-ready start calls
+- **A booted engine-running unit has a GPS fix at once**, in REAL too (the force-ready start calls
   `acquireAndUseSatellites()` in `WelcomePage`). A test that needs an invalid GPS, for example to enter the date on SET 2
   (read-only with a fix), boots with `coldGps: true`.
 - **`ActiveWaypoint` replaces its `turnStack` array** (`clearTurnStack`) instead of emptying it. A reference captured once

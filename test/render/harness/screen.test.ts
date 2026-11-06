@@ -10,6 +10,9 @@ import {intersection} from '../../harness/navdata/builders';
 import {approach, Leg, withProcedures} from '../../harness/navdata/procedures';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 function mount(html: string): Element {
     document.body.innerHTML = `<div id="pageContainer">${html}</div>`;
     return document.getElementById('pageContainer')!;
@@ -126,7 +129,7 @@ describe('Screen, the status line', () => {
     });
 
     it('shows CRSR on the left and the page name on the right with the left cursor on (booted unit)', async () => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({storage: REAL});
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
 
@@ -135,7 +138,7 @@ describe('Screen, the status line', () => {
     });
 
     it('shows CRSR on both sides with both cursors on (booted unit)', async () => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({storage: REAL});
         await unit.panel.selectPage('L', 'FPL 0');
         await unit.panel.cursor('L');
         await unit.panel.cursor('R');

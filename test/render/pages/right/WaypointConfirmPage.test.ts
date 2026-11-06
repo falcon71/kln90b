@@ -80,8 +80,9 @@ const world = () => ({
  * TRI 3 on the left with the cursor on its first waypoint and NAV 1 on the right, after the status line messages of the
  * page changes have gone (they show for about 5 s)
  */
-async function tri3WithNav1(): Promise<HeadlessUnit> {
-    const unit = await bootUnit(world());
+async function tri3WithNav1(storage: Record<string, unknown> = {}): Promise<HeadlessUnit> {
+    const w = world();
+    const unit = await bootUnit({...w, storage: {...w.storage, ...storage}});
     await unit.panel.selectPage('R', 'NAV 1');
     await unit.panel.selectPage('L', 'TRI 3');
     await vi.advanceTimersByTimeAsync(6000);
@@ -121,7 +122,7 @@ describe('waypoint confirmation page (3-14)', () => {
     // 3-14 steps 7 and 8 (figures 3-45 to 3-47): ENT after an identifier shows its waypoint page on the right with ENT
     // flashing in the status line; the second ENT approves it and the right side returns to the page shown before
     it('shows the waypoint page with ENT, and the second ENT returns to the page shown before (3-14)', async () => {
-        const unit = await tri3WithNav1();
+        const unit = await tri3WithNav1({fastGpsAcquisition: false}); // REAL: the boot's POSITION DIFFERS lights MSG, which FAST no longer posts (#468)
         await unit.panel.enterIdent('L', 'KAAA');
 
         await unit.panel.ent();

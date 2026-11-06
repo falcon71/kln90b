@@ -35,8 +35,8 @@ describe('GPS week rollover (64c203d)', () => {
         expect(gps.isValid()).toBe(false);
         gps.timeZulu = TimeStamp.create(userDate);
         // Not settle(): the era check runs at the acquisition tick, before the valid-state tick recalculates, so the loop
-        // must stop at the first valid second
-        for (let i = 0; i < 60 && !gps.isValid(); i++) {
+        // must stop at the first valid second. The reset receiver searches as REAL does in both settings, about 73 s (#468)
+        for (let i = 0; i < 120 && !gps.isValid(); i++) {
             await vi.advanceTimersByTimeAsync(1000);
         }
         expect(gps.isValid()).toBe(true);

@@ -233,10 +233,10 @@ describe('cursor buttons (3-11)', () => {
 
 describe('MSG button (3-16)', () => {
     // 3-16: the message page shows the messages over the full width, the newest first, and a second press returns to
-    // the pages in view. The booted unit, which has no stored position, holds POSITION DIFFERS; the test posts the
-    // newest
+    // the pages in view. The booted unit, which has no stored position, holds POSITION DIFFERS (REAL: FAST posts none,
+    // #468); the test posts the newest
     it('shows the message page, and a second press returns to the pages in view', async () => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({storage: {fastGpsAcquisition: false}});
         unit.props.messageHandler.addMessage(new OneTimeMessage(['NEWEST MESSAGE', 'SECOND LINE']));
 
         await unit.panel.press('KLN90B_MSG_Push');

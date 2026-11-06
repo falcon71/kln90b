@@ -176,7 +176,7 @@ describe('Super NAV 5 mode row at north (characterization)', () => {
 // while a message is new
 describe('Super NAV 5 message prompt (3-16, 3-36)', () => {
     it('flashes msg in inverse video while a message is unread (3-16, 3-36)', async () => {
-        const unit = await bootUnit(); // the boot messages are unread (test/README.md section 6)
+        const unit = await bootUnit({storage: {fastGpsAcquisition: false}}); // the boot messages are unread (test/README.md section 6); REAL, as FAST posts no POSITION DIFFERS (#468)
         await showSuperNav5(unit);
 
         // A flashing cell shows the flashing phase on one display tick in four (the blink tick) and the steady phase on

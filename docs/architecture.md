@@ -21,7 +21,8 @@ Comments such as `3-29` in the code are page numbers in the KLN 90B Pilot's Guid
     - A `loggingEnabled = false` flag exists in `Scanlist.ts`.
     - There is a commented-out `this.bus.onAll(console.log)` in `KLN90BCore.ts`.
     - There is a lot of `console.log`.
-    - The user setting `fastGpsAcquisition` (SET 10 page) **defaults to true** (`GPS_ACQUISITION_FAST`).
+    - The user setting `fastGpsAcquisition` (SET 10 page) **defaults to true** (`GPS_ACQUISITION_FAST`). FAST is a hot start
+      from the true state at every power-on; the receiver is otherwise the same as REAL (see Core 3).
 - Other branches: `switch-to-wt-flightplan` (abandoned; see Core 5), `fuzzy-gps` (Kalman-filtered GPS noise, "not
   working very well"), `analog-xtk-filter`, `fs2020`.
 
@@ -311,10 +312,18 @@ prediction context of the main computer.
       calibrated so that the whole search lands near ORS 01's 20 minutes and the observed 21:36); all others are then
       inhibited while the SDK collects the almanac from it (12.5 min). Then ACQ with the right time. If the kept
       satellite is lost first, the inhibits are lifted and the blind search resumes.
-    - **Idle**: the first fix (`gpsAcquired`), a forced acquisition (`acquireAndUseSatellites`: engine-running start,
-      SET 10 FAST) and power-off end the model: the search's inhibits are lifted (the receiver failures' inhibits stay, see the
-      failures below) and the acquisition time returns to `IDLE_ACQUISITION` (40 s). With `fastGpsAcquisition` the
-      model never starts, nor in a session whose computer was built FAST (the SDK timings are fixed at construction).
+    - **Idle**: the first fix (`gpsAcquired`), a forced acquisition (`acquireAndUseSatellites`: the engine-running
+      start) and power-off end the model: the search's inhibits are lifted (the receiver failures' inhibits stay, see the
+      failures below) and the acquisition time returns to `IDLE_ACQUISITION` (40 s).
+    - **FAST is a hot start, not a second receiver** (#468). With `fastGpsAcquisition`, `GPS.initializeFromTruth()` runs
+      at every power-on before `search.start`: it writes the sim position (the coordinates and the SDK's last known
+      position), the exact clock, a current almanac and a current ephemeris (also for satellites that load later). The
+      REAL start model then finds a hot start: ACQ with the right time, the acquisition time with ephemeris, no
+      almanac search. FAST and REAL share all SDK timings, and `GpsSearch` has no FAST path. Because the stored
+      position and clock equal the true ones, neither `POSITION DIFFERS FROM LAST POSITION BY >2NM` nor
+      `SYSTEM TIME UPDATED TO GPS TIME` appears in FAST. Take-home mode skips the initialization. `GPS.startFast()`
+      does the same when SET 10 is switched to FAST without a fix, then restarts the search; with a fix nothing
+      happens, and a switch to REAL only saves the setting.
     - `KLNGPSSatComputer.isAlmanacValid` reports the decision: ACQ true, almanac and sky search false, Idle the SDK's
       own check.
     - **Corrections during a search** (3-5, 3-17..3-19, #357). The Pilot's Guide gives the entry of the date and time
@@ -322,8 +331,8 @@ prediction context of the main computer.
       `gpsSatComputer.internalTime` and calls `search.start(coords)` again, so the decision is made anew from the
       corrected values on the next tick. It is called by `SelfTestRightPage` (`saveDate`, `saveTime`), `Set2Page`
       (`saveDate`, `saveTime`) and `Set1Page.confirmPosition`, after the page has written the value. It does nothing
-      with a fix (the satellites supply both) and in take-home. FAST has no start model, so only the SDK's last known
-      position moves there (`Set1Page` still calls `syncLastKnownPosition`). The model restarts at once: whether the
+      with a fix (the satellites supply both) and in take-home. In FAST too, the search restarts from the values the
+      pilot entered, which replace the truth the power-on wrote. The model restarts at once: whether the
       real unit restarts at once or at its next search cycle is not documented.
     - **STA 1** (`Sta1Page`, #213) shows what the unit knows, not the true sky. During ACQ without a fix it lists
       `search.predictedSatellites()` with the predicted elevation, constant through the acquisition. Otherwise it lists
@@ -331,7 +340,9 @@ prediction context of the main computer.
       (`GPS.simTimeUnix`), else `--`. A satellite below the horizon has no elevation and shows `--`.
     - Public SDK API used: `createPredictionContext`, `setSatelliteInhibit`, `syncLastKnownPosition` (the stored
       position within 100 NM of the present one, so the SDK's 2 NM hot-start rule works on it; else the present
-      position), `eraseLastKnownPosition`, `eraseCachedEphemeris` (the harness's `coldGps`).
+      position), `eraseLastKnownPosition`, `eraseCachedEphemeris` (the harness's `coldGps`: the boot's power-on wrote the
+      truth, but the reset is no power-on, so nothing is written again after the ephemeris is erased and the search takes
+      REAL timings in FAST too).
     - Beyond 100 NM the SDK's last known position is the present one, so its 2 NM rule would make every satellite with
       a current ephemeris hot. For that power-on the model sets the acquisition time with ephemeris to the warm draw
       (`setAcquisitionTimeWithEphemeris`), and `end()` puts back `HOT_ACQUISITION`: a start far from the stored
@@ -340,7 +351,7 @@ prediction context of the main computer.
   `GPS.tick` calls `onUpdate()`. Sync role is `'none'`. SBAS is disabled by the emptied `gps_sbas.json`. Timing (#62):
   ephemeris download 30 s (one data frame) and expiry 2 h, acquisition with a current ephemeris 9 ± 3 s (a hot start
   has its fix before the 17 s self-test ends), almanac download 12.5 min, almanac expiry six months (3-17), timeout
-  4 min. With `fastGpsAcquisition` all of these drop to about 1 to 10 s.
+  4 min. FAST uses the same timings; it is fast because the power-on start is hot (#468).
 - **Satellite signal** (`kln90b/GpsSignal.ts`, `AntennaAttitude.ts`, #467; design in
   `docs/superpowers/specs/2026-11-06-satellite-signal-design.md`). `GPS.signals` (`SatelliteSignals`) holds one SNR per
   satellite and is ticked in `GPS.tick` after `GpsFailures.tick` and before the search and the SDK's update. The SNR is
@@ -357,7 +368,7 @@ prediction context of the main computer.
       call only. The SDK then does what a missing signal does: a tracked satellite falls back to `None` and stays in
       its channel, searched; a searched one is not acquired and becomes `Unreachable` after the acquisition timeout. The
       channel assignment keeps the geometric value, so channels still follow the almanac's prediction. The wrapper reads
-      a private SDK field; a test holds it. A forced acquisition (engine-running start, SET 10 FAST) refreshes the
+      a private SDK field; a test holds it. A forced acquisition (the engine-running start) refreshes the
       signals at its first reachability query, because the SDK computes the satellite positions inside that update.
     - **The block** of each PRN comes from `block` in `gps_ephemeris.json`, read from the SDK satellite's private
       ephemeris entry; the offset per block is in `GpsSignal.ts`. A satellite without a known block gets 0.
@@ -365,9 +376,8 @@ prediction context of the main computer.
       navigation file and the IGS satellite metadata in `ephemeris/` (`tools/ephemeris/`, see `ephemeris/README.md`),
       adds each PRN's block and writes its exact byte size into the package's `layout.json`. `FakeXhr` serves the same
       generated JSON to the tests.
-    - **FAST timings** (#46, acquisition timeout 1 s): a lost satellite becomes `Unreachable` after a second, STA 1
-      shows `*xx-` and its channel moves on to another satellite. With the real timings it stays in its channel,
-      searched, and reads `*xx  00`.
+    - **Timings are the same in FAST and REAL** (#468; the earlier FAST timings of #46 are gone): a lost satellite stays in
+      its channel, searched, and STA 1 reads `*xx  00`.
     - **STA 1** reads `signals.snr(prn)`; its state is the SDK's own channel state, and without a fix it shows `ACQ`
       while a lost satellite above the mask holds a channel.
 - **Receiver failures** (`kln90b/failures/GpsFailures.ts`, #460; specification in `docs/failures.md`). `GPS` builds
@@ -425,7 +435,7 @@ prediction context of the main computer.
   the approach limit of 0.3 NM and with the altitude row when the unit has an altitude input. The same `predictRaim`
   serves the ACTV gate (Core 5).
 - `isValid()` is true one calculation tick after the first valid solution, and stays true while the solution is valid.
-  The tick in between is TRAN (`isTransition()`, 5-29, #215). A forced acquisition (engine-running start, SET 10 FAST)
+  The tick in between is TRAN (`isTransition()`, 5-29, #215). A forced acquisition (the engine-running start)
   is accepted at once, without TRAN (`acceptForcedSolution`, called by `KLNGPSSatComputer.acquireAndUseSatellites`).
   `gpsAcquired()` runs on acceptance and sets `hadFixSincePowerOn`, which `powerChanged` clears at power-on and
   power-off.

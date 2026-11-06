@@ -5,7 +5,7 @@ import {DEFAULT_START} from '../harness/sim/clock';
 import {Screen} from '../harness/render/screen';
 import {storedSetting} from '../harness/storage';
 import {messages} from '../harness/readers';
-import {inhibitAllBut, liftInhibits} from '../harness/gps';
+import {inhibitAllBut, liftInhibits, secondsToFix} from '../harness/gps';
 import {TimeStamp} from '../../kln90b/data/Time';
 import {GPS_ERA_DURATION, SearchMode} from '../../kln90b/GpsSearch';
 
@@ -47,16 +47,6 @@ async function powerOnCold(storage: Record<string, unknown>, clockOffsetMs = 0, 
     gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() + clockOffsetMs);
     await unit.panel.powerOn();
     return unit;
-}
-
-/** Seconds from now until the GPS has a solution, or cap when it has none by then. The time is the subject (test/README.md) */
-async function secondsToFix(unit: HeadlessUnit, cap: number): Promise<number> {
-    const gps = unit.props.sensors.in.gps;
-    let s = 0;
-    for (; s < cap && !gps.isValid(); s++) {
-        await vi.advanceTimersByTimeAsync(1000);
-    }
-    return s;
 }
 
 describe('GPS time to first fix, slow acquisition', () => {
@@ -516,19 +506,20 @@ describe('correcting the position or the time during a search (3-5, 3-17, #357)'
     }, SLOW);
 });
 
-// B-4: the message appears when the GPS corrects the system time by more than 10 minutes. The fast acquisition (the
-// default) keeps these short; it does not take part in the comparison.
+// B-4: the message appears when the GPS corrects the system time by more than 10 minutes. REAL: FAST sets the clock to
+// the true time at power-on and never posts it (#468). A clock 15 minutes off finds its fix only in the sky search (3-17:
+// within 12 minutes)
 describe('SYSTEM TIME UPDATED TO GPS TIME (B-4)', () => {
     it('posts when the GPS moves the clock by 15 minutes (B-4)', async () => {
-        const unit = await powerOnCold({lastLatitude: 47, lastLongitude: 8}, -15 * MINUTE);
-        expect(await secondsToFix(unit, 600)).toBeLessThan(600);
+        const unit = await powerOnCold(WARM, -15 * MINUTE);
+        expect(await secondsToFix(unit, 720)).toBeLessThan(720);
 
         expect(messages(unit)).toContain('SYSTEM TIME UPDATED TO GPS TIME');
         expect(Math.abs(unit.props.sensors.in.gps.timeZulu.getTimestamp() - Date.now())).toBeLessThan(1500);
-    });
+    }, SLOW);
 
     it('does not post when the GPS moves the clock by 5 minutes (B-4)', async () => {
-        const unit = await powerOnCold({lastLatitude: 47, lastLongitude: 8}, -5 * MINUTE);
+        const unit = await powerOnCold(WARM, -5 * MINUTE);
         expect(await secondsToFix(unit, 600)).toBeLessThan(600);
 
         expect(messages(unit)).not.toContain('SYSTEM TIME UPDATED TO GPS TIME');
@@ -537,26 +528,27 @@ describe('SYSTEM TIME UPDATED TO GPS TIME (B-4)', () => {
 });
 
 // B-3: the message appears when the GPS first reaches NAV and the position differs from the one at power-off by more
-// than 2 NM. One minute of latitude is one nautical mile.
+// than 2 NM. One minute of latitude is one nautical mile. REAL: FAST sets the stored position to the true one at power-on
+// and never posts it (#468)
 describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
     const TEXT = 'POSITION DIFFERS FROM LAST POSITION BY >2NM';
 
     it('does not post when the stored position is 1.5 NM away (B-3)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47 + 1.5 / 60, lastLongitude: 8}});
+        const unit = await bootUnit({storage: {...WARM, lastLatitude: 47 + 1.5 / 60}});
         await settle(unit);
 
         expect(messages(unit)).not.toContain(TEXT);
     });
 
     it('posts when the stored position is 2.5 NM away (B-3)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47 + 2.5 / 60, lastLongitude: 8}});
+        const unit = await bootUnit({storage: {...WARM, lastLatitude: 47 + 2.5 / 60}});
         await settle(unit);
 
         expect(messages(unit)).toContain(TEXT);
     });
 
     it('posts after a power cycle in which the aircraft moved 3 NM (B-3)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({storage: WARM});
         await settle(unit);
         expect(messages(unit)).not.toContain(TEXT);
 
@@ -570,7 +562,7 @@ describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
     });
 
     it('does not post after a power cycle in which the aircraft stayed (B-3)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({storage: WARM});
         await settle(unit);
 
         await unit.panel.powerOff();
@@ -584,7 +576,7 @@ describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
     // B-3 ties the message to the first NAV after power-on. A loss of the fix in flight is no power cycle: the fix
     // regained 6 NM further on is no first fix and is not compared with the position where the fix was lost (#454)
     it('does not post when the fix is regained in flight 6 NM from where it was lost (B-3, #454)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({storage: WARM});
         await settle(unit);
         const gps = unit.props.sensors.in.gps;
         expect(messages(unit)).not.toContain(TEXT); // Precondition: the first fix posted nothing
@@ -603,11 +595,12 @@ describe('POSITION DIFFERS FROM LAST POSITION BY >2NM (B-3)', () => {
 });
 
 describe('messages at power-on (B-3, B-4)', () => {
+    // REAL, so that the messages can post: FAST never posts either (#468).
     // B-3: POSITION DIFFERS posts only when the first fix is more than 2 NM from the position at power-off; B-4: SYSTEM
     // TIME UPDATED only when the GPS moves the clock by more than 10 minutes. A cold-and-dark unit switched on where it
     // was switched off, with its clock right, therefore posts neither, and the status line shows no MSG (3-10).
     it('posts no message on a cold-and-dark start at the stored position (B-3, B-4, 3-10)', async () => {
-        const unit = await bootToSelfTest({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootToSelfTest({storage: WARM});
         await unit.panel.approveSelfTest();
         await settle(unit);
 
@@ -620,7 +613,7 @@ describe('messages at power-on (B-3, B-4)', () => {
     // B-3 says for a position within 2 NM, does not post POSITION DIFFERS
     it('boots with the engine running at the stored position to NAV 2 with a fix and no POSITION DIFFERS '
         + '(B-3)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({storage: WARM});
         await settle(unit);
 
         expect(unit.props.sensors.in.gps.isValid()).toBe(true);
@@ -632,7 +625,7 @@ describe('messages at power-on (B-3, B-4)', () => {
     // with the engine running stands for a unit that is already on, and its clock is right: the GPS measures the off
     // time itself and no longer depends on the hour PowerSupply assumes (#328)
     it('posts no message on an engine-running start at the stored position (B-3, B-4, #328)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({storage: WARM});
         await settle(unit);
 
         expect(messages(unit)).toEqual([]);
@@ -686,7 +679,7 @@ describe('GPS data kept over a power-off', () => {
     // #62: the receiver keeps the ephemeris in battery memory; the forced acquisition of an engine-running boot collects
     // it for the satellites in view
     it('saves the ephemeris of the satellites in view at power-off (#62)', async () => {
-        const unit = await bootUnit({storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({storage: WARM}); //REAL: FAST gives every satellite a current ephemeris (#468)
         await settle(unit);
 
         await unit.panel.powerOff();
@@ -721,39 +714,138 @@ describe('GPS data kept over a power-off', () => {
     });
 });
 
-// characterization: the FAST acquisition of SET 10 is a simulator convenience, not in the Pilot's Guide (#46)
-describe('fast GPS acquisition (characterization)', () => {
-    it('characterization: a cold start with FAST acquisition is NAV ready within 30 s of power-on', async () => {
-        const unit = await powerOnCold({lastLatitude: 47, lastLongitude: 8});
+// The FAST acquisition of SET 10 is a simulator convenience, not in the Pilot's Guide (#46). Since #468 it is the same
+// receiver as REAL: at power-on the unit's memory is set to the true state (position, clock, almanac, ephemeris), and the
+// start model of #62 runs as in REAL, which makes it a hot start
+describe('FAST GPS acquisition (#468)', () => {
+    const POSITION_DIFFERS = 'POSITION DIFFERS FROM LAST POSITION BY >2NM';
+    const TIME_UPDATED = 'SYSTEM TIME UPDATED TO GPS TIME';
+    /** Last used on the other side of the world, more than six months ago: REAL needs an almanac search */
+    const FAR_AND_OLD = {...ANTIPODE, lastAlmanacDownload: START - 400 * DAY};
+    /** The sim's time as a UNIX timestamp, the time base of the receiver's ephemeris and almanac (FakeSim E:ABSOLUTE TIME) */
+    const simUnix = (unit: HeadlessUnit) => Date.now() + unit.env.sim.absoluteTimeOffsetMs;
 
-        expect(await secondsToFix(unit, 30)).toBeLessThan(30);
-    });
+    // #62: a hot start has its fix by 0:17, self-test included. The SDK draws at most HOT_ACQUISITION +
+    // HOT_ACQUISITION_RANGE / 2 = 12 s, plus the search's begin tick and TRAN
+    it('FAST: a power-on 1000 NM from the stored position has its fix in hot-start time (#468, #62: 0:17)', async () => {
+        const unit = await powerOnCold(FAR_AND_OLD);
 
-    // The receiver keeps the timings it was built with for the session, so a unit built FAST stays out of the start
-    // model after SET 10 is switched to REAL: no satellite is inhibited at the next power-on (#62)
-    it('characterization: a unit built FAST runs no start model after a switch to REAL', async () => {
-        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
-        unit.props.userSettings.getSetting('fastGpsAcquisition').set(false);
-        await unit.panel.powerOn();
-        await vi.advanceTimersByTimeAsync(5000);
+        expect(await secondsToFix(unit, 60)).toBeLessThanOrEqual(17);
+        expect(messages(unit)).not.toContain(POSITION_DIFFERS);
+        expect(messages(unit)).not.toContain(TIME_UPDATED);
+    }, SLOW);
 
-        expect(unit.props.sensors.in.gps.gpsSatComputer.inhibitedSatellitePrnCodes.get().size).toBe(0);
-    });
-
-    it('characterization: choosing FAST on SET 10 while the slow search runs gives a fix within 2 s', async () => {
-        const unit = await bootUnit({coldGps: true, storage: {fastGpsAcquisition: false}});
+    // The design's central claim: FAST runs the same start model as REAL, from the true state, not the SDK on its own.
+    // The search begins at the first calculation tick after the power-on; the hot fix takes at least HOT_ACQUISITION -
+    // HOT_ACQUISITION_RANGE / 2 = 6 s, so 3 s after the power-on the search is still under way
+    it('FAST: a power-on runs the start model as REAL does, a predicted acquisition (#468, #62)', async () => {
+        const unit = await powerOnCold(FAR_AND_OLD);
+        await vi.advanceTimersByTimeAsync(3000);
         const gps = unit.props.sensors.in.gps;
-        await unit.panel.selectPage('L', 'SET 10');
-        await unit.panel.cursor('L');
-        await unit.panel.inner('L', 1);
-        expect(Screen.read().rows('L')[0]).toBe('GPS:   FAST');
 
-        expect(await secondsToFix(unit, 2)).toBeLessThan(2);
-        expect(gps.gpsSatComputer.state).toBe(GPSSystemState.SolutionAcquired);
+        expect(gps.isValid()).toBe(false);
+        expect(gps.search.mode).toBe(SearchMode.Acquisition);
+        expect(gps.search.predictedSatellites().map(s => s.prn).sort((a, b) => a - b)).toEqual(IN_VIEW);
+    });
+
+    // The SDK's context time, the default of downloadAlamanac(), moves only in its constructor and in its updates while
+    // powered. A sim date moved 7 months while the unit is off would leave it 7 months old: FAST completes the almanac at
+    // the sim time, so it stays a hot start
+    it('FAST: a power-on after the sim date moved 7 months while the unit was off is a hot start (#468, #62: 0:17)', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
+        unit.env.sim.absoluteTimeOffsetMs += 7 * 30 * DAY;
+        await unit.panel.powerOn();
+
+        expect(await secondsToFix(unit, 60)).toBeLessThanOrEqual(17);
+    }, SLOW);
+
+    // The control: the same stored data in REAL runs an almanac search (ORS 01 6-30), so the speed above comes from FAST
+    it('REAL: the same power-on runs an almanac search and has no fix within 60 s (#468)', async () => {
+        const unit = await powerOnCold({...FAR_AND_OLD, fastGpsAcquisition: false});
+
+        expect(await secondsToFix(unit, 60)).toBe(60);
+    }, SLOW);
+
+    it('FAST: the unit clock is set to the sim time at power-on (#468)', async () => {
+        const unit = await bootUnit({engineRunning: false, storage: {lastLatitude: 47, lastLongitude: 8}});
+        const gps = unit.props.sensors.in.gps;
+        gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
+        // Read in the power event itself, after the GPS handled it (it subscribed first): no tick has run since
+        let atPowerOn: { clock: number, sim: number } | undefined;
+        unit.core.bus.getSubscriber<{ powerEvent: { isPowered: boolean } }>().on('powerEvent').handle(e => {
+            if (e.isPowered) {
+                atPowerOn = {clock: gps.timeZulu.getTimestamp(), sim: simUnix(unit)};
+            }
+        });
+        await unit.panel.powerOn();
+
+        expect(gps.isValid()).toBe(false);
+        // Below 1 ms: E:ABSOLUTE TIME is a double of seconds since year 1, which rounds the milliseconds
+        expect(Math.abs(atPowerOn!.clock - atPowerOn!.sim)).toBeLessThan(1);
+    });
+
+    // The saved ephemeris is restored once the receiver's satellites have loaded (Gps.ts awaitInit), which can be after the
+    // first power-on of a session. FAST must still leave every satellite with a current ephemeris. The test holds the
+    // receiver's ephemeris file back until after the power-on; the stored ephemeris is stale
+    it('FAST: the first power-on of a session is hot although the satellites load after it (#468)', async () => {
+        const held: (() => void)[] = [];
+        const send = XMLHttpRequest.prototype.send;
+        const spy = vi.spyOn(XMLHttpRequest.prototype, 'send').mockImplementation(function (this: XMLHttpRequest) {
+            if (String((this as any).url).endsWith('gps_ephemeris.json')) {
+                held.push(() => send.call(this));
+            } else {
+                send.call(this);
+            }
+        });
+        let unit: HeadlessUnit;
+        try {
+            unit = await bootUnit({engineRunning: false, storage: {...FAR_AND_OLD, lastEphemeris: ephemeris(START - 400 * DAY)}});
+            await unit.panel.powerOn();
+            expect(held.length).toBeGreaterThan(0); //Precondition: the file is held
+            expect(unit.props.sensors.in.gps.gpsSatComputer.getSatellites()).toEqual([]); //Precondition: not loaded at power-on
+            await vi.advanceTimersByTimeAsync(1000);
+        } finally {
+            spy.mockRestore();
+        }
+        held.forEach(release => release());
+
+        expect(1 + await secondsToFix(unit, 60)).toBeLessThanOrEqual(17);
+        const now = simUnix(unit);
+        const sats = unit.props.sensors.in.gps.gpsSatComputer.getSatellites();
+        expect(sats.length).toBeGreaterThan(24); //The constellation of resources/, not an empty list
+        expect(sats.filter(s => s.lastEphemerisTime === undefined || Math.abs(now - s.lastEphemerisTime) >= 2 * 60 * MINUTE)
+            .map(s => s.prn)).toEqual([]);
+    }, SLOW);
+
+    // The engine-running start keeps its forced acquisition (WelcomePage); FAST has set the stored position to the true one
+    // before it, so the default position 0/0 of empty storage is not compared
+    it('FAST: an engine-running start with empty storage posts no POSITION DIFFERS (#468)', async () => {
+        const unit = await bootUnit({});
+        await settle(unit);
+
+        expect(messages(unit)).not.toContain(POSITION_DIFFERS);
+    });
+
+    // The control: REAL compares with the stored position 0/0 (B-3)
+    it('REAL: an engine-running start with empty storage posts POSITION DIFFERS (B-3, #468)', async () => {
+        const unit = await bootUnit({storage: {fastGpsAcquisition: false}});
+        await settle(unit);
+
+        expect(messages(unit)).toContain(POSITION_DIFFERS);
+    });
+
+    // The SDK timings are private (GPSSatComputer.satelliteTimingOptions); a FAST timeout of 1 s made a satellite lost to
+    // a weak signal Unreachable for an hour (#467)
+    it.each([['REAL', false], ['FAST', true]])('FAST and REAL use the same receiver timings: %s (#468)', async (_, fast) => {
+        const unit = await bootUnit({engineRunning: false, storage: {fastGpsAcquisition: fast}});
+        const options = (unit.props.sensors.in.gps.gpsSatComputer as any).satelliteTimingOptions;
+
+        expect({acquisitionTimeout: options.acquisitionTimeout, ephemerisDownloadTime: options.ephemerisDownloadTime})
+            .toEqual({acquisitionTimeout: 4 * MINUTE, ephemerisDownloadTime: 30_000});
     });
 });
 
-// 5-29: a forced acquisition (the engine-running start in WelcomePage, SET 10 FAST) calls acquireAndUseSatellites()
+// 5-29: a forced acquisition (the engine-running start in WelcomePage) calls acquireAndUseSatellites()
 // on the receiver; the unit accepts that solution at once, without the TRAN tick of a searched one (#215)
 describe('forced acquisition (5-29, #215)', () => {
     it('is valid at once and not in transition, without a further calculation tick (#215)', async () => {
@@ -774,30 +866,33 @@ describe('forced acquisition (5-29, #215)', () => {
 
 // B-2: DATA BASE OUT OF DATE appears when a date from the GPS overrides a pilot-entered date and the data base is then
 // out of date. The fake clock starts after the end of the navdata cycle (MAY15JUN12/26, sim/clock.ts); the unit's own
-// clock is set back into the cycle before the power-on, as a pilot would on the self-test page
+// clock is set back into the cycle before the power-on, as a pilot would on the self-test page. REAL: FAST sets the clock
+// to the true date at power-on, which is past the end at power-up and posts nothing (#468). The clock 30 days off finds
+// its fix only in the sky search (3-17: within 12 minutes)
 describe('DATA BASE OUT OF DATE after the GPS sets the date (B-2)', () => {
     const AFTER_CYCLE = new Date('2026-07-01T12:00:00Z');
     const TEXT = 'DATA BASE OUT OF DATE ALL DATA MUST BE CONFIRMED BEFORE USE';
+    const REAL_HERE = {...WARM, lastAlmanacDownload: AFTER_CYCLE.getTime() - DAY};
 
     it('posts when the GPS moves the date past the end of the data base (B-2)', async () => {
-        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: REAL_HERE});
         const gps = unit.props.sensors.in.gps;
         gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
         await unit.panel.powerOn();
-        expect(await secondsToFix(unit, 60)).toBeLessThan(60);
+        expect(await secondsToFix(unit, 720)).toBeLessThan(720);
         await vi.advanceTimersByTimeAsync(5000);
 
         expect(messages(unit).filter(m => m === TEXT)).toHaveLength(1);
-    });
+    }, SLOW);
 
     // B-2 names one message, and 3-16 keeps it until read. Before #175 the one-time message of Database.onGPSAcquired and
     // the persistent message were both listed at the fix
     it('lists it once at every display tick from the fix on, unread (B-2, 3-16) (#175)', async () => {
-        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: REAL_HERE});
         const gps = unit.props.sensors.in.gps;
         gps.timeZulu = TimeStamp.create(gps.timeZulu.getTimestamp() - 30 * DAY);
         await unit.panel.powerOn();
-        expect(await secondsToFix(unit, 60)).toBeLessThan(60);
+        expect(await secondsToFix(unit, 720)).toBeLessThan(720);
 
         const counts: number[] = [];
         for (let i = 0; i < 20; i++) {
@@ -807,15 +902,15 @@ describe('DATA BASE OUT OF DATE after the GPS sets the date (B-2)', () => {
 
         expect(counts).toEqual(new Array(20).fill(1));
         expect(unit.props.messageHandler.getMessages().find(m => m.message.join(' ') === TEXT)!.seen).toBe(false);
-    });
+    }, SLOW);
 
     it('does not post when the GPS leaves the date as it was (B-2)', async () => {
-        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: {lastLatitude: 47, lastLongitude: 8}});
+        const unit = await bootUnit({engineRunning: false, start: AFTER_CYCLE, storage: REAL_HERE});
         await unit.panel.powerOn();
-        expect(await secondsToFix(unit, 60)).toBeLessThan(60);
+        expect(await secondsToFix(unit, 720)).toBeLessThan(720);
 
         expect(messages(unit)).not.toContain(TEXT);
-    });
+    }, SLOW);
 });
 
 // 5-29: the receiver tracks up to eight satellites. The channel list is a private SDK field (KLNGPSSatComputer.getChannels

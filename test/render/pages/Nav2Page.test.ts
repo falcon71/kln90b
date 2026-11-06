@@ -5,6 +5,9 @@ import {pointFrom} from '../../harness/flight/geo';
 import {vor} from '../../harness/navdata/builders';
 import {Screen} from '../../harness/render/screen';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 /** Boots at `position` with the facilities given, then waits for the NAV 2 VOR search (it searches every 10 s) */
 async function nav2At(position: { lat: number, lon: number }, facilities: ReturnType<typeof vor>[] = [], magvar = 0) {
     const unit = await bootUnit({facilities, position, magvar});
@@ -14,7 +17,7 @@ async function nav2At(position: { lat: number, lon: number }, facilities: Return
 
 describe('NAV 2 page (characterization)', () => {
     it('shows radial and distance from the nearest VOR and the present position', async () => {
-        await bootUnit({facilities: [vor('ABC', 47.2, 8.0, {magneticVariation: 0})], position: {lat: 47.0, lon: 8.0}});
+        await bootUnit({storage: REAL, facilities: [vor('ABC', 47.2, 8.0, {magneticVariation: 0})], position: {lat: 47.0, lon: 8.0}});
         // NAV 2 searches its VOR every 10 s (SEARCH_INTERVAL_TICKS in Nav2Page.tsx)
         await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);
 

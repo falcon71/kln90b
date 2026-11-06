@@ -8,8 +8,11 @@ import {activeIdent, messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 import {DEFAULT_START} from '../../harness/sim/clock';
-import {inhibitAllBut, liftInhibits} from '../../harness/gps';
+import {holdInhibits, inhibitAllBut, liftInhibits} from '../../harness/gps';
 import {GpsGeometry} from '../../../kln90b/GpsSolution';
+
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
 
 describe('ALTITUDE FAIL', () => {
     // B-1: the message shows when the altitude input fails. Input.AltimeterInterfaced false is a unit without the input
@@ -22,7 +25,7 @@ describe('ALTITUDE FAIL', () => {
     });
 
     it('does not show on a unit with an altitude input (B-1)', async () => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({storage: REAL});
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
@@ -31,7 +34,7 @@ describe('ALTITUDE FAIL', () => {
     });
 
     it('does not show on a VFR-only unit without an altitude input (characterization)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({...VFR_ONLY, ...NO_ALTIMETER})});
+        const unit = await bootUnit({storage: REAL, panelXml: panelXml({...VFR_ONLY, ...NO_ALTIMETER})});
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
@@ -40,7 +43,7 @@ describe('ALTITUDE FAIL', () => {
     });
 
     it('does not show when an air data computer supplies the altitude (B-1)', async () => {
-        const unit = await bootUnit({panelXml: panelXml({...NO_ALTIMETER, ...AIRDATA})});
+        const unit = await bootUnit({storage: REAL, panelXml: panelXml({...NO_ALTIMETER, ...AIRDATA})});
         await vi.advanceTimersByTimeAsync(2000);
 
         expect(messages(unit)).not.toContain('ALTITUDE FAIL');
@@ -62,7 +65,7 @@ describe('MAGNETIC VAR INVALID (5-44, B-2)', () => {
     });
 
     it('does not show at N 73.5 (5-44, B-2)', async () => {
-        const unit = await bootUnit({position: {lat: 73.5, lon: 8.0}});
+        const unit = await bootUnit({storage: REAL, position: {lat: 73.5, lon: 8.0}});
         await settle(unit);
 
         expect(messages(unit)).not.toContain('MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH');
@@ -641,7 +644,7 @@ describe('signal loss and RAIM messages (#453)', () => {
         const unit = await bootUnit({panelXml: panelXml(NO_ALTIMETER)});
         await settle(unit);
         const gps = unit.props.sensors.in.gps;
-        inhibitAllBut(unit, 4);
+        holdInhibits(unit, inhibitAllBut(unit, 4)); // The start model of the power-on would lift them (#468)
         await untilMeasurements(unit, 4);
         await vi.advanceTimersByTimeAsync(8000);
         expect(listed(unit)).toEqual([]); // Precondition: 8 s of the 10 s have counted

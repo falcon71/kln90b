@@ -96,7 +96,8 @@ export class KLNGPSSatComputer extends GPSSatComputer {
     }
 
     /**
-     * The forced acquisition of an engine-running start or of SET 10 FAST ends the start model. The receiver failures'
+     * The forced acquisition of an engine-running start ends the start model. FAST forces nothing (#468): it starts the
+     * search from the true state instead, as a forced acquisition makes a lost satellite Unreachable. The receiver failures'
      * inhibits are applied first: the SDK's forced channel assignment skips inhibited satellites (#460, GPSSat.ts
      * losSatelliteFilterOmniscient). The jamming level and the antenna's attitude are read before (#467), and the signals
      * are refreshed inside the forced update, at its first reachability query, once the SDK has computed that update's
@@ -183,6 +184,22 @@ export class KLNGPSSatComputer extends GPSSatComputer {
     }
 
     /**
+     * FAST (#468): gives every satellite a current ephemeris, collected at the given time. The time is private satellite
+     * data in the SDK, as for restoreEphemeris. Does nothing before the satellites are loaded
+     * @param time The sim time, UNIX ms: the time base the SDK checks the ephemeris' age against
+     * @throws Error if a satellite's private data moved in an SDK upgrade
+     */
+    public setEphemerisCurrent(time: number): void {
+        for (const sat of this.getSatellites()) {
+            const data = (sat as any).data;
+            if (data === undefined || !("lastEphemerisTime" in data)) {
+                throw new Error("GPSSatellite data moved: recheck Gps.ts after the SDK upgrade");
+            }
+            data.lastEphemerisTime = time;
+        }
+    }
+
+    /**
      * channels is private, but we display this in the STA 1 page, so we make it public here
      */
     public getChannels(): (GPSSatellite | null)[] {
@@ -218,6 +235,8 @@ export class GPS {
     public simTimeUnix: number = 0;
     private intSaveCount = 0;
     private readonly takeHomeMode: boolean;
+    /** FAST has initialized the memory from the truth: the ephemeris restore of the satellites' late load must keep it current (#468) */
+    private ephemerisFromTruthPending = false;
     private gpsStartTime: number = 0;
     private solutionAccepted = false; //5-29: the unit accepts the receiver's solution one calculation tick after it appears (TRAN)
     private inTransition = false;
@@ -267,20 +286,20 @@ export class GPS {
         this.measurement = new FailingMeasurement(measurement, this.failures);
         this._solution = this.takeHomeMode ? {...TAKE_HOME_SOLUTION} : computeGeometry([], false, this.solutionCoefficients);
         this.measurementInputs = {geometry: this._solution, prns: this.solutionPrns, coefficients: this.solutionCoefficients, indicatedAltitudeFt: null};
-        const fastGPS = this.userSettings.getSetting("fastGpsAcquisition").get();
-
+        //#468: FAST and REAL are the same receiver with the same timings. FAST only sets the unit's memory to the true state
+        //at power-on (initializeFromTruth)
         const gpsOptions: GPSSatComputerOptions = {
             channelCount: 8,
             timingOptions: { //3-17, #62
                 almanacExpireTime: 182 * 24 * 60 * 60 * 1000, //Six months
                 ephemerisExpireTime: 2 * 60 * 60 * 1000,
-                acquisitionTime: fastGPS ? 10 * 1000 : IDLE_ACQUISITION, //GpsSearch sets it per power-on
-                acquisitionTimeRange: fastGPS ? 1000 : WARM_ACQUISITION_RANGE,
-                acquisitionTimeWithEphemeris: fastGPS ? 10 * 1000 : HOT_ACQUISITION, //#62: a power cycle with a current ephemeris has its fix in 0:17, self-test included
-                acquisitionTimeRangeWithEphemeris: fastGPS ? 1000 : HOT_ACQUISITION_RANGE,
-                acquisitionTimeout: fastGPS ? 1000 : 4 * 60 * 1000,
-                ephemerisDownloadTime: fastGPS ? 1000 : 30000, //30 Seconds, one data frame
-                almanacDownloadTime: fastGPS ? 1000 : 750000, //12.5 minutes
+                acquisitionTime: IDLE_ACQUISITION, //GpsSearch sets it per power-on
+                acquisitionTimeRange: WARM_ACQUISITION_RANGE,
+                acquisitionTimeWithEphemeris: HOT_ACQUISITION, //#62: a power cycle with a current ephemeris has its fix in 0:17, self-test included
+                acquisitionTimeRangeWithEphemeris: HOT_ACQUISITION_RANGE,
+                acquisitionTimeout: 4 * 60 * 1000,
+                ephemerisDownloadTime: 30000, //30 Seconds, one data frame
+                almanacDownloadTime: 750000, //12.5 minutes
             },
         };
 
@@ -300,8 +319,7 @@ export class GPS {
         );
         //Before the power event subscription, so that powerChanged always finds the search. PowerSupply publishes no power
         //event before Sensors exists, so powerChanged never runs before the end of this constructor
-        //The model needs the REAL timings the computer was built with: after a switch from FAST it stays off until the next session
-        this.search = new GpsSearch(this.gpsSatComputer, () => fastGPS || this.userSettings.getSetting("fastGpsAcquisition").get(), () => this.failures.receiverFailed);
+        this.search = new GpsSearch(this.gpsSatComputer, () => this.failures.receiverFailed);
         this.gpsSatComputer.search = this.search;
         //Through the object, not a bound method, so that a test's spy on signals.isLost takes effect
         const isLost = (prn: number) => {
@@ -326,6 +344,10 @@ export class GPS {
         const savedEphemeris = parseEphemeris(userSettings.getSetting("lastEphemeris").get());
         this.gpsSatComputer.awaitInit().then(() => {
             this.gpsSatComputer.restoreEphemeris(savedEphemeris);
+            if (this.ephemerisFromTruthPending) {
+                //A FAST power-on ran before the satellites were loaded: its ephemeris would be lost to the restore (#468)
+                this.gpsSatComputer.setEphemerisCurrent(this.currentSimUnixTime());
+            }
             this.gpsSatComputer.wrapReachability(isLost);
         });
 
@@ -333,11 +355,7 @@ export class GPS {
             userSettings.getSetting("lastLatitude").get(),
             userSettings.getSetting("lastLongitude").get(),
         );
-        if (fastGPS) {
-            this.gpsSatComputer.downloadAlamanac();
-        } else {
-            this.gpsSatComputer.downloadAlamanac(userSettings.getSetting("lastAlmanacDownload").get());
-        }
+        this.gpsSatComputer.downloadAlamanac(userSettings.getSetting("lastAlmanacDownload").get());
 
         this.gpsSatComputer.syncLastKnownPosition(this.coords);
 
@@ -534,7 +552,7 @@ export class GPS {
         return this.inTransition;
     }
 
-    /** The forced acquisition of an engine-running start or SET 10 FAST is accepted at once, without TRAN */
+    /** The forced acquisition of an engine-running start is accepted at once, without TRAN */
     public acceptForcedSolution(): void {
         this.updateSolution(); //No tick has seen the satellites of the forced acquisition yet
         if (this._solution.valid && !this.solutionAccepted) {
@@ -563,6 +581,46 @@ export class GPS {
         }
         this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp();
         this.search.start(this.coords);
+    }
+
+    /**
+     * SET 10 switched to FAST (#468): without a fix, the memory is set to the true state and the search starts again from
+     * it, as at a power-on with FAST. No forced acquisition: it would make a satellite with a lost signal Unreachable. With
+     * a fix nothing changes, and take-home mode has no satellites
+     */
+    public startFast(): void {
+        if (this.isValid() || this.takeHomeMode) {
+            return;
+        }
+        this.initializeFromTruth();
+        this.search.start(this.coords);
+    }
+
+    /**
+     * FAST (SET 10, #468): sets the unit's memory to the true state, as a pilot would on SET 1 and SET 2 (3-17..3-19), plus
+     * a current almanac and ephemeris. The start model then runs as in REAL and finds a hot start: the stored position is
+     * the present one (the SDK's 2 NM rule) and every satellite has a current ephemeris. The first fix then matches the
+     * stored position and the clock, so neither B-3 nor B-4 posts. Nothing in take-home mode, which has no satellites
+     */
+    public initializeFromTruth(): void {
+        if (this.takeHomeMode) {
+            return;
+        }
+        const now = this.currentSimUnixTime(); //The time base the SDK checks the almanac's and the ephemeris' age against
+        this.coords.set(
+            SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree),
+            SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree),
+        );
+        this.timeZulu.setTimestamp(now);
+        this.gpsSatComputer.internalTime = now;
+        this.gpsSatComputer.downloadAlamanac(now); //Explicitly: the SDK's default is its context time, stale before its first update
+        this.gpsSatComputer.syncLastKnownPosition(this.coords);
+        this.gpsSatComputer.setEphemerisCurrent(now); //Nothing yet if the satellites are still loading: see the constructor
+        this.ephemerisFromTruthPending = true;
+    }
+
+    private currentSimUnixTime(): number {
+        return this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
     }
 
     public savePosition(): void {
@@ -626,6 +684,9 @@ export class GPS {
             //real-world counterpart
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp(); //The receiver reads it on the first update, before tick refreshes it (#211)
+            if (this.userSettings.getSetting("fastGpsAcquisition").get()) {
+                this.initializeFromTruth(); //#468: before the search, which decides its start from this memory
+            }
             this.search.start(this.coords); //The receiver starts from the position stored at power-off (#62)
             this._hadFixSincePowerOn = false;
             this.gpsStartTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);

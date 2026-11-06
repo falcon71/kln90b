@@ -2,7 +2,7 @@ import {GeoPoint, GPSPredictionContext, GPSPredictionSatellite, GPSSatelliteStat
 import type {KLNGPSSatComputer} from "./Gps";
 
 export const enum SearchMode {
-    /** No start in progress: the unit navigates, FAST acquisition is selected, or the start was forced. The SDK runs on its own */
+    /** No start in progress: the unit navigates, or the start was forced. The SDK runs on its own */
     Idle,
     /** 3-17, 5-29: the receiver searches the satellites its almanac predicts for the stored position and its own clock */
     Acquisition,
@@ -88,17 +88,17 @@ export class GpsSearch {
      * @param allBlocked The failures forbid tracking any satellite (a receiver failure). Asked once per application, not
      * per satellite: it reads the settings (the tick cost rule, CLAUDE.md)
      */
-    constructor(private readonly computer: KLNGPSSatComputer, private readonly isFast: () => boolean, private readonly allBlocked: () => boolean) {
+    constructor(private readonly computer: KLNGPSSatComputer, private readonly allBlocked: () => boolean) {
         this.prediction = computer.createPredictionContext();
         this.prediction.awaitInit().then(() => this.predictionReady = true);
     }
 
-    /** Power-on: the receiver starts from the position it had at power-off. The mode is decided on the next tick */
+    /**
+     * Power-on: the receiver starts from the position it had at power-off. The mode is decided on the next tick. FAST runs
+     * the same search, from the true state it has written into the memory before (Gps.ts initializeFromTruth, #468)
+     */
     public start(storedPosition: LatLonInterface): void {
         this.end();
-        if (this.isFast()) {
-            return; //FAST is a simulator convenience (#46): the SDK runs on its own with short timings
-        }
         this.pendingStart = new GeoPoint(storedPosition.lat, storedPosition.lon);
     }
 

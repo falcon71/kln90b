@@ -86,7 +86,8 @@ describe('MOD 1 CDI scale field with an approach loaded 40 NM from the airport',
 /** The standard route KAAA, ABC, KBBB, 5 NM before ABC with ABC active, in ENR-LEG */
 async function onStandardRoute(xml?: string): Promise<HeadlessUnit> {
     const {kaaa, abc} = standardRoute();
-    return bootOnStandardRoute({position: pointBefore(kaaa, abc, 5), panelXml: xml});
+    // REAL: the status lines below show the msg of POSITION DIFFERS, which a FAST boot no longer posts (#468)
+    return bootOnStandardRoute({position: pointBefore(kaaa, abc, 5), panelXml: xml, storage: {fastGpsAcquisition: false}});
 }
 
 describe('MOD 1 page (characterization)', () => {
