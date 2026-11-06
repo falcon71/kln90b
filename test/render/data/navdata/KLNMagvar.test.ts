@@ -8,6 +8,9 @@ import {angleDiff, finalCourseDeg} from '../../../harness/flight/geo';
 import {Screen} from '../../../harness/render/screen';
 import {NavMode} from '../../../../kln90b/data/VolatileMemory';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 const MAGVAR_INVALID = 'MAGNETIC VAR INVALID ALL DATA REFERENCED TO TRUE NORTH';
 
 /** The TK row of NAV 3 */
@@ -26,7 +29,7 @@ describe('MAGNETIC VAR INVALID at the southern limit (3-1, 5-44, B-2)', () => {
     });
 
     it('does not show at S 59.5 (3-1, 5-44, B-2)', async () => {
-        const unit = await bootUnit({position: {lat: -59.5, lon: 8.0}});
+        const unit = await bootUnit({storage: REAL, position: {lat: -59.5, lon: 8.0}});
         await settle(unit);
 
         expect(messages(unit)).not.toContain(MAGVAR_INVALID);
@@ -86,10 +89,10 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
     const kfar = airport('KFAR', 75.0, 8.0);
     const OBS_SOURCE_OFF = panelXml(NO_OBS);
 
-    async function toKfar() {
+    async function toKfar(storage: Record<string, unknown> = {}) {
         const unit = await bootUnit({
             facilities: [kaaa, kfar], position: {lat: 73.5, lon: 8.0}, magvar: 10, panelXml: OBS_SOURCE_OFF,
-            storage: savedFlightplan(0, [kaaa, kfar]),
+            storage: {...savedFlightplan(0, [kaaa, kfar]), ...storage},
         });
         await settle(unit);
         expect(activeIdent(unit)).toBe('KFAR');
@@ -98,7 +101,7 @@ describe('OBS mode with the active waypoint outside the coverage area', () => {
 
     // The counterpart of the OBS tests below: in Leg mode, with the aircraft inside the area, the message stays away
     it('does not show the message in Leg mode, with the aircraft inside the area (5-44)', async () => {
-        const unit = await toKfar();
+        const unit = await toKfar(REAL);
 
         expect(unit.props.memory.navPage.navmode).toBe(NavMode.ENR_LEG);
         expect(messages(unit)).not.toContain(MAGVAR_INVALID);

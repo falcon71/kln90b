@@ -52,7 +52,7 @@ export class Set10Page extends SixLineHalfPage {
     private saveFastGpsAcquisition(fastGpsAcquisition: number): void {
         this.props.userSettings.getSetting("fastGpsAcquisition").set(fastGpsAcquisition === 1);
         if (fastGpsAcquisition === 1) {
-            this.props.sensors.in.gps.gpsSatComputer.acquireAndUseSatellites();
+            this.props.sensors.in.gps.startFast(); //#468: REAL only saves the setting; the next power-on runs as REAL
         }
     }
 

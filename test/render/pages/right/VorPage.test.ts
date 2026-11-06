@@ -199,7 +199,8 @@ describe('VOR page contents (3-49)', () => {
         const unit = await bootUnit({
             facilities: [...before, vor('YKM', 46.57, -120.45, {name: 'YAKIMA'})],
             position: {lat: 47, lon: 8},
-            storage: {vorPageWpt: ICAO.valueToStringV2(ICAO.value('V', 'K1', '', 'YKM'))},
+            // REAL: the status line holds the msg of POSITION DIFFERS, which a FAST boot no longer posts (#468)
+            storage: {vorPageWpt: ICAO.valueToStringV2(ICAO.value('V', 'K1', '', 'YKM')), fastGpsAcquisition: false},
         });
         expect(unit.props.memory.vorPage.ident).toBe('YKM'); // Precondition: the page restored its saved VOR
 

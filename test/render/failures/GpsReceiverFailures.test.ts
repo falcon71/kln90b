@@ -195,7 +195,8 @@ describe('the receiver failures in the receiver (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 120_000);
 
-    // SET 10 FAST forces an acquisition at once (Set10Page): it also skips the blocked satellites
+    // The engine-running start forces an acquisition (WelcomePage): it also skips the blocked satellites. SET 10 FAST no
+    // longer forces one (#468), see the next test
     it('a forced acquisition during the failure acquires nothing', async () => {
         const unit = await bootUnit();
         await settle(unit);
@@ -210,6 +211,30 @@ describe('the receiver failures in the receiver (#460)', () => {
         expect(inhibited(unit)).toEqual(allPrns(unit));
         await vi.advanceTimersByTimeAsync(2000);
         expect(gps.isValid()).toBe(false);
+    }, 60_000);
+
+    // #468: a switch to FAST without a fix initializes the memory from the truth and restarts the search, which the blocks hold
+    it('SET 10 switched to FAST during the failure acquires nothing', async () => {
+        const unit = await bootUnit({storage: {...HOME, fastGpsAcquisition: false}});
+        await settle(unit);
+        const gps = unit.props.sensors.in.gps;
+        unit.props.failures.fail('gpsReceiver');
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(gps.isValid()).toBe(false); // Preconditions
+        expect(tracked(unit)).toEqual([]);
+
+        await unit.panel.selectPage('L', 'SET 10');
+        await unit.panel.cursor('L');
+        await unit.panel.inner('L', 1);
+        expect(unit.props.userSettings.getSetting('fastGpsAcquisition').get()).toBe(true); // Precondition
+        for (let s = 0; s < 30; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(tracked(unit)).toEqual([]);
+        }
+
+        expect(inhibited(unit)).toEqual(allPrns(unit));
+        expect(gps.isValid()).toBe(false);
+        expect(unit.errors).toEqual([]);
     }, 60_000);
 
     // The runtime state of GpsFailures restarts at both power edges (design, "GpsFailures"): off, the level is 0; on, the

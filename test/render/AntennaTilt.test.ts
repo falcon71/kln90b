@@ -12,8 +12,11 @@ import {Screen} from '../harness/render/screen';
  * the antenna faces the inside of the turn, so a low satellite on the high-wing side (the outside of the turn) is lost
  */
 
-/** The position stored at the last power-off, so the boot posts no POSITION DIFFERS message. Real timings keep a lost satellite searched, *PP  00 */
-const HOME = {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 8};
+/**
+ * The position stored at the last power-off, so a REAL boot posts no POSITION DIFFERS message. FAST and REAL share the
+ * receiver's timings (#468), so both keep a lost satellite searched, *PP  00
+ */
+const HOME = {lastLatitude: 47, lastLongitude: 8};
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -30,8 +33,8 @@ const elevationDeg = (sat: GPSSatellite): number => 90 - sat.position.get()[0] *
 /** The azimuth relative to the nose, positive to the right, in -180..180 */
 const relative = (sat: GPSSatellite, heading: number): number => ((azimuth(sat) - heading + 540) % 360) - 180;
 
-async function flyingUnit(antennaAttitude = true): Promise<{ unit: HeadlessUnit, low: GPSSatellite, view: readonly GPSSatellite[] }> {
-    const unit = await bootUnit({storage: HOME, antennaAttitude});
+async function flyingUnit(antennaAttitude = true, storage: Record<string, unknown> = {}): Promise<{ unit: HeadlessUnit, low: GPSSatellite, view: readonly GPSSatellite[] }> {
+    const unit = await bootUnit({storage: {...HOME, ...storage}, antennaAttitude});
     await settle(unit);
     const signals = gpsOf(unit).signals;
     signals.fadeScale = 0;
@@ -70,9 +73,14 @@ async function satelliteRows(unit: HeadlessUnit): Promise<string[]> {
     return [...first, ...second];
 }
 
-describe('the antenna tilts with the aircraft (#467, characterization)', () => {
+// #468: FAST is the same receiver as REAL. With FAST's former timeout of 1 s the lost satellite turned Unreachable (*PP-)
+// and stayed out for an hour
+describe.each([
+    {name: 'REAL', fastGpsAcquisition: false},
+    {name: 'FAST', fastGpsAcquisition: true},
+])('the antenna tilts with the aircraft, $name (#467, #468, characterization)', ({fastGpsAcquisition}) => {
     it('a right bank loses the lowest satellite when it is on the left, the outside of the turn: *PP  00 on STA 1, and the satellites on the right stay', async () => {
-        const {unit, low, view} = await flyingUnit();
+        const {unit, low, view} = await flyingUnit(true, {fastGpsAcquisition});
         await unit.panel.selectPage('L', 'STA 1');
         const heading = azimuth(low) + 90; // The satellite is 90 degrees to the left of the nose
         const rightSide = satellites(unit).filter(s => inUse(s) && relative(s, heading) > 30).map(s => s.prn);
@@ -93,7 +101,7 @@ describe('the antenna tilts with the aircraft (#467, characterization)', () => {
     }, 60_000);
 
     it('level again, the lost satellite is in use again within 20 s', async () => {
-        const {unit, low} = await flyingUnit();
+        const {unit, low} = await flyingUnit(true, {fastGpsAcquisition});
         const heading = azimuth(low) + 90;
         fly(unit, heading, -30);
         await twoCalcTicks(unit);
@@ -112,7 +120,9 @@ describe('the antenna tilts with the aircraft (#467, characterization)', () => {
         expect(gpsOf(unit).signals.isLost(low.prn)).toBe(false);
         expect(unit.errors).toEqual([]);
     }, 60_000);
+});
 
+describe('the antenna tilts with the aircraft (#467, characterization)', () => {
     it('MSFS bank signs: a left bank (positive) keeps the low satellite on the left and loses low ones on the right instead', async () => {
         const {unit, low, view} = await flyingUnit();
         const heading = azimuth(low) + 90; // low is on the left

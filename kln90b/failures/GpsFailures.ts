@@ -217,7 +217,7 @@ export class GpsFailures {
 
     /**
      * Brings the jamming level up to date outside the calculation tick, for the forced acquisition of an engine-running
-     * start or of SET 10 FAST: reset() sets the level to 0 at power-on, and the forced acquisition runs before the first
+     * start: reset() sets the level to 0 at power-on, and the forced acquisition runs before the first
      * tick sets it again. Loads the stored values when they are not cached. Counts no time and draws no wander. Allocates
      * nothing once the values are cached
      */

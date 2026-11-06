@@ -127,7 +127,8 @@ describe('the GPS solution (5-29, #453)', () => {
         const gps = unit.props.sensors.in.gps;
 
         await vi.advanceTimersByTimeAsync(Date.parse('2026-11-05T01:50:00Z') - Date.now());
-        expect(gps.solution.hdop).toBeLessThan(1.2);
+        // Good geometry before the drop; the REAL timings (#468) keep a setting satellite searched, so the set differs: about 1.36
+        expect(gps.solution.hdop).toBeLessThan(1.5);
 
         await vi.advanceTimersByTimeAsync(Date.parse('2026-11-05T01:50:45Z') - Date.now());
         expect(gps.solution.hdop).toBeGreaterThan(4.5);

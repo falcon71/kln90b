@@ -10,6 +10,12 @@ import {showSuperNav5} from '../../../harness/render/superNav5';
 import {storedSetting} from '../../../harness/storage';
 import {KLNFacilityRepository} from '../../../../kln90b/data/navdata/KLNFacilityRepository';
 
+/**
+ * REAL GPS acquisition: the unit's position stays the empty storage's 0/0 until the first fix, far from the NDB. FAST sets
+ * it to the true position at power-on (#468), so its boot already finds the NDB
+ */
+const REAL = {fastGpsAcquisition: false};
+
 // Invented airports on the meridian of the aircraft, 0.1 degrees (6 NM) apart, one of each kind the SET 3 criteria
 // (3-22, 3-23) tell apart. The aircraft is at 47.0N 8.0E.
 const POSITION = {lat: 47.0, lon: 8.0};
@@ -560,7 +566,7 @@ describe('the nearest lists before their search sessions have started (#424)', (
                 return type === FacilitySearchType.Ndb ? new Promise<any>(resolve => setTimeout(() => resolve(session), 15_000)) : session;
             });
         onTestFinished(() => spy.mockRestore());
-        const unit = await bootUnit({facilities: [ndb('NAA', 47.05, 8.0)], position: POSITION});
+        const unit = await bootUnit({storage: REAL, facilities: [ndb('NAA', 47.05, 8.0)], position: POSITION});
         expect(unit.props.nearestLists.ndbNearestList.getNearestList()).toEqual([]); // Precondition: no search yet
 
         await vi.advanceTimersByTimeAsync(NEAREST_SEARCH_WAIT_MS);

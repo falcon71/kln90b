@@ -31,7 +31,8 @@ describe('FrontPanel power helpers (harness)', () => {
         await unit.panel.approveSelfTest();
 
         expect(unit.props.pageManager.getCurrentPage()).toBeInstanceOf(MainPage);
-        expect(Screen.read().status()).toEqual({left: 'NAV 2', mode: 'enr-leg msg', right: 'SUP'});
+        // No msg: the FAST power-on posts no POSITION DIFFERS (#468), and nothing else is new
+        expect(Screen.read().status()).toEqual({left: 'NAV 2', mode: 'enr-leg', right: 'SUP'});
     });
 
     it('powers off to a blank screen', async () => {

@@ -3,6 +3,9 @@ import {bootUnit} from '../../../harness/boot';
 import {Screen} from '../../../harness/render/screen';
 import {blinkCycle} from '../../../harness/render/blink';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 /** The six rows of the full page (SET 0 has no right half), without trailing blanks */
 function rows(): string[] {
     return Screen.read().text().split('\n').slice(0, 6).map(r => r.trimEnd());
@@ -10,7 +13,7 @@ function rows(): string[] {
 
 describe('SET 0 page, the database update (2b9f811)', () => {
     it('leaves the mode and the right page name out of the status line (2-5)', async () => {
-        const unit = await bootUnit();
+        const unit = await bootUnit({storage: REAL});
         await unit.panel.selectPage('L', 'SET 0');
 
         expect(unit.errors).toEqual([]);

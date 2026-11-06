@@ -3,6 +3,7 @@ import {bootToSelfTest, bootUnit, HeadlessUnit, settle} from '../../harness/boot
 import {APR_ARM_SWITCH, panelXml} from '../../harness/panelXml';
 import {messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
+import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 
 /**
  * #459: the remote lamps (docs/failures.md, "Annunciators"; the design
@@ -117,6 +118,8 @@ describe('the lamp failures (#459)', () => {
     // The screen still tells the truth (Appendix B): only the remote lamp is dark
     it('a dark MSG lamp', async () => {
         const unit = await bootToSelfTest({panelXml: PANEL, storage: failed('msgBulb')});
+        // An unread message of its own: the cold start posts none before its fix, and FAST none at all (#468, test/README.md)
+        unit.props.messageHandler.addMessage(new OneTimeMessage(['UNREAD MESSAGE']));
         const mark = unit.env.sim.writes.length;
         const masks: string[] = [];
         for (let i = 0; i < 4; i++) {

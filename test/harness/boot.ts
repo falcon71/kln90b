@@ -59,9 +59,9 @@ export interface BootOptions {
     atcModel?: string;
     /**
      * An engine-running boot whose GPS has no fix yet: gps.reset() after propsReady, and the cached ephemeris erased. It
-     * acquires again on its own, fast or slow per the fastGpsAcquisition setting. Slow, it is a warm search without
-     * ephemeris of about 70 s (GpsSearch IDLE_ACQUISITION plus 30 s of ephemeris); the 120 s cap of settle keeps a
-     * margin. Replaces the hand-written reset in tests of the invalid-GPS state.
+     * acquires again on its own. The reset is no power-on, so FAST writes no truth: the search takes the REAL timings
+     * in FAST too, a warm search without ephemeris of about 70 s (GpsSearch IDLE_ACQUISITION plus 30 s of ephemeris);
+     * the 120 s cap of settle keeps a margin. Replaces the hand-written reset in tests of the invalid-GPS state.
      */
     coldGps?: boolean;
     /** Magnetic variation in degrees east; a number for the whole world. Default 0 */

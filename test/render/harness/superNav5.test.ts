@@ -9,10 +9,13 @@ import {Screen} from '../../harness/render/screen';
 import {SuperNav5Page} from '../../../kln90b/pages/left/SuperNav5Page';
 import {MessagePage} from '../../../kln90b/controls/MessagePage';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 describe('SuperNav5.read (harness)', () => {
     // 3-36: NAV 5 on both sides makes Super NAV 5, with field 1 set to XTK. The -.-NM- text without an active waypoint is a characterization: the guide has no figure of it
     it('reads the left column, the message and range, and hides the right cursor windows', async () => {
-        const unit = await bootUnit({storage: {superNav5Field1: SuperNav5Field1.XTK}});
+        const unit = await bootUnit({storage: {...REAL, superNav5Field1: SuperNav5Field1.XTK}});
         await showSuperNav5(unit, {waitMs: 250});
 
         const nav5 = SuperNav5.read();
@@ -70,7 +73,7 @@ describe('SuperNav5.focused (harness)', () => {
     }
 
     it('is empty while the left cursor is off, although an unread message inverts the msg prompt', async () => {
-        await superNav5();
+        await superNav5(REAL);
 
         // The boot messages are unread: the prompt is the inverted span that focused() has to leave out
         expect(SuperNav5.read().msg).toBe('msg');

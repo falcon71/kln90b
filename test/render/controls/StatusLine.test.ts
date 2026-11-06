@@ -27,8 +27,8 @@ async function msgLightOverTwoSeconds(unit: HeadlessUnit): Promise<Set<number>> 
 // aircraft must not add a flash of its own. A wrong external CDI course is the cheap trigger of a persistent message.
 describe('L:KLN90B_MsgLight (spec)', () => {
     it('flashes while a message is unread (3-16, 3-59)', async () => {
-        // A booted unit always has unread messages (test/README.md, section 6)
-        const unit = await bootUnit();
+        // A booted REAL unit always has unread messages (test/README.md, section 6); FAST posts no POSITION DIFFERS (#468)
+        const unit = await bootUnit({storage: {fastGpsAcquisition: false}});
         await settle(unit);
 
         expect(await msgLightOverTwoSeconds(unit)).toEqual(new Set([0, 1]));
@@ -164,7 +164,7 @@ describe('status line, the center segment (spec)', () => {
     // 3-16, figure 3-55: a new message makes the msg prompt flash in inverse video. The harness reads the flashing
     // inverse as I in one phase and F in the other
     it('flashes msg in inverse video while a message is unread (3-16, figure 3-55)', async () => {
-        await bootUnit(); // the boot messages are unread (test/README.md section 6)
+        await bootUnit({storage: {fastGpsAcquisition: false}}); // the boot messages are unread (test/README.md section 6); REAL, as FAST posts no POSITION DIFFERS (#468)
 
         expectFlashing(await twoCycles(prompt), 'msg III', 'msg FFF');
     });
@@ -257,7 +257,8 @@ describe('status line after an ENT prompt (#320)', () => {
      * dark in that phase while a message is unread, 3-59), then ENT activates OBS, so the next tick shows msg again
      */
     async function entInTheBlinkPhase(): Promise<HeadlessUnit> {
-        const unit = await onRoute();
+        // REAL: FAST posts no POSITION DIFFERS, the boot message (#468)
+        const unit = await bootOnStandardRoute({panelXml: panelXml(NO_OBS), storage: {fastGpsAcquisition: false}});
         await unit.panel.selectPage('L', 'MOD 2');
         for (let i = 0; i < 4 && unit.env.sim.get('L:KLN90B_MsgLight', 'bool') !== 0; i++) {
             await vi.advanceTimersByTimeAsync(250);

@@ -3,6 +3,9 @@ import {bootUnit, HeadlessUnit, NEAREST_SEARCH_WAIT_MS} from '../../../harness/b
 import {ndb} from '../../../harness/navdata/builders';
 import {Screen} from '../../../harness/render/screen';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 /*
  * WaypointPage is the base of the APT, VOR, NDB, INT and SUP pages. These tests drive it through the NDB page, which
  * has a nearest list without filters, and keep the facilities of the other pages away. The flow between the nearest
@@ -35,6 +38,7 @@ async function ndbPageOnNaa(): Promise<HeadlessUnit> {
 describe('waypoint page, shown by the NDB page (characterization)', () => {
     it('shows a waypoint with its name, frequency and position', async () => {
         const unit = await bootUnit({
+            storage: REAL,
             facilities: [ndb('NAA', 47.2, 10.5, {frequencyKHz: 251.5, name: 'ALPHA'})], position: {lat: 47.0, lon: 10.5},
         });
         await unit.panel.selectPage('R', 'NDB  ');

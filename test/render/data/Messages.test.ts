@@ -6,6 +6,9 @@ import {messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {OneTimeMessage} from '../../../kln90b/data/MessageHandler';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 /** The six text rows of the MSG page, trimmed */
 const msgRows = () => Array.from({length: 6}, (_, r) => Screen.read().row(r).trimEnd());
 
@@ -67,6 +70,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 
     it('does not show without a fuel computer, whatever the fuel on board flag says (characterization)', async () => {
         const unit = await bootUnit({
+            storage: REAL,
             panelXml: panelXml({'Input.FuelComputer.IsInterfaced': false, 'Input.FuelComputer.FOBTransmitted': false}),
         });
         await vi.advanceTimersByTimeAsync(2000);
@@ -78,6 +82,7 @@ describe('SET FUEL ON BOARD ON OTH 5 IF NECESSARY', () => {
 
     it('does not show with a fuel computer that sends the fuel on board (B-4)', async () => {
         const unit = await bootUnit({
+            storage: REAL,
             panelXml: panelXml(fuelComputer({fob: true})),
         });
         await vi.advanceTimersByTimeAsync(2000);

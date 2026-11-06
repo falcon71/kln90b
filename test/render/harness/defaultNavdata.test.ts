@@ -6,6 +6,9 @@ import {airport, intersection, ndb, vor} from '../../harness/navdata/builders';
 import {defaultNavdata} from '../../harness/fixtures';
 import {distanceNm} from '../../harness/flight/geo';
 
+/** REAL GPS acquisition: an engine-running boot with no stored position posts POSITION DIFFERS, which a FAST one no longer does (#468) */
+const REAL = {fastGpsAcquisition: false};
+
 // Contract source: this harness (test/harness/fixtures.ts, defaultNavdata); no manual page
 describe('default navdata (harness)', () => {
     // One test facility of every type. A case leaves out the type of its own page, so that only the default navdata of
@@ -19,7 +22,7 @@ describe('default navdata (harness)', () => {
     ];
 
     it.each([['VOR  '], ['NDB  '], ['INT  '], ['APT 1']] as const)('a world without the type shows no NO ... WPTS on the %s page', async page => {
-        const unit = await bootUnit({facilities: worldWithout(page)});
+        const unit = await bootUnit({storage: REAL, facilities: worldWithout(page)});
         await unit.panel.selectPage('R', page);
         expect(Screen.read().status().mode).toBe('enr-leg msg');
     });

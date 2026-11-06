@@ -21,7 +21,8 @@ const OBS_SOURCE_OFF = panelXml(NO_OBS);
 async function onLeg(from: {lat: number, lon: number}, to: {lat: number, lon: number}, position: {lat: number, lon: number}, xml?: string): Promise<HeadlessUnit> {
     const kaaa = airport('KAAA', from.lat, from.lon);
     const abc = vor('ABC', to.lat, to.lon);
-    const unit = await bootUnit({facilities: [kaaa, abc], position, panelXml: xml, storage: savedFlightplan(0, [kaaa, abc])});
+    // REAL: the status lines below show the msg of POSITION DIFFERS, which a FAST boot no longer posts (#468)
+    const unit = await bootUnit({facilities: [kaaa, abc], position, panelXml: xml, storage: {...savedFlightplan(0, [kaaa, abc]), fastGpsAcquisition: false}});
     await settle(unit);
     expect(activeIdent(unit)).toBe('ABC'); // Precondition
     return unit;

@@ -238,8 +238,7 @@ satellites go weakest first and some come back, and the unit shows the states of
   the SDK, so it keeps its channel and is searched.
 - **STA 1.** A satellite jamming took stays in its channel and shows `*xx 00` with its elevation, as a satellite still
   being searched does (guess from the real-unit video cited in `Sta1Page.tsx`). A total loss shows every row so, with
-  the state ACQ. With FAST timings (#46, acquisition timeout 1 s) the lost satellite becomes `Unreachable` after a
-  second, shows `*xx-` and its channel moves on.
+  the state ACQ. FAST and REAL share the timings (#468), so this holds in both.
 - **What follows** is what any loss of signal shows (#453): the EPE grows, RAIM is lost while the fix holds, and finally
   the fix goes with `SATELLITE COVERAGE INADEQUATE FOR NAV` and the NAV flag. `RAIM NOT AVAILABLE` shows only if RAIM
   stays lost for more than 10 s before the fix goes, which depends on the sky. There is no message of its own.
@@ -512,10 +511,14 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
     (also in memory, not only in storage), and `USER DATA LOST` shows (B-4). This includes the welcome text, the
     last position, the stored almanac and ephemeris, and the receiver's own copies of them in the SDK computer;
   - the clock is lost: the unit starts with a default date and time (guess: a fixed date, chosen when this is built, which
-    the Self Test page then shows), so with the almanac and the last position also gone the receiver does an almanac
-    search, unless the pilot enters the date, time and position (3-5, 3-17 to 3-19, the existing start model);
-  - with no stored position there is nothing to compare the first fix with, so `POSITION DIFFERS FROM LAST POSITION BY
-    >2NM` does not show after a wipe;
+    the Self Test page then shows). In REAL, with the almanac and the last position also gone, the receiver does an
+    almanac search, unless the pilot enters the date, time and position (3-5, 3-17 to 3-19, the existing start model).
+    In FAST, the default, `GPS.powerChanged` runs `initializeFromTruth` at the power-on (#468) and overwrites the wiped
+    clock, position, almanac and ephemeris with the true ones, so the receiver starts hot. That holds only if the wipe
+    runs before `GPS.powerChanged` does: a requirement on this feature, not yet built. `fastGpsAcquisition` is not
+    wiped (see the kept settings below);
+  - with no stored position there is nothing to compare the first fix with, so in REAL `POSITION DIFFERS FROM LAST
+    POSITION BY >2NM` does not show after a wipe; in FAST it never shows;
   - the STA 4 operating hours and power cycles restart at 0: they are set to zero when the nonvolatile memory is
     cleared (5-31);
   - kept: the failure state, the battery state and the fictional SET 10 settings (not the unit's memory),

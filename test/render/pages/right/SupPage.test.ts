@@ -48,9 +48,9 @@ async function typeEastBelow100(unit: HeadlessUnit, digits: string): Promise<voi
  * The SUP page on the right, showing USUP (the first user waypoint), once its reference VOR has been computed.
  * `magvar` is the variation of the aircraft's position, `vorVariation` the one of ABC, both in degrees east.
  */
-async function supPage(o: { magvar?: number, vorVariation?: number, extra?: ReturnType<typeof vor>[] } = {}): Promise<HeadlessUnit> {
+async function supPage(o: { magvar?: number, vorVariation?: number, extra?: ReturnType<typeof vor>[], storage?: Record<string, unknown> } = {}): Promise<HeadlessUnit> {
     const unit = await bootUnit({
-        facilities: [abc(o.vorVariation ?? 0), ...(o.extra ?? [])], position: POSITION, magvar: o.magvar ?? 0, storage: SUPS(),
+        facilities: [abc(o.vorVariation ?? 0), ...(o.extra ?? [])], position: POSITION, magvar: o.magvar ?? 0, storage: {...SUPS(), ...o.storage},
     });
     await unit.panel.selectPage('R', 'SUP  ');
     await vi.advanceTimersByTimeAsync(REF_DELAY_MS);
@@ -89,7 +89,7 @@ const userWaypoint = (unit: HeadlessUnit, ident: string) =>
 // With no magnetic variation the RAD row shows the same value either way (#280).
 describe('SUP page (characterization)', () => {
     it('shows a user waypoint with its reference VOR, radial and coordinates', async () => {
-        await supPage();
+        await supPage({storage: {fastGpsAcquisition: false}}); // REAL: the snapshot holds the msg of POSITION DIFFERS, which FAST no longer posts (#468)
 
         const screen = Screen.read();
         expect({rows: [0, 1, 2, 4, 5].map(r => screen.rows('R')[r]), status: screen.status()}).toMatchInlineSnapshot(`
