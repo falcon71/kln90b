@@ -266,11 +266,13 @@ holds them. `computeGeometry` already builds the rows `G` (line of sight and clo
   the exact fit are far below what the mixed phase moves the position by.
 - **A row's line of sight** is the direction of that PRN from the reference state: in the real sky (the SDK's position)
   when the reference is the true state, in the fake sky at the false position when it is the false state.
-- **A row's range error** is the range its signal claims minus the range from the reference state, with the whole
-  milliseconds that the receiver fixed when it acquired the row: at its acquisition the receiver places the row's code
-  phase within ±0.5 ms (±150 km) of the range it predicts from its belief, as it knows its clock from the other
-  satellites. From then on the row is tracked continuously, so its error drifts with the difference between the
-  claimed and the predicted range rates (a few hundred m/s for a fake row) and does not wrap again. The range from an
+- **A row's range error** is the range its signal claims minus the range from the reference state, less the whole
+  milliseconds the receiver resolved for the row. It resolves them when the row enters the solution, placing the row's
+  code phase within ±0.5 ms (±150 km) of the range the reference state predicts, as it knows its clock from the other
+  satellites; and again when the reference state changes, as its time base changes then (refined while planning,
+  2026-11-07: resolving against the reference state rather than the belief keeps a solution whose rows all claim one
+  state exactly consistent). Between those moments the row is tracked continuously, so its error drifts with the
+  difference between the claimed and the predicted range rates (a few hundred m/s for a fake row) and does not wrap. The range from an
   elevation follows from the orbit radius and the earth's radius; the builder computes it allocation-free. The faulty
   satellite's bias stays as #460 built it, on real rows.
 - **The altitude row.** With an altitude input (NAV A, 5-29) the altitude is a row of the solution, as today. The fake
