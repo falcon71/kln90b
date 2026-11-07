@@ -28,7 +28,7 @@
 1. **A teleport or a slew far across the map** (the sim's map relocation): a transmitter left by a jump of hundreds of NM is replaced exactly once, at the new place; nothing loops or throws. Test in Task 4.
 2. **A power cycle or a hot swap while captured or in the mixed phase:** no ticks run while off or disabled; at power-on the fake satellites restart from nothing, the claims are released, and the stored false position and clock make the fake satellites come back with hot times. Test in Task 10.
 3. **A repair in the middle of the mixed phase:** the claims, the fake rows, the range errors and the RAIM detection go in the same tick; STA 1 shows no fake satellite at the next display tick. Test in Task 10.
-4. **An airport search that never resolves** (`Coherent.call` with nothing attached never replies): the spoofer stays pending and sends nothing, jamming works on, nothing throws, and a session that ends while pending draws a new spoofer at the next start. Test in Task 5.
+4. **An airport search that never resolves** (`Coherent.call` with nothing attached never replies): the spoofer stays pending and sends nothing, jamming works on, nothing throws, and a session that ends while pending draws a new spoofer at the next start. Test in Task 6.
 5. **Both failures active, one repaired:** the other transmitter, its stored values and its effect are unchanged. Test in Task 10.
 
 ---
@@ -84,7 +84,7 @@ The spec's largest risk ("The fake receiver and the shared channels"). Prove the
   - `noise rise`: `noiseRiseDb(0, 0)` is 0; `noiseRiseDb(dbToRatio(6.02), 0)` ≈ 7.0.
   - `fake SNR caps at about 51.5 with eight fake satellites`: `fakeSnr(dbToRatio(40), 8, 0)` within [51, 54] and `fakeSnr(dbToRatio(60), 8, 0)` within 0.1 of it.
   - `a jammer of the drawn power takes the weakest satellite at its first-loss distance`: `noiseRiseDb(dbToRatio(levelDb(jammerPowerDb(150), 150, 10000, -25)), 0)` ≈ 7.0 (±0.05).
-  - `the jammer edge is where the rise is 1 dB, capped by the horizon`: `jammerEdgeNm(jammerPowerDb(150), 35000)` is about 3.9 × 150 capped near 242 + a few NM of diffraction (assert within [243, 260]); `jammerEdgeNm(jammerPowerDb(150), 0)` within [12.3, 20].
+  - `the jammer edge is where the rise is 1 dB, capped by the horizon`: `jammerEdgeNm(jammerPowerDb(150), 35000)` is about 3.9 × 150 capped near 242 + a few NM of diffraction (assert within [243, 260]); `jammerEdgeNm(jammerPowerDb(150), 0)` within [25, 35] (the 12.3 NM ground horizon plus the diffraction band that a strong jammer still reaches through; about 29).
   - `a spoofer is horizon-limited`: `spooferEdgeNm(spooferPowerDb(450), 8, 35000)` within [242.4, 270].
   - `range from elevation`: zenith ≈ 20,189 km (±1 km); 0° ≈ 25,785 km (±5 km).
 - [ ] **Step 2: Run** `npx vitest run test/unit/GpsTransmitter.test.ts`. Expected: FAIL (module missing).
@@ -137,13 +137,13 @@ The spec's largest risk ("The fake receiver and the shared channels"). Prove the
   - `export interface SpooferSite extends TransmitterSite { falseLat: number; falseLon: number; falseAltFt: number; shiftMs: number; clockM: number }`
   - `export interface AirportFinder { find(lat: number, lon: number, radiusNm: number): Promise<{ lat: number; lon: number; elevationFt: number } | null> }`
   - `export interface TransmitterInputs { lat: number; lon: number; aglFt: number; groundElevationFt: number; simTimeS: number; attitude: Readonly<AntennaAttitude> }` (one object owned by `GPS`, filled in place each tick)
-  - `export class Transmitters` with `constructor(bus: EventBus, failures: Failures, takeHomeMode: boolean, random: () => number = Math.random)`, `setAirportFinder(finder: AirportFinder): void`, `tick(inputs: Readonly<TransmitterInputs>): void`, `refresh(inputs: Readonly<TransmitterInputs>): void` (levels only: no time, no draw, no save), `reset(): void` (power change: forgets the last position and time, keeps the sites), `get jammer(): Readonly<TransmitterSite> | null`, `get spoofer(): Readonly<SpooferSite> | null` (null while the airport search is pending), `jammerRatio: number` (J at the aircraft, 0 without), `spooferRatio: number` (the spoofer's total level at the aircraft as a ratio, 0 without or while pending), `spooferFakeCount: number` (set by Task 8's `FakeReceiver` through `setFakeCount(n: number)`; until then 8).
-  - Constants (guesses from the spec): `GROUND_DISTANCE_MIN_NM = 2`, `GROUND_DISTANCE_MAX_NM = 15`, `PLACE_SHARE_MIN = 0.9`, `PLACE_SHARE_MAX = 1.0`, `PLACE_BEARING_SPREAD_DEG = 30`, `JAMMER_FIRST_LOSS_MIN_NM = 100`, `JAMMER_FIRST_LOSS_MAX_NM = 250`, `SPOOFER_CAPTURE_MIN_NM = 300`, `SPOOFER_CAPTURE_MAX_NM = 600`, `FALSE_DISTANCE_MIN_NM = 30`, `FALSE_DISTANCE_MAX_NM = 150`, `AIRPORT_SEARCH_RADIUS_NM = 30`, `SHIFT_MIN_H = 2`, `SHIFT_MAX_H = 12`, `REFERENCE_FLOOR_FT = 10000`, `REF_SAVE_STEP_FT = 500` (save when the reference has grown by this since the last save; our choice for "at most every few seconds of climb").
+  - `export class Transmitters` with `constructor(bus: EventBus, failures: Failures, takeHomeMode: boolean, random: () => number = Math.random)`, `setAirportFinder(finder: AirportFinder): void`, `tick(inputs: Readonly<TransmitterInputs>): void`, `refresh(inputs: Readonly<TransmitterInputs>): void` (levels only: no time, no draw, no save), `reset(): void` (power change: forgets the last position and time, keeps the sites), `get jammer(): Readonly<TransmitterSite> | null`, `get spoofer(): Readonly<SpooferSite> | null` (null while the airport search is pending), `jammerRatio: number` (J at the aircraft, 0 without), `spooferRatio: number` (the spoofer's total level at the aircraft as a ratio, 0 without or while pending), `spooferFakeCount: number` and `setFakeCount(n: number): void` (Task 8's `GPS` wiring calls it each tick with the fake sky's count; until then 8).
+  - Constants (guesses from the spec): `GROUND_DISTANCE_MIN_NM = 2`, `GROUND_DISTANCE_MAX_NM = 15` (the placement uses `min(GROUND_DISTANCE_MAX_NM, radioHorizonNm(aglFt))`, so a ground transmitter stays within line of sight and takes effect at once), `PLACE_SHARE_MIN = 0.9`, `PLACE_SHARE_MAX = 1.0`, `PLACE_BEARING_SPREAD_DEG = 30`, `JAMMER_FIRST_LOSS_MIN_NM = 100`, `JAMMER_FIRST_LOSS_MAX_NM = 250`, `SPOOFER_CAPTURE_MIN_NM = 300`, `SPOOFER_CAPTURE_MAX_NM = 600`, `FALSE_DISTANCE_MIN_NM = 30`, `FALSE_DISTANCE_MAX_NM = 150`, `AIRPORT_SEARCH_RADIUS_NM = 30`, `SHIFT_MIN_H = 2`, `SHIFT_MAX_H = 12`, `REFERENCE_FLOOR_FT = 10000`, `REF_SAVE_STEP_FT = 500` (save when the reference has grown by this since the last save; our choice for "at most every few seconds of climb").
 
 **Rules to implement** (the spec's "Transmitters", "Power", "Placement", "Persistence"):
 - Stored values: `gpsJamming` `{lat, lon, powerDb, refAglFt}`; `gpsSpoofing` additionally `{falseLat, falseLon, falseAltFt, shiftMs, clockM}`. Missing or non-finite fields: generate anew.
 - Track for placement: from the previous tick's true position to this one; below 2 kt (3-35) or with no previous position (first tick after `reset`, a step back, or a step over 60 s as `MAX_SIGNAL_STEP_S`) the bearing is random.
-- On the ground (`attitude.onGround`): random bearing, distance uniform in [2, 15] NM. In flight: bearing = track + uniform(−30, 30); distance = uniform(0.9, 1.0) × the edge at the present AGL (`jammerEdgeNm` / `spooferEdgeNm` with `spooferFakeCount`).
+- On the ground (`attitude.onGround`): random bearing, distance uniform in [2, min(15, radioHorizonNm(aglFt))] NM (12.3 NM at AGL 0). In flight: bearing = track + uniform(−30, 30); distance = uniform(0.9, 1.0) × the edge at the present AGL (`jammerEdgeNm` / `spooferEdgeNm` with `spooferFakeCount`).
 - Reference altitude: starts at `max(REFERENCE_FLOOR_FT, present AGL)` at the generation; grows with the AGL; saved per `REF_SAVE_STEP_FT`.
 - Leave: horizontal distance > edge at `refAglFt` → generate anew at once (one generation per tick at most).
 - Spoofer generation: draw the place, the power (from `spooferPowerDb(capture)`), the shift (uniform hours in [2, 12], random sign), `clockM` uniform in ±`METERS_PER_MS / 2`, a point 30 to 150 NM from the place at a random bearing; then `finder.find(point, 30)`. The match sets `falseLat/Lon/AltFt`; `null` sets the point and `inputs.groundElevationFt` at the generation. Until the promise resolves `spoofer` is null and nothing is saved. A finder not yet set (`setAirportFinder` not called) counts as pending. A result that arrives after the failure was repaired or regenerated is dropped (a generation counter).
@@ -152,7 +152,7 @@ The spec's largest risk ("The fake receiver and the shared channels"). Prove the
 
 - [ ] **Step 1: Write the failing tests** (`test/unit/failures/Transmitters.test.ts`, with a fake `Failures` as `GpsFailures.test.ts` builds one, `mulberry32` from `test/harness/sim/random.ts`, and a fake finder that resolves what the test says):
   - `gpsSpoofing is in the catalog: SPOOFING, manual, no TEST FAIL` (`FailureCatalog.test.ts`).
-  - `on the ground the jammer is placed 2 to 15 NM away and takes effect at once` (ratio at the first tick gives a noise rise above 20 dB).
+  - `on the ground the jammer is placed 2 to 12.3 NM away (within the ground horizon) and takes effect at once` (ratio at the first tick gives a noise rise above 20 dB).
   - `in flight the jammer is placed ahead within ±30 degrees at 90 to 100 % of the present edge` (100 draws, flying 090 at 5,000 ft AGL: every bearing within [60, 120], every distance within [0.9, 1.0] × `jammerEdgeNm(powerDb, 5000)`).
   - `a prop at 5,000 ft is placed by its present horizon, not by the reference altitude` (distance ≤ `jammerEdgeNm(powerDb, 5000)`).
   - `below 2 kt the bearing is random` (spread over all quadrants in 100 draws).
@@ -177,7 +177,7 @@ The spec's largest risk ("The fake receiver and the shared channels"). Prove the
 
 **Files:**
 - Create: `kln90b/data/navdata/NearestAirportFinder.ts`
-- Modify: `kln90b/KLN90BCore.ts` (after `facilityLoader` exists: `sensors.in.gps.transmitters.setAirportFinder(new NearestAirportFinder(facilityLoader))`)
+- Modify: `kln90b/Gps.ts` (construct and own `public readonly transmitters = new Transmitters(bus, failures, this.takeHomeMode)`; not yet ticked, Task 6 wires the tick), `kln90b/KLN90BCore.ts` (after `facilityLoader` exists: `sensors.in.gps.transmitters.setAirportFinder(new NearestAirportFinder(facilityLoader))`)
 - Test: `test/render/failures/AirportFinder.test.ts`
 
 **Interfaces:**
@@ -188,7 +188,7 @@ The spec's largest risk ("The fake receiver and the shared channels"). Prove the
   - `finds the nearest hard-surfaced airport with a runway of 1500 m or more within the radius` (three airports: a 1,200 m asphalt nearer, a grass 2,000 m nearer, a 2,500 m asphalt farther but inside: returns the last, elevation converted to feet).
   - `returns null when none matches within the radius`.
   - `ignores a user airport` (a user airport, region `XX`, nearest and matching: not returned).
-  - **Review Focus 4:** `an airport search that never resolves leaves the spoofer pending, sends nothing, and jamming works on` (a finder whose promise never resolves, both failures stored active: `transmitters.spoofer === null`, `spooferRatio === 0`, `jammerRatio > 0`, `unit.errors` empty after 60 s).
+  - `the unit wires the finder into the transmitters at boot` (after `bootUnit`, a stored spoofer's generation calls the real finder: spy on `NearestAirportFinder.prototype.find`).
 - [ ] **Step 2: Run** `npx vitest run test/render/failures/AirportFinder.test.ts`. Expected: FAIL.
 - [ ] **Step 3: Implement** the finder and the wiring.
 - [ ] **Step 4: Run** the test and `npx tsc --noEmit`. Expected: PASS, clean.
@@ -208,13 +208,14 @@ The spec's largest risk ("The fake receiver and the shared channels"). Prove the
 - Produces: `GPS.transmitters: Transmitters`; `GPS.transmitterInputs: Readonly<TransmitterInputs>` (read by Task 8).
 
 - [ ] **Step 1: Write the failing tests** (rewrite `GpsJamming.test.ts`; keep its helpers `satelliteRows`, `afterCalcTick`, `searchedRow`; `signals.fadeScale = 0` and `jitterScale = 0` where the SNR is compared):
-  - `a jammer ahead at 200 NM: nothing at first, then the weakest satellites go first as the aircraft closes in` (jet at FL350, 450 kt, `firstLossNm` 150, line of sight; at 220 NM out no satellite lost; between 150 and 100 NM the first lost are the lowest SNRs; the rest go by ~55 NM; assert the order follows the SNRs, not a timer).
+  - `a jammer ahead at 200 NM: nothing at first, then the weakest satellites go first as the aircraft closes in` (jet at FL350, 450 kt, `firstLossNm` 150, line of sight; at 220 NM out no satellite lost; between 150 and 115 NM the first lost are the lowest SNRs; the last is lost between 20 and 40 NM; assert the order follows the SNRs, not a timer. The test may move the aircraft in steps of a few NM with a few calculation ticks at each, to keep the run short).
   - `RAIM NOT AVAILABLE emerges before the fix goes` (same flight; the RAIM loss lasts more than 10 s before `SATELLITE COVERAGE INADEQUATE FOR NAV`).
   - `a descent below the jammer's horizon brings the satellites back` (prop at 5,000 ft jammed; descend to 500 ft AGL beyond the 500 ft horizon: the fix returns; same site).
   - `banking toward the jammer loses satellites that level flight keeps` (set `PLANE BANK DEGREES` toward the site at a distance where level flight keeps a fix: more satellites lost).
   - `on the ground the jammer is close and takes the satellites within seconds` (activate `gpsJamming` through the FLR path or the `Failures` API on the ground: no fix within 10 s, STA 1 `ACQ`, rows `*xx 00`).
   - `an engine-running start inside a stored jammer's effect acquires nothing` (the old ramp test, ported: the stored site 5 NM away).
   - `the repair: the rise 0, no satellite lost, a fix again within 120 s`.
+  - **Review Focus 4:** `an airport search that never resolves leaves the spoofer pending, sends nothing, and jamming works on` (replace the finder with one whose promise never resolves, both failures stored active: `transmitters.spoofer === null`, `spooferRatio === 0`, `jammerRatio > 0`, `unit.errors` empty after 60 s).
   - `with failures off, nothing changes` (no transmitter, `noiseRise` 0: the SNRs equal those of `GpsAcquisition.test.ts`'s snapshot).
 - [ ] **Step 2: Run** `npx vitest run test/render/failures/GpsJamming.test.ts`. Expected: FAIL.
 - [ ] **Step 3: Implement** the wiring. Read `PLANE ALT ABOVE GROUND` in the take-home branch too only if needed (it is not: take-home has no transmitters).
