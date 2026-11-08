@@ -1,7 +1,7 @@
 {
   "name": "kln90b",
   "//": "6 chars maximum for the version!",
-  "version": "2.3B1",
+  "version": "2.3B2",
   "description": "",
   "engines": {
     "node": ">=22.18"
