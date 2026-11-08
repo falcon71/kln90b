@@ -308,6 +308,12 @@ prediction context of the main computer.
       known position is erased and the almanac check reports invalid, so the SDK runs its blind search in PRN order
       (`BLIND_ACQUISITION`, 90 ± 30 s per satellite). A fix lost for `GIVE_UP_TIME` starts a sky search too, one that
       keeps the receiver's belief (#465, see "Recovery after a lost fix" below).
+    - **The blind searches sweep in passes** (#470). The SDK gives up on a satellite it searched in vain for its
+      acquisition timeout (4 min) and moves the channel on to the next PRN; it leaves the satellite out for an hour. In
+      the almanac search and the power-on sky search (`GpsSearch.searchesBlind`), once no PRN the search may search is
+      left outside the channels, `nextPassWhenAllGivenUp` forgets the marks and the sweep starts over. With a belief (ACQ,
+      Idle, the sky search that keeps the belief) a satellite in view whose signal is lost never times out (see the
+      reachability below).
     - **Almanac search**: the almanac is six months old or more by the unit's clock, which also covers a clock that is
       years off (ORS 01 6-30). Blind search until one satellite is acquired (`ALMANAC_SEARCH_ACQUISITION`, 390 ± 60 s,
       calibrated so that the whole search lands near ORS 01's 20 minutes and the observed 21:36); all others are then
@@ -371,7 +377,13 @@ prediction context of the main computer.
       its channel, searched; a searched one is not acquired and becomes `Unreachable` after the acquisition timeout. The
       channel assignment keeps the geometric value, so channels still follow the almanac's prediction. The wrapper reads
       a private SDK field; a test holds it. A forced acquisition (the engine-running start) refreshes the
-      signals at its first reachability query, because the SDK computes the satellite positions inside that update.
+      signals at its first reachability query, because the SDK computes the satellite positions inside that update. A
+      lost satellite always takes the SDK's unforced update, also in a forced one (#469): the forced branch would make
+      it `Unreachable` and free its channel, while the unforced one, with the forced update's delta time of 0, leaves it
+      `None` in its channel, searched. While the search has a belief (`!GpsSearch.searchesBlind`) a lost satellite that
+      is up by the SDK's geometry is searched without end (#470): the wrapper clears its private `timeSpentAcquiring`
+      before each update, so the SDK's acquisition timeout never makes it `Unreachable`, the SDK's state for a
+      satellite below the horizon.
     - **The block** of each PRN comes from `block` in `gps_ephemeris.json`, read from the SDK satellite's private
       ephemeris entry; the offset per block is in `GpsSignal.ts`. A satellite without a known block gets 0.
     - **The ephemeris is generated.** `gps_ephemeris.json` is no committed file: the build generates it from the RINEX

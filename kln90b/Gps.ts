@@ -27,6 +27,7 @@ import {
     HOT_ACQUISITION_RANGE,
     IDLE_ACQUISITION,
     receiverTimeDifference,
+    SDK_REACHABLE_STRENGTH,
     SearchMode,
     WARM_ACQUISITION_RANGE,
 } from "./GpsSearch";
@@ -129,12 +130,12 @@ export class KLNGPSSatComputer extends GPSSatComputer {
 
     /**
      * The forced acquisition of an engine-running start ends the start model. FAST forces nothing (#468): it starts the
-     * search from the true state instead, as a forced acquisition makes a lost satellite Unreachable. The receiver failures'
+     * search from the true state instead, the same receiver as REAL. The receiver failures'
      * inhibits are applied first: the SDK's forced channel assignment skips inhibited satellites (#460, GPSSat.ts
      * losSatelliteFilterOmniscient). The transmitters' levels (#465) and the antenna's attitude are read before (#467), and
      * the signals are refreshed inside the forced update, at its first reachability query, once the SDK has computed that
      * update's positions: at power-on their reset emptied the lost set, and no calculation tick has run yet to refill it.
-     * The forced path makes a lost satellite Unreachable (GPSSat.ts updateStateTracked)
+     * A lost satellite keeps the channel the forced update gives it and is searched there (#469, wrapReachability)
      */
     public acquireAndUseSatellites(): void {
         this.onBeforeForcedAcquisition?.();
@@ -153,27 +154,45 @@ export class KLNGPSSatComputer extends GPSSatComputer {
      * own value is put back after it, so the channel assignment keeps the geometric value and gives channels from the
      * almanac's prediction, as the real receiver does. The wrapper allocates nothing per call.
      *
+     * #469: a lost satellite always takes the SDK's unforced update, also in the forced update of an engine-running start.
+     * The forced branch would make it Unreachable (GPSSat.ts updateStateTracked), which frees its channel and keeps it
+     * out of the assignment for minutes after its signal returns. The forced update runs with a delta time of 0, so the
+     * unforced branch neither acquires a searched satellite nor times it out: it stays None in its channel, searched, as
+     * after any other loss.
+     *
+     * #470: the SDK's Unreachable means below the horizon, and it then leaves the satellite out of its channel assignment
+     * for an hour. A receiver that knows its position, time and almanac does not give up on a satellite it predicts in
+     * view because it cannot hear it; it keeps searching it, however long the loss lasts. So while the search has that
+     * belief (GpsSearch.searchesBlind false), a lost satellite that is up by the SDK's own geometry has its acquisition
+     * clock (timeSpentAcquiring, private) cleared before each update, and never reaches the timeout. One that is below
+     * the horizon still times out, and the blind searches keep the SDK's timeout, which moves them on to the next PRN
+     * (GpsSearch.nextPassWhenAllGivenUp)
+     *
      * Safe to call again: each call wraps the SDK's own method, never an earlier wrapper. The data is private in the SDK
      * @param isLost Whether the receiver has lost the satellite's signal
-     * @throws Error if a satellite's private data or its signal strength moved in an SDK upgrade
+     * @throws Error if a satellite's private data, its signal strength or its acquisition clock moved in an SDK upgrade
      */
     public wrapReachability(isLost: (prn: number) => boolean): void {
         const original = GPSSatellite.prototype.updateState;
+        const computer = this;
         const wrapper = function (this: GPSSatellite, simTime: number, deltaTime: number, distanceFromLastKnownPos: number, forceAcquireAndUse: boolean): boolean {
             if (!isLost(this.prn)) {
                 return original.call(this, simTime, deltaTime, distanceFromLastKnownPos, forceAcquireAndUse);
             }
             const data = (this as any).data;
             const strength = data.signalStrength;
+            if (strength > SDK_REACHABLE_STRENGTH && !(computer.search?.searchesBlind ?? false)) {
+                data.timeSpentAcquiring = undefined; //Searched without end (#470)
+            }
             data.signalStrength = 0;
             try {
-                return original.call(this, simTime, deltaTime, distanceFromLastKnownPos, forceAcquireAndUse);
+                return original.call(this, simTime, deltaTime, distanceFromLastKnownPos, false); //Never forced (#469)
             } finally {
                 data.signalStrength = strength;
             }
         };
         for (const sat of this.getSatellites()) {
-            if (typeof (sat as any).data?.signalStrength !== "number") {
+            if (typeof (sat as any).data?.signalStrength !== "number" || !("timeSpentAcquiring" in (sat as any).data)) {
                 throw new Error("GPSSatellite data moved: recheck Gps.ts after the SDK upgrade");
             }
             (sat as any).updateState = wrapper;
@@ -182,10 +201,11 @@ export class KLNGPSSatComputer extends GPSSatComputer {
 
     /**
      * #465, design "Recovery": the sky search after a lost fix searches every PRN. The SDK marks a satellite it searched in
-     * vain for its acquisition timeout as Unreachable and leaves it out of its channel assignment for an hour; a satellite
-     * whose signal the receiver lost (#467) is marked so too, although it is up. The marks are forgotten here: a satellite
-     * in a channel is searched again there, the others can be given a channel again. Public SDK API only. Allocates
-     * nothing: the sky search that keeps the belief calls it in every tick (GpsSearch)
+     * vain for its acquisition timeout as Unreachable and leaves it out of its channel assignment for an hour; in a blind
+     * search a satellite whose signal the receiver lost (#467) is marked so too, although it is up (with a belief it never
+     * times out, #470). The marks are forgotten here: a satellite in a channel is searched again there, the others can be
+     * given a channel again. Public SDK API only. Allocates nothing: the sky search that keeps the belief calls it in every
+     * tick, and a blind search at the start of each pass (GpsSearch)
      */
     public forgetUnreachable(): void {
         const sats = this.getSatellites();
@@ -897,8 +917,8 @@ export class GPS {
 
     /**
      * SET 10 switched to FAST (#468): without a fix, the memory is set to the true state and the search starts again from
-     * it, as at a power-on with FAST. No forced acquisition: it would make a satellite with a lost signal Unreachable. With
-     * a fix nothing changes, and take-home mode has no satellites
+     * it, as at a power-on with FAST. No forced acquisition: FAST is the same receiver as REAL and runs the normal search,
+     * which acquires each satellite in its own time. With a fix nothing changes, and take-home mode has no satellites
      */
     public startFast(): void {
         if (this.isValid() || this.takeHomeMode) {

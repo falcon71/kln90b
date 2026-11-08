@@ -89,16 +89,18 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
     }, 60_000);
 
     // The forced acquisition of an engine-running start runs before the first calculation tick: the signals are refreshed
-    // with the rise before it, and the forced path makes every lost satellite Unreachable
+    // with the rise before it. #469: every lost satellite keeps the channel the forced acquisition gave it from the
+    // geometry, None and searched, as after any other loss; none is Unreachable
     it('an engine-running start under a noise rise of 26 dB acquires nothing in the forced acquisition, without an inhibit', async () => {
         forceNoiseRise(FULL_RISE);
-        const atForced: { tracked: number[], unreachable: number, inhibited: number[] }[] = [];
+        const atForced: { tracked: number[], unreachable: number[], inChannel: GPSSatelliteState[], inhibited: number[] }[] = [];
         const original = GPS.prototype.acceptForcedSolution;
         vi.spyOn(GPS.prototype, 'acceptForcedSolution').mockImplementation(function (this: GPS) {
             const sats = this.gpsSatComputer.getSatellites();
             atForced.push({
                 tracked: sats.filter(s => TRACKED.has(s.state.get())).map(s => s.prn),
-                unreachable: sats.filter(s => s.state.get() === GPSSatelliteState.Unreachable).length,
+                unreachable: sats.filter(s => s.state.get() === GPSSatelliteState.Unreachable).map(s => s.prn),
+                inChannel: this.gpsSatComputer.getChannels().filter(c => c !== null).map(c => c!.state.get()),
                 inhibited: [...this.gpsSatComputer.inhibitedSatellitePrnCodes.get()],
             });
             original.call(this);
@@ -106,15 +108,18 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
         const unit = await bootUnit({storage: HOME});
 
         expect(atForced.length).toBe(1);
-        expect(atForced[0].tracked).toEqual([]);
-        expect(atForced[0].unreachable).toBeGreaterThan(0); // Through the reachability
+        expect(atForced[0].tracked).toEqual([]); // Lost through the reachability
+        expect(atForced[0].unreachable).toEqual([]);
+        expect(atForced[0].inChannel.length).toBeGreaterThan(0); // The channels were given from the geometry
+        expect(atForced[0].inChannel.filter(s => s !== GPSSatelliteState.None)).toEqual([]);
         expect(atForced[0].inhibited).toEqual([]); // Not through inhibits
         expect(unit.props.sensors.in.gps.hadFixSincePowerOn).toBe(false);
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
     // Before the first update of a boot the SDK has every satellite overhead (zenith 0); the signals are refreshed inside
-    // the forced update, from the positions it computes. A level of 10 dB loses the low satellites and keeps the high ones
+    // the forced update, from the positions it computes. A level of 10 dB loses the low satellites and keeps the high ones.
+    // #469: a lost low satellite stays None in its channel, searched
     it('the forced acquisition judges the signals from the positions of its own update: under 10 dB the low satellites are lost, the high ones acquired', async () => {
         const atForced: { prn: number, snr: number, zenith: number, state: GPSSatelliteState, inChannel: boolean }[][] = [];
         const original = GPS.prototype.acceptForcedSolution;
@@ -135,7 +140,8 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
         expect(tracked.length).toBeGreaterThanOrEqual(4);
         expect(tracked.filter(s => s.snr < 35)).toEqual([]);
         expect(weakInChannel.length).toBeGreaterThan(0);
-        expect(weakInChannel.filter(s => s.state !== GPSSatelliteState.Unreachable)).toEqual([]);
+        expect(weakInChannel.filter(s => s.state !== GPSSatelliteState.None)).toEqual([]);
+        expect(sats.filter(s => s.state === GPSSatelliteState.Unreachable)).toEqual([]);
     }, 60_000);
 
     // The control of the case above: without the rise the same boot acquires in the forced acquisition
@@ -329,7 +335,8 @@ describe('wrapReachability (#467, characterization)', () => {
     }, 30_000);
 
     // The SDK delays a forced acquisition asked before its satellites are loaded until just before awaitInit resolves
-    // (GPSSat.ts doInit), so the wrapper must already be in place for it
+    // (GPSSat.ts doInit), so the wrapper must already be in place for it: every satellite lost, none acquired, and the lost
+    // satellites searched in their channels, none Unreachable (#469)
     it('a forced acquisition asked before the satellites are loaded runs with the reachability wrapped', async () => {
         const unit = await bootUnit({storage: HOME});
         const p = unit.props;
@@ -345,7 +352,10 @@ describe('wrapReachability (#467, characterization)', () => {
         const states = gps.gpsSatComputer.getSatellites().map(s => s.state.get());
         expect(states.length).toBeGreaterThan(0); // Precondition: loaded
         expect(states.filter(s => TRACKED.has(s))).toEqual([]);
-        expect(states.filter(s => s === GPSSatelliteState.Unreachable).length).toBeGreaterThan(0);
+        expect(states.filter(s => s === GPSSatelliteState.Unreachable)).toEqual([]);
+        const inChannel = gps.gpsSatComputer.getChannels().filter(c => c !== null).map(c => c!.state.get());
+        expect(inChannel.length).toBeGreaterThan(0); // The channels were given from the geometry
+        expect(inChannel.filter(s => s !== GPSSatelliteState.None)).toEqual([]);
         expect(unit.errors).toEqual([]);
     }, 30_000);
 });
