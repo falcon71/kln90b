@@ -880,10 +880,10 @@ export class NavCalculator implements CalcTickable {
         this.sensors.out.setDestETE(nav.eteToDest, this.eteToEta(nav.eteToDest));
         const gps = this.sensors.in.gps;
         //#453: GPS integrity fail (ARINC label 261 bit 24) is no fix, or no RAIM at the alert limit of the current phase.
-        //Real time, without the debounce of the messages. The APR integrity flag does not set it. #460: a faulty satellite
-        //RAIM detects for that limit fails it too (design, "The faulty satellite")
+        //Real time, without the debounce of the messages. The APR integrity flag does not set it. #460, #465: a bad range
+        //RAIM detects for that limit (the faulty satellite, a spoofer's fake satellites) fails it too (Gps.rangeErrorDetected)
         const hal = halForMode(nav.navmode);
-        const integrityFail = !gps.isValid() || raimStatus(gps.solution, hal) !== Raim.Available || gps.failures.faultDetected(hal);
+        const integrityFail = !gps.isValid() || raimStatus(gps.solution, hal) !== Raim.Available || gps.rangeErrorDetected(hal);
         this.sensors.out.setPos(gps.coords, gps.groundspeed, track, magvar, integrityFail);
 
         this.sensors.out.setWPIndex(nav.activeWaypoint.getActiveFplIdx(), nav.activeWaypoint.fpl0.getLegs().length);

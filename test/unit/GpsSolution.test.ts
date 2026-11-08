@@ -1,6 +1,19 @@
 import {describe, expect, it, vi} from 'vitest';
 import {GeoPoint, GPSPredictionContext, GPSSatellite, GPSSatelliteState, Vec3Math} from '@microsoft/msfs-sdk';
-import {ALTITUDE_WEIGHT, computeGeometry, GpsGeometry, MAX_ROWS, predictRaim, Raim, raimStatus} from '../../kln90b/GpsSolution';
+import {
+    ALTITUDE_WEIGHT,
+    computeGeometry,
+    createSolutionMatrices,
+    GpsGeometry,
+    MAX_ROWS,
+    predictRaim,
+    Raim,
+    RAIM_PFA,
+    raimStatus,
+    raimTestFails,
+    raimThreshold,
+    solveErrors,
+} from '../../kln90b/GpsSolution';
 import {RAIM_ENROUTE_NOT_APPROACH, stubSatellites} from '../harness/predictionStub';
 
 // #453: the receiver solution. Every expected value below is derived by hand, never by calling the module.
@@ -393,5 +406,150 @@ describe('predictRaim', () => {
         const context = stubContext([...stubSatellites(RAIM_ENROUTE_NOT_APPROACH), broken]);
 
         expect(predict(context, 2)).toBe(true);
+    });
+});
+
+describe('range errors (#465)', () => {
+    const SIX = [sky(20, 0), sky(50, 90), sky(50, 210), sky(50, 330), sky(70, 45), sky(70, 165)];
+    const setup = (satellites: Float64Array[], altitudeAided: boolean) => {
+        const coefficients = new Float64Array(2 * MAX_ROWS);
+        const m = createSolutionMatrices();
+        const g = computeGeometry(satellites, altitudeAided, coefficients, m);
+        expect(g.valid).toBe(true);
+        return {coefficients, m, g};
+    };
+    const errors = (n: number, entries: Record<number, number>): Float64Array => {
+        const e = new Float64Array(MAX_ROWS);
+        for (const key of Object.keys(entries)) {
+            e[Number(key)] = entries[Number(key)];
+        }
+        expect(n).toBeLessThanOrEqual(MAX_ROWS);
+        return e;
+    };
+
+    it('computeGeometry fills the matrices; its coefficients are the north and minus the west row of h', () => {
+        const {coefficients, m} = setup(SIX, false);
+        expect(m.n).toBe(6);
+        for (let i = 0; i < 6; i++) {
+            expect(coefficients[2 * i]).toBe(m.h[i]);
+            expect(coefficients[2 * i + 1]).toBe(-m.h[MAX_ROWS + i]);
+        }
+        // G rows: line of sight of the first satellite (zenith 20°, azimuth 0: north x, z up) and the clock column
+        expect(m.g[0]).toBeCloseTo(Math.sin(20 * DEG), 9);
+        expect(m.g[1]).toBeCloseTo(0, 9);
+        expect(m.g[2]).toBeCloseTo(Math.cos(20 * DEG), 9);
+        expect(m.g[3]).toBe(1);
+    });
+
+    it('the altitude row of G is [0, 0, ALTITUDE_WEIGHT, 0]', () => {
+        const {m} = setup(SIX, true);
+        expect(m.n).toBe(7);
+        expect(Array.from(m.g.slice(24, 28))).toEqual([0, 0, ALTITUDE_WEIGHT, 0]);
+    });
+
+    it('leaves the matrices alone when the solution is invalid', () => {
+        const m = createSolutionMatrices();
+        m.n = 99;
+        const g = computeGeometry([horizon(0), horizon(90), horizon(180), horizon(270)], false, undefined, m);
+        expect(g.valid).toBe(false);
+        expect(m.n).toBe(99);
+        expect(m.g.every((v) => v === 0)).toBe(true);
+    });
+
+    it("one satellite's error moves the position by minus its coefficients times the error", () => {
+        const {coefficients, m} = setup(SIX, false);
+        const out = new Float64Array(4);
+        solveErrors(m, errors(6, {2: 100}), out);
+        expect(out[0]).toBeCloseTo(-coefficients[4] * 100, 9);
+        expect(out[1]).toBeCloseTo(-coefficients[5] * 100, 9);
+        expect(Math.hypot(out[0], out[1])).toBeGreaterThan(1);
+    });
+
+    it('an error common to every satellite row is all clock', () => {
+        const {m} = setup(SIX, false);
+        const e = errors(6, {0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100});
+        const out = new Float64Array(4);
+        const sse = solveErrors(m, e, out);
+        for (let c = 0; c < 3; c++) {
+            expect(out[c]).toBeCloseTo(0, 9);
+        }
+        expect(out[3]).toBeCloseTo(100, 9);
+        expect(sse).toBeCloseTo(0, 6);
+    });
+
+    it('the residual of one bad row is its error squared times (1 - its hat diagonal)', () => {
+        const {m} = setup(SIX, false);
+        const row = 3;
+        // hat diagonal (G H)_ii = sum over c of g[i][c] h[c][i], from the matrices
+        let hat = 0;
+        for (let c = 0; c < 4; c++) {
+            hat += m.g[row * 4 + c] * m.h[c * MAX_ROWS + row];
+        }
+        expect(hat).toBeGreaterThan(0.1);
+        expect(hat).toBeLessThan(0.9);
+        const sse = solveErrors(m, errors(6, {[row]: 100}), new Float64Array(4));
+        expect(sse).toBeCloseTo(100 * 100 * (1 - hat), 4);
+    });
+
+    it('an altitude input reading 100 m high moves the solution up', () => {
+        const {m} = setup(SIX, true);
+        const out = new Float64Array(4);
+        solveErrors(m, errors(7, {6: -ALTITUDE_WEIGHT * 100}), out);
+        expect(out[2]).toBeGreaterThan(0);
+        // A well spread constellation holds it down, the shift is a fraction of the 100 m
+        expect(out[2]).toBeLessThan(100);
+    });
+
+    it('a symmetric 3 satellites + altitude has no redundancy: the altitude error moves up by all of it', () => {
+        const {m} = setup([sky(30, 0), sky(80, 90), sky(80, 270)], true);
+        const out = new Float64Array(4);
+        const sse = solveErrors(m, errors(4, {3: -ALTITUDE_WEIGHT * 100}), out);
+        expect(out[2]).toBeCloseTo(100, 6); // 1/w, see the hand solution of the coefficient tests above
+        expect(sse).toBeCloseTo(0, 6);
+    });
+
+    it('raimThreshold(2) is -2 ln(PFA) and raimThreshold(1) is the 1/15000 normal tail squared', () => {
+        expect(RAIM_PFA).toBe(1 / 15000);
+        expect(raimThreshold(2)).toBeCloseTo(-2 * Math.log(RAIM_PFA), 2); // 19.23
+        expect(raimThreshold(1)).toBeCloseTo(15.91, 1);
+    });
+
+    // Independent values (scipy chi2.isf(1/15000, dof), outside the project)
+    it('raimThreshold(3) and raimThreshold(4) match the chi-square quantiles', () => {
+        expect(raimThreshold(3)).toBeCloseTo(21.9546, 2);
+        expect(raimThreshold(4)).toBeCloseTo(24.3914, 2);
+    });
+
+    // The statistic is sse / 25: six measurements are 2 degrees of freedom (19.2316 x 25 = 480.79 m2), seven are 3
+    // (21.9546 x 25 = 548.86 m2)
+    it('raimTestFails flips at the threshold of measurements - 4 degrees of freedom', () => {
+        expect(raimTestFails(480, 6)).toBe(false);
+        expect(raimTestFails(482, 6)).toBe(true);
+        expect(raimTestFails(548, 7)).toBe(false);
+        expect(raimTestFails(550, 7)).toBe(true);
+    });
+
+    it('raimThreshold increases with the degrees of freedom', () => {
+        let previous = 0;
+        for (let dof = 1; dof <= 8; dof++) {
+            const t = raimThreshold(dof);
+            expect(t).toBeGreaterThan(previous);
+            previous = t;
+        }
+    });
+
+    it('raimTestFails: false below five measurements whatever the residual', () => {
+        expect(raimTestFails(1e9, 4)).toBe(false);
+        expect(raimTestFails(1e9, 0)).toBe(false);
+    });
+
+    it('raimTestFails: false at a residual of zero', () => {
+        expect(raimTestFails(0, 6)).toBe(false);
+    });
+
+    it('raimTestFails: true for one 100 m error among six satellites, false for 1 m', () => {
+        const {m} = setup(SIX, false);
+        expect(raimTestFails(solveErrors(m, errors(6, {2: 100}), new Float64Array(4)), 6)).toBe(true);
+        expect(raimTestFails(solveErrors(m, errors(6, {2: 1}), new Float64Array(4)), 6)).toBe(false);
     });
 });

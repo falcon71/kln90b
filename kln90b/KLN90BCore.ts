@@ -51,6 +51,7 @@ import {VolatileMemory} from "./data/VolatileMemory";
 import {NearestUtils} from "./data/navdata/NearestUtils";
 import {RemarksManager} from "./settings/RemarksManager";
 import {Nearestlists} from "./data/navdata/NearestList";
+import {NearestAirportFinder} from "./data/navdata/NearestAirportFinder";
 import {KLNFacilityLoader} from "./data/navdata/KLNFacilityLoader";
 import {UserWaypointPersistor} from "./settings/UserWaypointPersistor";
 import {Scanlists} from "./data/navdata/Scanlist";
@@ -326,6 +327,7 @@ export class KLN90BCore {
             facilityRepository,
         );
 
+        sensors.in.gps.transmitters.setAirportFinder(new NearestAirportFinder(facilityLoader)); //#465: the spoofer's false position snaps to an airport
         const scanlists = new Scanlists(facilityLoader, this.bus);
 
         this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityRepository, this.userSettings);

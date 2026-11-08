@@ -235,6 +235,21 @@ describe('the GPS receiver entries (#460)', () => {
         expect(keys).toContain('gpsAntenna');
         expect(keys).toContain('gpsReceiver');
         expect(keys).not.toContain('gpsJamming');
+        expect(keys).not.toContain('gpsSpoofing');
         expect(keys).not.toContain('faultySatellite');
+    });
+});
+
+describe('the spoofing entry (#465)', () => {
+    it('gpsSpoofing is in the catalog: SPOOFING, manual, no TEST FAIL', () => {
+        const spoof = def('gpsSpoofing');
+        expect(spoof.flrName).toBe('SPOOFING');
+        expect(spoof.random).toBe(false);
+        expect(spoof.testFail).toBe(false);
+        expect(spoof.message).toBeNull();
+        expect(spoof.detection).toBeNull();
+        expect(spoof.outputs).toEqual([]);
+        expect(spoof.inputs).toEqual([]);
+        expect(spoof.isEligible(plane())).toBe(true);
     });
 });

@@ -577,9 +577,10 @@ class BadGeometryApproachMessage implements Message {
 }
 
 /**
- * B-3: RAIM has detected a satellite whose range is wrong (the faulty satellite, #460), for the alert limit of the mode
- * (halForMode). No delay: a detected fault is an alarm, not a dropout (design, "The faulty satellite"). The unit detects
- * the satellite and does not exclude it, so the message stays while the fault is detected
+ * B-3: RAIM has detected a range that is wrong (the faulty satellite, #460; a spoofer's fake satellites or the altitude
+ * against them, #465) by the residual test, for the alert limit of the mode (halForMode, Gps.rangeErrorDetected). No delay:
+ * a detected fault is an alarm, not a dropout (design, "The faulty satellite"). The unit detects the error and does not
+ * exclude a satellite, so the message stays while the error is detected
  */
 class RaimPositionErrorMessage implements Message {
 
@@ -590,7 +591,7 @@ class RaimPositionErrorMessage implements Message {
     }
 
     public isConditionValid(): boolean {
-        return this.gps.isValid() && this.gps.failures.faultDetected(halForMode(this.navState.navmode));
+        return this.gps.isValid() && this.gps.rangeErrorDetected(halForMode(this.navState.navmode));
     }
 }
 

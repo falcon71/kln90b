@@ -8,6 +8,7 @@ import {AntennaAttitudeSource, LEVEL_ANTENNA} from '../../kln90b/AntennaAttitude
 import {AntennaAttitude, SatelliteSignals} from '../../kln90b/GpsSignal';
 import {PowerEvent} from '../../kln90b/PowerSupply';
 import {MessageHandler} from '../../kln90b/data/MessageHandler';
+import {forceNoiseRise} from '../harness/gps';
 
 /**
  * #467: a satellite whose signal the receiver lost acts on the SDK through its reachability (Gps.ts wrapReachability),
@@ -17,10 +18,10 @@ import {MessageHandler} from '../../kln90b/data/MessageHandler';
 
 /** The position stored at the last power-off is where the unit boots, so the boot posts no POSITION DIFFERS message */
 const HOME = {lastLatitude: 47, lastLongitude: 8};
-/** A finished jamming ramp of 26 dB, stored by an earlier session */
-const FINISHED_RAMP = {failure_gpsJamming: JSON.stringify({rampS: 240, finalDb: 26, elapsedS: 240})};
-/** A ramp of 26 dB over 240 s, started at the boot */
-const RAMP = {failure_gpsJamming: JSON.stringify({rampS: 240, finalDb: 26, elapsedS: 0})};
+/** 26 dB from the boot on, as #460's finished ramp stored by an earlier session */
+const FULL_RISE = () => 26;
+/** 26 dB over 240 s from the boot, as #460's ramp started at the boot */
+const RISING = (ticks: number) => Math.min(26, ticks * 26 / 240);
 
 const TRACKED = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
 const byNumber = (a: number, b: number) => a - b;
@@ -88,8 +89,9 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
     }, 60_000);
 
     // The forced acquisition of an engine-running start runs before the first calculation tick: the signals are refreshed
-    // from the stored, finished ramp before it, and the forced path makes every lost satellite Unreachable
-    it('an engine-running start with a finished jamming ramp stored acquires nothing in the forced acquisition, without an inhibit', async () => {
+    // with the rise before it, and the forced path makes every lost satellite Unreachable
+    it('an engine-running start under a noise rise of 26 dB acquires nothing in the forced acquisition, without an inhibit', async () => {
+        forceNoiseRise(FULL_RISE);
         const atForced: { tracked: number[], unreachable: number, inhibited: number[] }[] = [];
         const original = GPS.prototype.acceptForcedSolution;
         vi.spyOn(GPS.prototype, 'acceptForcedSolution').mockImplementation(function (this: GPS) {
@@ -101,7 +103,7 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
             });
             original.call(this);
         });
-        const unit = await bootUnit({storage: {...HOME, ...FINISHED_RAMP}});
+        const unit = await bootUnit({storage: HOME});
 
         expect(atForced.length).toBe(1);
         expect(atForced[0].tracked).toEqual([]);
@@ -123,7 +125,8 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
             })));
             original.call(this);
         });
-        await bootUnit({storage: {...HOME, failure_gpsJamming: JSON.stringify({rampS: 100, finalDb: 10, elapsedS: 100})}});
+        forceNoiseRise(() => 10);
+        await bootUnit({storage: HOME});
 
         expect(atForced.length).toBe(1);
         const sats = atForced[0];
@@ -135,8 +138,8 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
         expect(weakInChannel.filter(s => s.state !== GPSSatelliteState.Unreachable)).toEqual([]);
     }, 60_000);
 
-    // The control of the case above: without the jamming the same boot acquires in the forced acquisition
-    it('the same engine-running start without jamming acquires in the forced acquisition', async () => {
+    // The control of the case above: without the rise the same boot acquires in the forced acquisition
+    it('the same engine-running start without a noise rise acquires in the forced acquisition', async () => {
         const atForced: number[][] = [];
         const original = GPS.prototype.acceptForcedSolution;
         vi.spyOn(GPS.prototype, 'acceptForcedSolution').mockImplementation(function (this: GPS) {
@@ -150,8 +153,9 @@ describe('a lost satellite reaches the SDK through its reachability (#467, chara
         expect(unit.props.sensors.in.gps.hadFixSincePowerOn).toBe(true);
     }, 60_000);
 
-    it('during jamming with satellites lost, no satellite is inhibited', async () => {
-        const unit = await bootUnit({storage: {...HOME, ...RAMP}});
+    it('under a rising noise floor with satellites lost, no satellite is inhibited', async () => {
+        forceNoiseRise(RISING);
+        const unit = await bootUnit({storage: HOME});
         const gps = unit.props.sensors.in.gps;
         const all = gps.gpsSatComputer.getSatellites().map(s => s.prn);
         const lost = () => all.filter(prn => gps.signals.isLost(prn) && channelPrns(unit).includes(prn));
@@ -239,7 +243,8 @@ describe('the antenna and the power cycle in the receiver (#467, characterizatio
 
     // reset() at every power change: the lost set and the SNRs start again (the spec, "What persists")
     it('a power-off clears the lost set and the SNRs', async () => {
-        const unit = await bootUnit({storage: {...HOME, ...FINISHED_RAMP}});
+        forceNoiseRise(FULL_RISE);
+        const unit = await bootUnit({storage: HOME});
         await untilCalcTick(unit);
         const gps = unit.props.sensors.in.gps;
         const all = gps.gpsSatComputer.getSatellites().map(s => s.prn);

@@ -163,13 +163,17 @@ export class Sta1Page extends SixLineHalfPage {
         return gps.gpsSatComputer.state === GPSSystemState.Acquiring ? "  ACQ" : " INIT";
     }
 
-    /** A satellite in a channel whose signal the receiver lost, above the 5 degree mask (5-30) */
+    /**
+     * A satellite in a channel whose signal the receiver lost, above the 5 degree mask (5-30), or a channel searching a
+     * spoofer's fake satellite (#465)
+     */
     private searchesLostSatellite(): boolean {
         const gps = this.props.sensors.in.gps;
-        const channels = gps.gpsSatComputer.getChannels();
-        for (let i = 0; i < channels.length; i++) {
-            const sat = channels[i];
-            if (sat !== null && gps.signals.isLost(sat.prn) && sat.position.get()[0] < MASK_ZENITH_RAD) {
+        const rows = gps.channelRows();
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (row.fake ? row.state === GPSSatelliteState.None
+                : gps.signals.isLost(row.prn) && row.zenithRad !== null && row.zenithRad < MASK_ZENITH_RAD) {
                 return true;
             }
         }
@@ -186,30 +190,39 @@ export class Sta1Page extends SixLineHalfPage {
         //#467: a satellite whose signal the receiver lost stays in its channel and is searched, not found: the SDK's own
         //None state, which reads *xx 00 (5-30)
 
+        const channels = gps.channelRows();
         if (gps.search.mode === SearchMode.Acquisition && !gps.isValid()) {
             //A real-unit video: during ACQ the page lists the satellites predicted for the stored position and the unit's
             //clock, with the predicted elevation (#213)
             return gps.search.predictedSatellites().map(p => {
+                //#465: a channel locked on the PRN's fake signal shows that signal
+                const fake = channels.find(r => r.fake && r.prn === p.prn);
                 const sat = gps.gpsSatComputer.getSatellites().find(s => s.prn === p.prn);
                 return {
                     prn: p.prn,
-                    state: sat === undefined ? GPSSatelliteState.None : sat.state.get(),
+                    state: fake !== undefined ? fake.state : sat === undefined ? GPSSatelliteState.None : sat.state.get(),
                     //The signal comes from where the satellite really stands, not from where the unit predicts it
-                    snr: sat === undefined ? 0 : gps.signals.snr(sat.prn),
+                    snr: fake !== undefined ? fake.snr : sat === undefined ? 0 : gps.signals.snr(sat.prn),
                     ele: toElevation(p.position.get()[0]),
                 };
             }).sort(byPrn);
         }
 
-        const sats = gps.gpsSatComputer.getChannels().filter(sat => sat !== null) as GPSSatellite[];
-        const rows: SatRow[] = sats.slice(0, MAX_ROWS).map(sat => ({
-            prn: sat.prn,
-            state: sat.state.get(),
-            snr: gps.signals.snr(sat.prn),
-            //A satellite searched blindly has no known position until its orbit data is in (#213)
-            ele: gps.isValid() || sat.isCachedEphemerisValid(gps.simTimeUnix) ? toElevation(sat.position.get()[0]) : null,
+        //#465: the unit's channels, a fake satellite in the channel it claims (FakeReceiver)
+        const rows: SatRow[] = channels.slice(0, MAX_ROWS).map(row => ({
+            prn: row.prn,
+            state: row.state,
+            snr: row.snr,
+            ele: row.zenithRad === null || !(row.fake || gps.isValid() || this.hasOrbitData(row.prn)) ? null : toElevation(row.zenithRad),
         }));
         return rows.sort(byPrn);
+    }
+
+    /** A satellite searched blindly has no known position until its orbit data is in (#213) */
+    private hasOrbitData(prn: number): boolean {
+        const gps = this.props.sensors.in.gps;
+        const sat = gps.gpsSatComputer.getSatellites().find(s => s.prn === prn);
+        return sat !== undefined && sat.isCachedEphemerisValid(gps.simTimeUnix);
     }
 
     private drawSat(row: SatRow | undefined): string{

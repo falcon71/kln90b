@@ -7,7 +7,7 @@ import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from "../
 export type FailureKey = 'arinc429Out' | 'rs232Out' | 'rmiOutput' | 'obsResolver' | 'rs232In' | 'rs232Data' | 'airdata429' | 'altitude' | 'eeprom'
     | 'msgBulb' | 'wptBulb' | 'armBulb' | 'actvBulb' | 'msgWiring' | 'wptWiring' | 'armWiring' | 'actvWiring'
     | 'msgDriver' | 'wptDriver' | 'armDriver' | 'actvDriver' | 'superflag'
-    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'faultySatellite';
+    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'gpsSpoofing' | 'faultySatellite';
 
 /** Interconnect property names of the output ports */
 export type FailedOutputPort = 'arinc429Tx' | 'rs232Out' | 'obiBus' | 'superflag';
@@ -167,8 +167,14 @@ export const FAILURE_CATALOG: readonly FailureDefinition[] = [
         isEligible: () => true,
     },
     {
-        //#460: interference that raises the noise floor; the pilot starts it, the random trigger does not
+        //#460, #465: a jammer on the ground that raises the noise floor; the pilot starts it, the random trigger does not
         key: 'gpsJamming', flrName: 'JAMMING', random: false, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#465: a spoofer on the ground that sends a fake sky; the pilot starts it, the random trigger does not
+        key: 'gpsSpoofing', flrName: 'SPOOFING', random: false, testFail: false,
         outputs: [], inputs: [], message: null, detection: null,
         isEligible: () => true,
     },

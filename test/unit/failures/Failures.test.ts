@@ -243,12 +243,13 @@ describe('Failures.values and setValues (#460)', () => {
 });
 
 describe('randomCandidates with the GPS entries (#460)', () => {
-    it('includes the antenna and receiver, excludes jamming and the faulty satellite', () => {
+    it('includes the antenna and receiver, excludes jamming, spoofing and the faulty satellite', () => {
         const {failures} = build();
         const keys = failures.randomCandidates().map(d => d.key);
         expect(keys).toContain('gpsAntenna');
         expect(keys).toContain('gpsReceiver');
         expect(keys).not.toContain('gpsJamming');
+        expect(keys).not.toContain('gpsSpoofing');
         expect(keys).not.toContain('faultySatellite');
     });
 });
