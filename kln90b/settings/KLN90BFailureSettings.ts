@@ -3,9 +3,10 @@ import {FAILURE_CATALOG, FailureKey, failureSettingName} from "../failures/Failu
 
 /**
  * failure_<key>: "" = working, anything else = failed (the stored text is "{}" until a failure stores values, #460). failureMtbf: the
- * mean time between random failures in hours, 0 = off (#458)
+ * mean time between random failures in hours, 0 = off (#458). batteryHealth: the internal battery's charge in percent,
+ * batteryDate: the sim date (E:ABSOLUTE TIME, seconds) of the last session, 0 = never run (#461)
  */
-export type KLN90BFailureTypes = { failureMtbf: number } & { [K in `failure_${FailureKey}`]: string };
+export type KLN90BFailureTypes = { failureMtbf: number, batteryHealth: number, batteryDate: number } & { [K in `failure_${FailureKey}`]: string };
 
 type Def = UserSettingDefinition<KLN90BFailureTypes[keyof KLN90BFailureTypes]>;
 
@@ -21,7 +22,7 @@ export class KLN90BFailureSettings {
     }
 
     private static buildSettingsDefs(): Def[] {
-        const defs: Def[] = [{name: 'failureMtbf', defaultValue: 0}];
+        const defs: Def[] = [{name: 'failureMtbf', defaultValue: 0}, {name: 'batteryHealth', defaultValue: 100}, {name: 'batteryDate', defaultValue: 0}];
         for (const failure of FAILURE_CATALOG) {
             defs.push({name: failureSettingName(failure.key), defaultValue: ""});
         }

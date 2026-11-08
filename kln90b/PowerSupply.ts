@@ -19,6 +19,17 @@ export const RIDE_THROUGH_TIME = 1500;
 export interface PowerEventData {
     isPowered: boolean,
     timeSincePowerChange: number, //milliseconds
+    /** True only on the power-on that found the battery failed and lost the user memory (#461) */
+    memoryLost?: boolean,
+}
+
+/**
+ * #461: published at a power-on with the battery failed, before the power cycle is counted and before the powerEvent,
+ * so that every holder of user memory has cleared itself when the power-on handlers run. Not cached: a holder built
+ * later reads the wiped storage instead
+ */
+export interface UserMemoryLostEvent {
+    userMemoryLost: void;
 }
 
 
@@ -44,7 +55,10 @@ export class PowerSupply {
     private lastPowerChangeTime: number = Date.now() - HOURS_TO_SECONDS * 1000;
 
 
-    constructor(private props: WelcomePageProps | PageProps, private readonly brightnessManager: BrightnessManager) {
+    /**
+     * @param batteryFailed Whether the battery has failed, asked at every power-on (#461)
+     */
+    constructor(private props: WelcomePageProps | PageProps, private readonly brightnessManager: BrightnessManager, private readonly batteryFailed: () => boolean) {
 
         const hEvent = this.props.bus.getSubscriber<HEvent>();
         hEvent.on('hEvent').handle((e: string) => {
@@ -197,7 +211,14 @@ export class PowerSupply {
 
         const now = Date.now();
         const timePoweredOff = now - this.lastPowerChangeTime;
+        let memoryLost = false;
         if (isPowered) {
+            //#461: the battery-backed memory (maintenance manual PDF 58) was not held while the unit was off. Only a real
+            //power-on gets here: the ride-through and the hot-swap resume are none
+            memoryLost = this.batteryFailed();
+            if (memoryLost) {
+                this.props.bus.getPublisher<UserMemoryLostEvent>().pub("userMemoryLost", undefined, false, false);
+            }
             this.powerCyclesSettings.set(this.powerCyclesSettings.value + 1);
             console.log("Powercycles: ", this.powerCyclesSettings.value);
             this.props.pageManager.setCurrentPage(WelcomePage, this.props);
@@ -207,6 +228,7 @@ export class PowerSupply {
         this.isPoweredPublisher.pub("powerEvent", {
             isPowered: isPowered,
             timeSincePowerChange: timePoweredOff,
+            memoryLost: memoryLost,
         });
         this.lastPowerChangeTime = now;
     }

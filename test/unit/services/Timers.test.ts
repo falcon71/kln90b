@@ -19,7 +19,7 @@ function setup(mode: boolean, totalTime = 0) {
     settings.getSetting('totalTime').set(totalTime);
     const gps = {groundspeed: 0, timeZulu: at(15, 2, 0)};
     const state: DtPageState = {flightTimer: 0, departureTime: null} as DtPageState;
-    const timers = new Timers({in: {gps}} as any, settings, state);
+    const timers = new Timers(bus, {in: {gps}} as any, settings, state);
     return {gps, state, timers};
 }
 

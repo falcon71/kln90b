@@ -16,9 +16,10 @@ The GPS receiver failures (`gpsAntenna`, `gpsReceiver`) and the faulty satellite
 [superpowers/specs/2026-11-05-failures-gps-receiver-design.md](superpowers/specs/2026-11-05-failures-gps-receiver-design.md)).
 Jamming and spoofing are built from simulated ground transmitters (#465, design
 [superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md](superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md)),
-which replaced the jamming ramp of #460. The other failures of the catalog are specified here and built by the later
-parts of #366: the battery by #461. The source of truth for what the catalog holds is
-`kln90b/failures/FailureCatalog.ts`.
+which replaced the jamming ramp of #460. The internal battery, its aging and the loss of the user memory at a power-on
+are built too (#461, design
+[superpowers/specs/2026-11-08-failures-battery-design.md](superpowers/specs/2026-11-08-failures-battery-design.md)).
+The source of truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
 
 Page numbers without a prefix are the KLN 90B Pilot's Guide (006-08773-0000). "IM" is the Installation Manual
 (006-10521-0005 Rev 5), "CMM" the Component Maintenance Manual (006-15521-0003 Rev 3) by its printed page numbers.
@@ -94,7 +95,7 @@ FLR 3). The FLR names are fictional. The table lists every failure; the sections
 | `msgDriver`, `wptDriver`, `armDriver`, `actvDriver` | `MSG DRIVER`, `WPT DRIVER`, `ARM DRIVER`, `ACTV DRIVER` | `MSG ANNUNCIATOR FAIL` and so on | the lamp is declared (`…Installed`); for ARM and ACTV also `Output.WriteGPSSimVars` | yes | yes |
 | `msgWiring`, `wptWiring`, `armWiring`, `actvWiring` | `MSG WIRING` … `ACTV WIRING` | `CHECK MSG ANNUNCIATOR` and so on | as the driver | yes | no |
 | `msgBulb`, `wptBulb`, `armBulb`, `actvBulb` | `MSG BULB` … `ACTV BULB` | none | as the driver | yes | no |
-| `battery` | `BATTERY` | `USER DATA LOST` at the next power-on | always (random only at 0 %) | at 0 % | no |
+| `battery` | `BATTERY` | `USER DATA LOST` at the next power-on, then `RCVR HARDWARE ERROR:` / `0008` until a satellite is tracked | always (random only at 0 %) | at 0 % | no |
 | `rs232In` | `RS-232 IN` | `NO RS-232 DATA` | a fuel computer, RS-232 air data, a baro source (`Input.Airdata.BaroSource` not 0, also with 429 air data) or an RS-232 heading is interfaced | yes | no |
 | `rs232Data` | `RS-232 DATA` | `RS-232 DATA ERROR` | as `rs232In` | yes | no |
 | `airdata429` | `429 AIRDATA` | `ARINC 429 AIR DATA FAIL` | air data is interfaced on `ARINC429` | yes | no |
@@ -504,7 +505,7 @@ extend it to a loss of the fix. Neither is a spoofing rule.
   acquisition, a power cycle with the same spoofer finds the stored false position and the battery clock in agreement
   with the fake signals and the fake ephemeris kept: the fake satellites come back with the hot time and no
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` shows. A new session is no hot start on the fakes: the unit's clock
-  starts from the sim's time (`E:ABSOLUTE TIME`), and the fake ephemeris is not stored. With FAST, the default, every power-on writes the
+  starts from the sim's time (`E:ABSOLUTE TIME`) plus the stored `clockOffset` (see the battery), and the fake ephemeris is not stored. With FAST, the default, every power-on writes the
   true state into the memory (#468): the receiver searches the real sky's PRNs from the truth and meets their fake
   signals. Inside a spoofer a power cycle is then no hot start on the fakes, and the capture after it shows
   `POSITION DIFFERS` as well as `SYSTEM TIME UPDATED`.
@@ -743,45 +744,114 @@ connected, and a failure of an RMI that does not exist would be invisible (the s
 
 ### Battery (`battery`)
 
-The internal lithium battery keeps the user memory while the unit is off (CMM). Typical life is three to five years
-(B-2).
+The unit has two batteries (CMM pages 17, 18 and 43 for the first, CMM page 22 for the second):
 
-- **The state is two values**: the health, a float from 0 to 100 %, and the latest sim date seen. Every battery is
-  made the same; how it is used and what it goes through decide how long it lasts, and that can change over its life.
-- **Aging** by sim time, counted **forward only**: at each session start, the time since the latest sim date seen is
-  taken, the health drops by that time multiplied by a rate drawn anew for this step from 20 to 33.3 % a year (a life
-  of 5 to 3 years, B-2), and the latest date is moved on. The health stops at 0. A sim date set back does not
-  recharge the battery, and time changes during a session do not age it. A sim date set years ahead ages it by that
-  much.
+- The Battery Module, a rechargeable pack that carries a short interruption of the aircraft power (the ride-through,
+  `PowerSupply.RIDE_THROUGH_TIME`). It is no part of this section.
+- The remote-mounted lithium battery that holds the nonvolatile RAM while the unit is off, with a comparator that
+  watches its voltage (CMM page 22). Its typical life is three to five years (B-2). This section is about it.
+
+Design: [superpowers/specs/2026-11-08-failures-battery-design.md](superpowers/specs/2026-11-08-failures-battery-design.md).
+
+- **The state is two values**: the health, a float from 0 to 100 %, and the latest sim date seen
+  (`batteryHealth`, `batteryDate`). Every battery is made the same; how it is used and what it goes through decide how
+  long it lasts, and that can change over its life.
+- **Aging** by sim time, counted **forward only** (`ageBattery`, `Battery.age`): at each session start, when
+  `KLN90BCore.asyncInit` builds the failure services, the time since the latest sim date seen is taken, the health drops
+  by that time multiplied by a rate drawn anew for this step from 20 to 33.3 % a year (a life of 5 to 3 years, B-2),
+  and the latest date is moved on. The health stops at 0. A sim date set back does not recharge the battery, and time
+  changes during a session do not age it. A sim date set years ahead ages it by that much. A date of 0 (a first
+  session, or a new installation) only notes the date.
 - FLR 1 shows the health in whole percent, rounded up, so `0` means empty.
 - **`BATTERY LOW`**: the unit assumes a conservative life of 1000 days (three years, rounded down) and warns about 15
   days before the end (B-2: replace within a week), so the message `BATTERY LOW: SERVICE` / `REQUIRED TO PREVENT` /
   `LOSS OF USER DATA` shows at a health of 1.5 % or less (100 % / 1000 days × 15 days), also once the battery has
-  failed.
-- **Failure**: at 0 % the battery may be drawn by the MTBF trigger. With MTBF off it reaches 0 % and stays there
-  without failing. FLR 3 can fail it at any charge.
+  failed. Like the unit's other hardware messages it is posted from the first navigation page of a power-on.
+- **Failure**: the catalog entry has `randomWhenEmpty`, so the MTBF trigger may draw it only at a health of exactly 0.
+  With MTBF off it reaches 0 % and stays there without failing. FLR 3 can fail it at any charge.
+- **Anti-goal: nothing is wiped while the unit is on** (maintainer, 2026-11-08). A battery that fails in operation, from
+  FLR 3 or the trigger, changes nothing until the next power-on. A pilot who repairs it before then (FLR 2 or FLR 1
+  `SERVICE?`) keeps every setting and all user data. The wipe happens only at a power-on, and only if the battery is
+  failed at that moment. The ride-through and the hot-swap resume are no power-on and wipe nothing.
+- **Anti-goal: a unit that has never stored anything is not a wiped unit.** The first start in a new aircraft (empty
+  storage) is a unit fresh from service: a new battery and a clock taken from the sim date, so the first fix is in the
+  current GPS era. The default clock of 1 JAN 1988 belongs to a loss of the user memory only. The restore failure of a
+  corrupt profile in `asyncInit` keeps its own behavior.
 - **Effect**: the unit works on. At every power-on while the battery is failed, including the first one of a sim
-  session, the user memory is lost:
-  - every user setting of the unit, the user waypoints, the flight plans and the remarks are reset to their defaults
-    (also in memory, not only in storage), and `USER DATA LOST` shows (B-4). This includes the welcome text, the
-    last position, the stored almanac and ephemeris, and the receiver's own copies of them in the SDK computer;
-  - the clock is lost: the unit starts with a default date and time (guess: a fixed date, chosen when this is built, which
-    the Self Test page then shows). In REAL, with the almanac and the last position also gone, the receiver does an
-    almanac search, unless the pilot enters the date, time and position (3-5, 3-17 to 3-19, the existing start model).
-    In FAST, the default, `GPS.powerChanged` runs `initializeFromTruth` at the power-on (#468) and overwrites the wiped
-    clock, position, almanac and ephemeris with the true ones, so the receiver starts hot. That holds only if the wipe
-    runs before `GPS.powerChanged` does: a requirement on this feature, not yet built. `fastGpsAcquisition` is not
-    wiped (see the kept settings below);
-  - with no stored position there is nothing to compare the first fix with, so in REAL `POSITION DIFFERS FROM LAST
-    POSITION BY >2NM` does not show after a wipe; in FAST it never shows;
-  - the STA 4 operating hours and power cycles restart at 0: they are set to zero when the nonvolatile memory is
-    cleared (5-31);
+  session, the user memory is lost. `PowerSupply` publishes the bus event `userMemoryLost` (not cached) when the unit
+  becomes powered and the failure is active, before it counts the power cycle and before `powerEvent`, which carries
+  `memoryLost`. Every holder of user memory resets itself in the handler, and the order against the power-on handlers
+  (`GPS.powerChanged` among them) holds by construction, for the first power-on of a session and every later one:
+  - every user setting of the unit, the user waypoints, the flight plans and the remarks are reset to their defaults,
+    also in memory and not only in storage (`wipeStorage` in `settings/UserMemory.ts`, and the handlers of the flight
+    plans, the active waypoint, the user waypoint persistor, `RemarksManager` and `Timers`), and `USER DATA LOST` shows
+    (B-4). This includes the welcome text, the last position, the stored almanac and ephemeris, and the receiver's own
+    copies of them in the SDK computer. The message list is cleared first, as messages the boot's restore posted about
+    the wiped data are void;
+  - a route synced from the EFB follows the same rule: one that is in FPL 0 at the power-on (synced while the unit was
+    off) is wiped with the rest, and one synced after the power-on is new data and loads as always;
+  - `VolatileMemory.reset` treats such a power-on as a long interruption (6-5), because the RAM that carries a short
+    one is held by the same battery;
+  - the clock is lost: it starts at 1 JAN 1988 00:00:00 UTC (`WIPED_CLOCK_MS`, the year the date editors default to),
+    which the Self Test page then shows. The receiver's almanac and every ephemeris are erased, and there is no stored
+    position. In REAL and in FAST alike the receiver then does an almanac search (`GpsSearch.begin`, the existing start
+    model, ORS 01 6-30). **Entering the date, the time or the position (3-5, 3-17 to 3-19) does not shorten that
+    search**: a receiver without an almanac has to collect one first. What the date entry on SET 2 does correct is the
+    era (see the clock below);
+  - **FAST does nothing at a power-on with a wipe** (maintainer, 2026-11-08), nor does a switch to FAST on SET 10 later in
+    that power-on (`GPS.startFast`). FAST stands for a unit that was just on and starts hot from a current memory; a
+    wiped memory has none. The next power-on is normal again once the battery is repaired. `fastGpsAcquisition` itself
+    is not wiped;
+  - an engine-running start keeps its forced acquisition (`WelcomePage`, `acquireAndUseSatellites`): it stands for a unit
+    that was on before the session began and would have collected its almanac by then. Its instant fix computes the
+    date in the era of the 1988 clock, which is the rollover date of the next section;
+  - with no stored position there is nothing to compare the first fix with, so `POSITION DIFFERS FROM LAST POSITION BY
+    >2NM` does not show after a wipe (B-3); the flag ends with the first fix or the next power-on;
+  - the STA 4 operating hours and power cycles restart at 0 (5-31), with this power-on counted, so the cycles read 1;
+  - a 1987 or 1988 clock is before the end of the database cycle, so `DATA BASE OUT OF DATE` does not post while the clock
+    stays in that era (the message latches on a change from current to expired, so a later date entry on SET 2 in the
+    current era can post it);
   - kept: the failure state, the battery state and the fictional SET 10 settings (not the unit's memory),
-    `userDataFormat` (it describes the storage, not data), and the EEPROM's calibration values (a settings category
-    of their own, see the EEPROM).
+    `userDataFormat` (it says the stored slots are V2, which the persistors write after a wipe too) and the EEPROM's
+    calibration values (a settings category of their own, see the EEPROM). The storage's kept keys are
+    `KEPT_USER_SETTINGS`.
+- **`RCVR HARDWARE ERROR:` / `0008`** (IM C-3): the receiver's battery-backed RAM failed its check and was cleared; the
+  manual names the loss of the receiver's backup among the causes. It shows from the first navigation page of a power-on
+  with a wipe until the receiver tracks its first satellite in it (`GPS.tracksSatellite`: a real satellite in a channel in
+  an acquired state, as STA 1 shows it), so at a cold-and-dark start it shows during the blind search and at an
+  engine-running start, whose forced acquisition tracks satellites at once, it does not. That the code ends with the
+  first satellite also for this cause is the design's reading of the manual (2026-11-08), not its pairing. It is a
+  message of its own beside `0010` of the antenna; both can be listed.
 - A failed battery stays failed until repaired, so the data is lost again at every power-on.
+- **FLR 2 is no service** (maintainer, 2026-11-08): it repairs the failure only. The battery works again, but the health
+  stays where it is (a battery at 0 % may be drawn again by the trigger), the data already lost stays lost, and the
+  unit's clock is not corrected: a wrong era stays. **FLR 1 `SERVICE?`** stands for the unit brought to a shop: it
+  repairs every failure, sets the health to 100 % (the latest date stays) and sets the unit's clock to the true date and
+  time (`Battery.service`, `GPS.serviceClock`), also with a fix: while the unit has a fix every tick takes the era from
+  the unit's own clock, so a corrected clock stays corrected. The data lost by a wipe stays lost.
 - The first session after this feature is installed starts with a new battery: health 100 % and the session's sim
   date as the latest date seen.
+
+#### The clock across sessions
+
+The unit's clock is battery-backed, and on a real unit a wrong era stays until the pilot enters the date on SET 2
+before the next fix. The simulation keeps it (maintainer, 2026-11-08):
+
+- The user setting `clockOffset` (milliseconds, default 0) holds the clock as its offset from the sim time.
+  `GPS.saveClock` writes it whenever the clock is set other than by running (a fix and its time update, a date or time
+  entry on SET 2, `SERVICE?`, FAST, the wipe) and at a power-off; `savePosition` saves it too. The wipe resets it with
+  every other key and then writes the offset of the 1988 clock.
+- At the construction of `GPS` the clock is the sim time plus the stored offset, with the random ±2.5 s as before (the
+  drift while the unit was off). The default 0 keeps a first start, and every unit whose clock was right, in the
+  current era as before. One deliberate exception to "a failure changes nothing while failures are off": a clock that
+  is wrong at the end of a session stays wrong in the next.
+- A first fix computes its date in the era of the unit's own clock (`calculateGPSTime`), so with the 1988 clock and a
+  sim date in 2026 the date comes out two eras early, about 1987, and with a date entered on SET 2 in the current era it
+  comes out right. `SYSTEM TIME UPDATED TO GPS TIME` follows as for any large correction.
+- **FAST keeps the unit's era**: `initializeFromTruth` sets the true date and time moved into the era of the unit's
+  clock (the true time minus the whole eras the unit is off), not the true time itself. The receiver, which works modulo
+  the era, then sees an exact clock and the start stays hot. Otherwise every FAST power-on would correct a wrong era kept
+  after an FLR 2 repair. With the clock in the current era nothing changes.
 
 ## The failure rate
 
@@ -798,7 +868,8 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
 
 - The failure state is persisted per aircraft model, under the same profile key as the user settings
   (`"<ATC MODEL>.profile_1"`): the MTBF, the active failures with their drawn values, and the battery state (the
-  health and the latest sim date seen). The EEPROM's calibration values are properties of the unit, not of a failure,
+  health and the latest sim date seen). The unit's clock offset is a user setting (`clockOffset`, see the battery): it is
+  battery-backed memory of the unit and the wipe resets it. The EEPROM's calibration values are properties of the unit, not of a failure,
   and have a settings category of their own (see the EEPROM). The drawn values are numbers in the failure's setting
   text (`Failures.values`, `setValues`):
   - the jammer: its place `lat` and `lon`, its power `powerDb` and its reference altitude `refAglFt`;
@@ -811,14 +882,16 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
   needs handling.
 - **It lives in its own settings manager**, added to `KLN90BSettingSaveManager`, so that the battery's wipe of the
   user memory leaves it alone.
-- New keys only, with defaults that mean "nothing failed, MTBF off, new battery". Changes are saved when they happen.
+- New keys only, with defaults that mean "nothing failed, MTBF off, new battery" (`batteryHealth` 100, `batteryDate` 0,
+  and in the user settings `clockOffset` 0). Changes are saved when they happen.
 - Detection is not persisted; it runs again after every power-on.
 
 ## Repair
 
-- FLR 2 repairs one failure; FLR 1 `SERVICE?` repairs every failure and installs a new battery (health 100 %).
+- FLR 2 repairs one failure; FLR 1 `SERVICE?` repairs every failure, installs a new battery (health 100 %) and sets the
+  unit's clock to the true date and time (see the battery).
 - A repair ends the effect at once: the port works from the next tick, the lamp follows its command, the receiver
-  acquires again, the message condition ends. Data lost by a dead battery stays lost.
+  acquires again, the message condition ends. Data lost by a dead battery stays lost, and a clock in the wrong era stays after FLR 2.
 - The EEPROM is the exception, as the unit reads it at a power-on only: the screen recenters, the D-bar is right again
   and the message goes at the next power-on (see the EEPROM).
 
@@ -849,7 +922,7 @@ SERVICE?
 - `MTBF:` is an editor field set of three digits and an `H`, not a select. It shows ` OFF` for 0, or the hours
   without leading zeros (` 15H`, `999H`). An entry of 0, or CLR on the field, sets OFF.
 - `BATTERY` is the remaining charge in percent, read-only.
-- `SERVICE?` is a button on line 6. ENT shows `CONFIRM?`; ENT again repairs everything and installs a new battery,
+- `SERVICE?` is a button on line 6. ENT shows `CONFIRM?`; ENT again repairs everything, installs a new battery and sets the clock,
   and the status line shows `SERVICED` (a new `StatusLineMessage`; the status line holds 11 characters). CLR at
   `CONFIRM?` cancels.
 
@@ -908,23 +981,6 @@ From #451. Each port asks the failure state; the failures above say which port e
 `Output.WriteGPSSimVars` stays the separate gate `Interconnect.gps(port)`. A GPS SimVar is written only when both the
 gate and the port let it through.
 
-## What the code needs first
-
-This section describes the code that #458 did not change and the later parts of #366 need. It is removed once #366 is
-implemented. These changes come before the failures that need them. The ports, the nullable values, `ALTITUDE FAIL`
-as a detected failure, TEST FAIL for an active failure and the injectable randomness are settled by #458.
-
-1. **No runtime wipe of the user memory** (it belongs to #461). User data is restored only in `KLN90BCore.asyncInit`. A dead battery at a
-   power-on within a session needs a path that resets the flight plans, the user waypoints in the facility
-   repository, the remarks, the user settings and the clock in memory, and through them in storage. The restore error
-   path (empty plans and `USER DATA LOST`) is the closest existing code. The receiver's memory is private SDK state:
-   the almanac time (`lastAlamanacTime`) and each satellite's `data.lastEphemerisTime`, which `GPS` sets only at
-   construction from the stored settings (`Gps.ts`). The clock has no stored value at all: `GPS` takes it from
-   `E:ABSOLUTE TIME` at construction. The wipe needs a way to erase the first and to set the second at a power-on.
-
-Already possible without new structure: the screen shift (a style change in a display tick). The FLR pages exist
-(#458).
-
 ## Public contract
 
 - New: the panel.xml key `Output.RmiInstalled` (default false), parsed like the annunciator keys.
@@ -979,10 +1035,3 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
 - The Appendix B messages that are not failures and are still missing: `APT ELEVATION UNKNOWN`, `POSITION OF WPT HAS
   CHANGED`, `POSITIONS OF OTHER WAYPOINTS HAVE CHANGED`. They belong in issues of their own.
 - Satellite health flags from the control segment (STA 1 health `B`).
-
-## Left to the implementation
-
-Like "What the code needs first", this section is removed once #366 is implemented.
-
-- The order of the work of the later parts and how it is split into commits (CLAUDE.md wants one commit per issue).
-- The default clock date after a battery wipe.

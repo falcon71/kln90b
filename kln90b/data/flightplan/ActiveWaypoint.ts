@@ -215,6 +215,16 @@ export class ActiveWaypoint {
     }
 
     /**
+     * #461: the user memory was lost at the power-on: the Direct To and the procedure leg are dropped, there is no active
+     * leg, and no last active waypoint (the stored one is already reset, UserMemory.wipeStorage)
+     */
+    public forgetAll(): void {
+        this.flag();
+        this.lastactiveWaypoint = null;
+        this.clearTurnStack();
+    }
+
+    /**
      * If FPL 0 is valid, then this activates the closest leg
      */
     public activateFpl0(): KLNFlightplanLeg | null {

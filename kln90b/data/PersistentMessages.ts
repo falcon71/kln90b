@@ -4,7 +4,8 @@ import {ModeController} from "../services/ModeController";
 import {padInt} from "./NumberFormat";
 import {roundBearing} from "./Coordinates";
 import {NavMath} from "@microsoft/msfs-sdk";
-import {NavMode, NavPageState} from "./VolatileMemory";
+import {NavMode, NavPageState, VolatileMemory} from "./VolatileMemory";
+import {Battery} from "../failures/Battery";
 import {Database} from "./navdata/Database";
 import {KLNMagvar} from "./navdata/KLNMagvar";
 import {PageManager} from "../pages/PageManager";
@@ -40,6 +41,8 @@ export const RAIM_MESSAGE_DELAY = 10_000;
 export function buildPersistentMessages(props: PageProps): Message[] {
     return [
         new AltitudeFailMessage(props.planeSettings, props.failureDetector),
+        new BatteryLowMessage(props.battery, props.memory),
+        new ReceiverMemoryLostMessage(props.memory, props.sensors.in.gps),
         ...FAILURE_CATALOG.filter(d => d.message !== null).map(d => new FailureMessage(d.key, [...d.message!], props.failureDetector)),
         new ArmGPSApproachMessage(props.memory.navPage),
         new DatabaseOutOfDateMessage(props.database),
@@ -232,6 +235,52 @@ class FailureMessage implements Message {
 
     public isConditionValid(): boolean {
         return this.detector.isDetected(this.key);
+    }
+}
+
+/**
+ * B-2, CMM 22: the internal battery is low (at or below BATTERY_LOW_PERCENT) or has failed. Like the other hardware
+ * messages it is not posted while the unit runs its self-test, but from the first main page on (#461)
+ */
+class BatteryLowMessage implements Message {
+
+    public readonly message: string[] = ["BATTERY LOW: SERVICE", "REQUIRED TO PREVENT", "LOSS OF USER DATA"];
+    public seen: boolean = false;
+
+    constructor(private readonly battery: Battery, private readonly memory: VolatileMemory) {
+    }
+
+    public isConditionValid(): boolean {
+        return this.memory.failureDetection.mainPageShown && this.battery.isLow;
+    }
+}
+
+/**
+ * IM C-3: RCVR HARDWARE ERROR 0008, the receiver's battery-backed memory failed its check and was cleared; the loss of its
+ * battery backup is one of the causes listed. The manual's remark that the code stays until satellites are received is
+ * tied to another cause of the same code; that it also holds for the battery backup is the design's reading (2026-11-08),
+ * not the manual's pairing. Here: from a power-on that wiped the
+ * memory (#461) until the receiver tracks its first satellite in it (GPS.tracksSatellite), posted from the first main page
+ * on like the unit's other hardware messages. A satellite tracked ends it for this power-on, also one tracked before the
+ * main page (an engine-running start's forced acquisition)
+ */
+class ReceiverMemoryLostMessage implements Message {
+
+    public readonly message: string[] = ["RCVR HARDWARE ERROR:", "0008"];
+    public seen: boolean = false;
+
+    constructor(private readonly memory: VolatileMemory, private readonly gps: GPS) {
+    }
+
+    public isConditionValid(): boolean {
+        if (!this.memory.receiverMemoryLost) {
+            return false;
+        }
+        if (this.gps.tracksSatellite) {
+            this.memory.receiverMemoryLost = false;
+            return false;
+        }
+        return this.memory.failureDetection.mainPageShown;
     }
 }
 

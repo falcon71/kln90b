@@ -120,7 +120,8 @@ export class Failures {
     }
 
     public randomCandidates(): FailureDefinition[] {
-        return FAILURE_CATALOG.filter(d => d.random && !this.isActive(d.key) && this.isEligible(d.key));
+        const batteryEmpty = this.settings.getSetting('batteryHealth').get() <= 0;
+        return FAILURE_CATALOG.filter(d => d.random && (!d.randomWhenEmpty || batteryEmpty) && !this.isActive(d.key) && this.isEligible(d.key));
     }
 
     public fail(key: FailureKey): void {

@@ -159,6 +159,16 @@ export class FakeReceiver {
         return false;
     }
 
+    /** The fake ephemeris of this PRN was collected from the spoofer (kept over a power cycle, erased by a wipe) */
+    public hasCollected(prn: number): boolean {
+        return this.collected[prn] === 1;
+    }
+
+    /** #461: the wipe of the receiver's memory erases the ephemeris collected from the spoofer too */
+    public forgetEphemeris(): void {
+        this.collected.fill(0);
+    }
+
     public isFakeInUse(prn: number): boolean {
         return this.state[prn] === Fake.InUse;
     }

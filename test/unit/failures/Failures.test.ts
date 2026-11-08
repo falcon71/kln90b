@@ -242,6 +242,23 @@ describe('Failures.values and setValues (#460)', () => {
     });
 });
 
+describe('the battery as a random candidate (#461)', () => {
+    it('is left out while there is charge and a candidate once empty', () => {
+        const {settings, failures} = build();
+        settings.getSetting('batteryHealth').set(0.001);
+        expect(failures.randomCandidates().map(d => d.key)).not.toContain('battery');
+        settings.getSetting('batteryHealth').set(0);
+        expect(failures.randomCandidates().map(d => d.key)).toContain('battery');
+    });
+
+    it('is listed as inactive at any charge', () => {
+        const {settings, failures} = build();
+        expect(failures.inactiveList().map(d => d.key)).toContain('battery');
+        settings.getSetting('batteryHealth').set(0);
+        expect(failures.inactiveList().map(d => d.key)).toContain('battery');
+    });
+});
+
 describe('randomCandidates with the GPS entries (#460)', () => {
     it('includes the antenna and receiver, excludes jamming, spoofing and the faulty satellite', () => {
         const {failures} = build();

@@ -23,7 +23,7 @@ import {TimeStamp} from "./Time";
 import {CenterWaypoint} from "../pages/right/Ctr1Page";
 import type {FplPage} from "../pages/left/FplPage";
 import type {Message} from "./MessageHandler";
-import {PowerEvent, PowerEventData} from "../PowerSupply";
+import {PowerEvent, PowerEventData, UserMemoryLostEvent} from "../PowerSupply";
 import {Sensors} from "../Sensors";
 import {SustainedCondition} from "./SustainedCondition";
 import type {FailureDetectionState} from "../failures/FailureDetector";
@@ -383,6 +383,12 @@ export class VolatileMemory {
      */
     public selfTestFailure: Error | null = null;
 
+    /**
+     * #461: this power-on wiped the user memory, and the receiver has not tracked a satellite since (RCVR HARDWARE ERROR
+     * 0008, IM C-3). Set at every power-on from its event; ReceiverMemoryLostMessage clears it once a satellite is tracked
+     */
+    public receiverMemoryLost: boolean = false;
+
     /** #416: the number of the current power-on. A step of the reset of an earlier one changes nothing (spec 4.3) */
     private powerOnCount = 0;
 
@@ -405,7 +411,20 @@ export class VolatileMemory {
             flightplans,
         };
 
+        bus.getSubscriber<UserMemoryLostEvent>().on("userMemoryLost").handle(this.forgetUserMemory.bind(this));
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.reset.bind(this));
+    }
+
+    /**
+     * #461: the flight plans and the active waypoint are part of the user memory a failed battery loses at the power-on.
+     * The plans are emptied in place, since every service holds them; each delete publishes flightplanChanged, so the
+     * persistence and the planner mirror follow
+     */
+    private forgetUserMemory(): void {
+        for (const fpl of this.fplPage.flightplans) {
+            fpl.delete();
+        }
+        this.navPage.activeWaypoint.forgetAll();
     }
 
     /**
@@ -443,6 +462,7 @@ export class VolatileMemory {
         this.failureDetection.detected.clear();
         this.failureDetection.noticed.clear();
         this.readAtPowerOn();
+        this.receiverMemoryLost = evt.memoryLost === true;
         this.transmittersStarted = false;
         this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry
@@ -452,7 +472,10 @@ export class VolatileMemory {
         this.intPage.lastMatch = null;
         this.supPage.lastMatch = null;
 
-        if (evt.timeSincePowerChange > RESET_TIME) {
+        //6-5; a power-on that lost the user memory (#461) has lost the short-term state as well
+        //forgetUserMemory and KLNMagvar dominate this branch today (no Direct To, magvar 0 at the wiped position); it states the design's rule
+        const longInterruption = evt.timeSincePowerChange > RESET_TIME || evt.memoryLost === true;
+        if (longInterruption) {
             //#423: before the removal, which would activate a new leg from the position stored at the power-off
             this.navPage.activeWaypoint.dropProcedureLeg();
             this.fplPage.flightplans[0].removeProcedures();
@@ -481,7 +504,7 @@ export class VolatileMemory {
         this.navPage.aprRaimLoss = new SustainedCondition(APR_RAIM_FLAG_DELAY);
         //The entered variation outside the database coverage is kept over a short power-off. The KLN 89 Pilot's Guide says
         //so (4-46, 4-47); the 90B guide is silent (5-44)
-        if (evt.timeSincePowerChange > RESET_TIME) {
+        if (longInterruption) {
             this.navPage.userMagvar = 0;
         }
         //#192: what a power-on forgets (spec 2026-10-24-power-cycle-design.md, 4.4). The KLN 89 trainer forgot the selected

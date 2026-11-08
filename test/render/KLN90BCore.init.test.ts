@@ -22,7 +22,7 @@ const SAMPLE_PANEL_XML = readFileSync('cfg/panel.xml', 'utf8');
  * The members of PageProps, the services bag every page and control receives, as docs/architecture.md (Core 1) lists
  * them, in that order. Sorted for the comparison
  */
-const PAGE_PROPS = ['ref', 'bus', 'userSettings', 'planeSettings', 'failures', 'failureDetector', 'eepromCalibration', 'sensors', 'pageManager', 'messageHandler',
+const PAGE_PROPS = ['ref', 'bus', 'userSettings', 'planeSettings', 'failures', 'battery', 'failureDetector', 'eepromCalibration', 'sensors', 'pageManager', 'messageHandler',
     'hardware', 'memory', 'facilityLoader', 'facilityRepository', 'nearestLists', 'nearestUtils', 'remarksManager',
     'scanLists', 'msa', 'vnav', 'modeController', 'database', 'magvar', 'sidstar', 'pendingCalls'];
 
