@@ -27,14 +27,14 @@ describe('SET 10 FAILURES button (#458)', () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 10');
 
-        expect(Screen.read().rows('L')[1].trim()).toBe('FAILURES');
+        expect(Screen.read().rows('L')[1].trim()).toBe('FAILURES?');
     });
 
     it('opens FLR 1 with ENT', async () => {
         const unit = await bootUnit();
         await unit.panel.selectPage('L', 'SET 10');
         await unit.panel.cursor('L');
-        await unit.panel.cursorTo('L', 'FAILURES');
+        await unit.panel.cursorTo('L', 'FAILURES?');
 
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);

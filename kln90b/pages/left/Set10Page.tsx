@@ -31,7 +31,7 @@ export class Set10Page extends SixLineHalfPage {
 
         this.children = new UIElementChildren<Set10PageTypes>({
             fastGps: new SelectField(['REAL', 'FAST'], fastGpsAcquisition ? 1 : 0, this.saveFastGpsAcquisition.bind(this)),
-            failures: new Button("FAILURES", () => this.openFailures()), //#458: the FLR pages
+            failures: new Button("FAILURES?", () => this.openFailures()), //#458: the FLR pages
         });
 
         this.cursorController = new CursorController(this.children);

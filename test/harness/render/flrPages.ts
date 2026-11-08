@@ -8,7 +8,7 @@ import {Screen} from './screen';
 export async function openFlr1(unit: HeadlessUnit): Promise<void> {
     await unit.panel.selectPage('L', 'SET 10');
     await unit.panel.cursor('L');
-    await unit.panel.cursorTo('L', 'FAILURES');
+    await unit.panel.cursorTo('L', 'FAILURES?');
     await unit.panel.ent();
     await vi.advanceTimersByTimeAsync(1000);
 }
