@@ -28,6 +28,16 @@ const MAX_ITEMS = 9;
 //#207: the 90B guide gives no radius; the KLN 89's is 200 NM, and the maintainer ruled the same
 const NEAREST_SEARCH_RADIUS_NM = 200;
 
+/** The runway surfaces of a hard-surface search */
+export const HARD_SURFACE_MASK = BitFlags.union(
+    BitFlags.createFlag(RunwaySurfaceType.Concrete),
+    BitFlags.createFlag(RunwaySurfaceType.Asphalt),
+    BitFlags.createFlag(RunwaySurfaceType.Tarmac),
+    BitFlags.createFlag(RunwaySurfaceType.Brick),
+    BitFlags.createFlag(RunwaySurfaceType.Bituminous),
+    BitFlags.createFlag(RunwaySurfaceType.Macadam), //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
+);
+
 type NearestSearchType = FacilitySearchType.Airport | FacilitySearchType.Vor | FacilitySearchType.Ndb;
 
 export class Nearestlists {
@@ -205,14 +215,7 @@ export class AirportNearestList extends NearestList<FacilitySearchType.Airport, 
                     BitFlags.createFlag(RunwaySurfaceType.LongGrass),
                 );
             case SURFACE_HRD:
-                return BitFlags.union(
-                    BitFlags.createFlag(RunwaySurfaceType.Concrete),
-                    BitFlags.createFlag(RunwaySurfaceType.Asphalt),
-                    BitFlags.createFlag(RunwaySurfaceType.Tarmac),
-                    BitFlags.createFlag(RunwaySurfaceType.Brick),
-                    BitFlags.createFlag(RunwaySurfaceType.Bituminous),
-                    BitFlags.createFlag(RunwaySurfaceType.Macadam), //#270: the maintainer ruled macadam a hard surface, as the SDK classes it
-                );
+                return HARD_SURFACE_MASK;
         }
     }
 

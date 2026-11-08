@@ -31,7 +31,7 @@ export function receiverTimeDifference(a: number, b: number): number {
 }
 
 const SIX_MONTHS = 182 * 24 * 60 * 60 * 1000; //3-17, the same as the SDK almanacExpireTime in Gps.ts
-const CLOCK_TOLERANCE = 10 * 60 * 1000; //Install manual 2-66: the time must be right within 10 minutes for ACQ
+export const CLOCK_TOLERANCE = 10 * 60 * 1000; //Install manual 2-66: the time must be right within 10 minutes for ACQ
 const SDK_LAST_KNOWN_POSITION_LIMIT = UnitType.NMILE.convertTo(100, UnitType.GA_RADIAN); //The SDK's own rule in its channel assignment
 const ELEVATION_MASK_DEG = 5; //5-30: the elevation ranges from 5 to 90 degrees
 /** Install manual 2-66: ACQ has its fix within 5 minutes; without one the predicted satellites are not there */
@@ -57,6 +57,10 @@ export const BLIND_ACQUISITION_RANGE = 60 * 1000;
 export const ALMANAC_SEARCH_ACQUISITION = 390 * 1000;
 export const ALMANAC_SEARCH_ACQUISITION_RANGE = 120 * 1000;
 
+/** The SDK's own line of sight: a satellite with a geometric signal strength above this is in view (GPSSat.ts) */
+const SDK_REACHABLE_STRENGTH = 0.05;
+const PRN_SLOTS = 256;
+
 const ACQUIRED_STATES = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
 
 const elevationDeg = (sat: GPSPredictionSatellite): number => 90 - UnitType.RADIAN.convertTo(sat.position.get()[0], UnitType.DEGREE);
@@ -79,7 +83,24 @@ export class GpsSearch {
     /** The search's own choice: the PRNs the receiver may track, or null for all (#460, design "The inhibits") */
     private allowed: Set<number> | null = null;
     /** The inhibit last applied here, by PRN, so that applyInhibits changes only what changed */
-    private readonly applied = new Uint8Array(256);
+    private readonly applied = new Uint8Array(PRN_SLOTS);
+    /**
+     * Per PRN: a satellite below the horizon that the SDK's blind fill put into a channel, held inhibited during the sky search
+     * that keeps the belief until it has left the channels (tickSkySearchKeepingBelief)
+     */
+    private readonly releasing = new Uint8Array(PRN_SLOTS);
+    /** Per PRN: in a channel, filled in place */
+    private readonly inChannel = new Uint8Array(PRN_SLOTS);
+    /**
+     * The sim time the unit lost its fix, or null (#465, design "Recovery"). Read only while idle; end() clears it, which every
+     * fix calls (GPS.gpsAcquired), so a fix before the give-up time cancels the sky search
+     */
+    private lostAt: number | null = null;
+    /**
+     * The sky search keeps the receiver's belief: its position, its almanac and the SDK's timings for a satellite it
+     * predicts (#465, final review 2026-11-08). Only the sky search after a lost fix in flight; see lostFix
+     */
+    private _keepsBelief = false;
 
     /**
      * The receiver failures' block (#460) is merged with the search's choice, so that it survives every start, end and
@@ -105,6 +126,9 @@ export class GpsSearch {
     /** First fix, forced acquisition or power-off: the SDK runs on its own until the next power-on */
     public end(): void {
         this.pendingStart = null;
+        this.lostAt = null;
+        this._keepsBelief = false;
+        this.releasing.fill(0);
         this.predicted = [];
         this.keptPrn = null;
         if (this.mode !== SearchMode.Idle) {
@@ -119,6 +143,25 @@ export class GpsSearch {
     }
 
     /**
+     * #465, design "Recovery": the unit lost its fix, with a belief close enough to the real sky to reacquire as before.
+     * Without a fix for the give-up time (Install manual 2-66: 5 minutes) the satellites it predicts are not there, and it
+     * searches the sky as after a power-on (3-17), every PRN, until a fix ends the search.
+     *
+     * Decided at the final review (2026-11-08): that sky search keeps the receiver's belief. A jammed receiver's clock and
+     * position stay right, so it does not search blind: the SDK keeps its last known position, its almanac and the idle and
+     * hot timings of the satellites it predicts (startSkySearchKeepingBelief), and the fix returns within about a minute of
+     * four satellites coming back, as the jammed A321 of Felux et al. (NAVIGATION 71(3), 2024) recovered some 2 minutes
+     * after the interference ended. Its almanac puts no satellite below the horizon into a channel, and it does not give up
+     * on a satellite in view for an hour (tickSkySearchKeepingBelief). The fake receiver still searches every PRN with its
+     * blind time (FakeReceiver), as a fake satellite outside the believed sky is not predicted. The power-on sky search is
+     * unchanged
+     * @param simTime The sim time, UNIX ms
+     */
+    public lostFix(simTime: number): void {
+        this.lostAt = simTime;
+    }
+
+    /**
      * Applies the search's choice and the receiver failures' block: a satellite is inhibited when the search does not
      * allow it or a receiver failure blocks every satellite. GPS.tick calls it every tick, as a receiver failure can start
      * or be repaired at any time. It changes only the satellites whose inhibit changed since the last call, so with no
@@ -126,6 +169,11 @@ export class GpsSearch {
      */
     public applyInhibits(): void {
         this.apply(false);
+    }
+
+    /** The sky search keeps the receiver's belief (lostFix): the SDK keeps its almanac */
+    public get keepsBelief(): boolean {
+        return this._keepsBelief;
     }
 
     /** The satellites the unit predicts during ACQ, for STA 1 (#213) */
@@ -158,6 +206,17 @@ export class GpsSearch {
                 break;
             case SearchMode.AlmanacSearch:
                 this.tickAlmanacSearch(simTime, present);
+                break;
+            case SearchMode.SkySearch:
+                if (this._keepsBelief) {
+                    this.tickSkySearchKeepingBelief();
+                }
+                break;
+            case SearchMode.Idle:
+                if (this.lostAt !== null && simTime - this.lostAt >= GIVE_UP_TIME) {
+                    this.startSkySearchKeepingBelief(simTime);
+                    this.tickSkySearchKeepingBelief();
+                }
                 break;
         }
     }
@@ -212,6 +271,8 @@ export class GpsSearch {
     private startBlindSearch(mode: SearchMode.AlmanacSearch | SearchMode.SkySearch, simTime: number): void {
         this.predicted = [];
         this.keptPrn = null;
+        this._keepsBelief = false;
+        this.releasing.fill(0);
         this.inhibitAllExcept(null);
         this.computer.eraseLastKnownPosition();
         if (mode === SearchMode.AlmanacSearch) {
@@ -222,6 +283,57 @@ export class GpsSearch {
         this.almanacTimeAtStart = this.computer.getLastAlmanacTime();
         this.mode = mode;
         this.modeStartTime = simTime;
+    }
+
+    /**
+     * The sky search after a lost fix (lostFix): every PRN, no inhibit of the search's choice, but the SDK keeps its last
+     * known position, its almanac and the idle and hot timings
+     */
+    private startSkySearchKeepingBelief(simTime: number): void {
+        this.predicted = [];
+        this.keptPrn = null;
+        this._keepsBelief = true;
+        this.inhibitAllExcept(null);
+        this.computer.setAcquisitionTime(IDLE_ACQUISITION, WARM_ACQUISITION_RANGE);
+        this.computer.setAcquisitionTimeWithEphemeris(HOT_ACQUISITION, HOT_ACQUISITION_RANGE);
+        this.mode = SearchMode.SkySearch;
+        this.modeStartTime = simTime;
+    }
+
+    /**
+     * The sky search that keeps the belief, in every tick before the SDK's update. The SDK gives up on a satellite it searched
+     * in vain for its acquisition timeout (4 minutes) for an hour, and fills a channel it has nothing in view for with
+     * satellites in PRN order, below the horizon too (GPSSat.ts). Neither is what a receiver does that knows where it is,
+     * its time and its almanac:
+     * - the Unreachable marks are forgotten (KLNGPSSatComputer.forgetUnreachable), so that a satellite in view whose signal
+     *   is lost stays in its channel, searched, and one out of a channel can be given one;
+     * - a satellite below the horizon in a channel is inhibited until the SDK has taken it out at its next channel
+     *   assignment (every 5 s), so that the channel goes to a satellite in view. The SDK's own line of sight stands in for
+     *   the receiver's almanac at its belief, which is within the SDK's 100 NM and the start model's clock tolerance of the
+     *   truth here (Gps.fixLost). The inhibit is lifted as soon as the satellite has left the channels
+     * Allocates nothing
+     */
+    private tickSkySearchKeepingBelief(): void {
+        this.computer.forgetUnreachable();
+        const channels = this.computer.getChannels();
+        const inChannel = this.inChannel;
+        inChannel.fill(0);
+        for (let i = 0; i < channels.length; i++) {
+            const sat = channels[i];
+            if (sat !== null && sat.prn < PRN_SLOTS) {
+                inChannel[sat.prn] = 1;
+                if (!(sat.signalStrength.get() > SDK_REACHABLE_STRENGTH)) {
+                    this.releasing[sat.prn] = 1;
+                }
+            }
+        }
+        const sats = this.computer.getSatellites();
+        for (let i = 0; i < sats.length; i++) {
+            const prn = sats[i].prn;
+            if (prn < PRN_SLOTS && this.releasing[prn] === 1 && inChannel[prn] === 0) {
+                this.releasing[prn] = 0;
+            }
+        }
     }
 
     private tickAlmanacSearch(simTime: number, present: LatLonInterface): void {
@@ -263,7 +375,7 @@ export class GpsSearch {
         const allBlocked = this.allBlocked();
         for (let i = 0; i < sats.length; i++) {
             const prn = sats[i].prn;
-            const inhibit = allBlocked || (this.allowed !== null && !this.allowed.has(prn));
+            const inhibit = allBlocked || (this.allowed !== null && !this.allowed.has(prn)) || this.releasing[prn] === 1;
             const value = inhibit ? 1 : 0;
             if (all || this.applied[prn] !== value) {
                 this.applied[prn] = value;

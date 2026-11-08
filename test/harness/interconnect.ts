@@ -90,9 +90,10 @@ export const NOT_INTERFACES = new Set<string>([
     // Runtime overrides of panel.xml keys (SimVarSync)
     'L:KLN90B_OBSSOURCE', 'L:KLN90B_OBSTARGET', 'L:KLN90B_HEADINGINPUT', 'L:KLN90B_WRITEGPSSIMVARS',
     'L:KLN90B_ELECTRICITYSIMVARINDEX',
-    // The GPS receiver (Gps.ts, GpsMeasurement.ts); VELOCITY WORLD and PLANE ALTITUDE only with the simulated receiver
+    // The GPS receiver (Gps.ts, GpsMeasurement.ts); VELOCITY WORLD only with the simulated receiver. PLANE ALTITUDE for the
+    // simulated receiver and, with PLANE ALT ABOVE GROUND, for the ground transmitters' path to the aircraft (#465)
     'PLANE LATITUDE', 'PLANE LONGITUDE', 'GROUND VELOCITY', 'E:ABSOLUTE TIME', 'VELOCITY WORLD X', 'VELOCITY WORLD Z',
-    'PLANE ALTITUDE',
+    'PLANE ALTITUDE', 'PLANE ALT ABOVE GROUND',
     // The boot (KLN90BCore): the key of the saved settings and the forced ready state
     'ATC MODEL', 'ENG COMBUSTION:1',
 ]);

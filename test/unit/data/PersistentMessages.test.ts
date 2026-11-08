@@ -156,7 +156,8 @@ function harness(w: World) {
                         return {valid: w.solutionValid, measurements: w.measurements, maxSlope: w.maxSlope};
                     },
                     // #460: the #453 messages are not valid during a receiver failure, and RAIM POSITION ERROR needs a detected fault
-                    failures: {receiverFailed: false, faultDetected: () => false},
+                    failures: {receiverFailed: false},
+                    rangeErrorDetected: () => false,
                 },
             },
             out: {

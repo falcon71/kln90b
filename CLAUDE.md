@@ -105,9 +105,12 @@ change what they mean; add new ones instead:
   altitude input, and RAIM availability follows from the slope method against the alert limit of the flight phase.
   STA 1, STA 2, the messages and the approach gate use it, and STA 5 and the gate predict it through an SDK prediction
   context. `GpsFailures` (`failures/`, #460) blocks satellites for the receiver failures and puts a bias
-  on one satellite; spoofing is #465. Each satellite has its own SNR (`GpsSignal.ts`, #467: antenna tilt, block, fade,
-  jitter, minus the jamming level), and one lock rule loses and reacquires satellites for every cause. The wrapper
-  reaches into private SDK internals, so recheck it after SDK upgrades.
+  on one satellite. Jamming and spoofing come from simulated ground transmitters (`GpsTransmitter.ts`,
+  `failures/Transmitters.ts`, #465) whose levels raise the noise floor, and a spoofer's fake satellites take the unit's
+  channels (`failures/FakeReceiver.ts`) and enter a mixed solution with a residual RAIM test (`failures/RangeErrors.ts`).
+  Each satellite has its own SNR (`GpsSignal.ts`, #467: antenna tilt, block, fade, jitter, minus the transmitters' noise
+  rise), and one lock rule loses and reacquires satellites for every cause. The wrapper reaches into private SDK
+  internals, so recheck it after SDK upgrades.
 - **Failures** (`kln90b/failures/`, #458): a stateless service over saved settings, an MTBF trigger and a detector in
   the calculation ticks, and failing `Interconnect` ports. Read `docs/failures.md` before touching them.
 - **Navigation** uses the project's own model, deliberately *not* the SDK flight plan or LNAV.

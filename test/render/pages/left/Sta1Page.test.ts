@@ -160,6 +160,10 @@ describe('STA 1 page, tracked satellites with orbit data below the horizon', () 
         const gps = unit.props.sensors.in.gps;
         const channels = () => gps.gpsSatComputer.getChannels().filter(s => s !== null) as GPSSatellite[];
         expect(channels().length).toBeGreaterThan(0);
+        // #465, the decided exception of a far-off belief (design 2026-11-07, "Anti-goals" and "Recovery"): the jump loses the
+        // fix 10,800 NM from the believed position, which restarts the start model from it, and its ACQ shows the predicted
+        // satellites instead of the channels. This test is about the channels' rows, so the restart is held off
+        const start = vi.spyOn(gps.search, 'start').mockImplementation(() => undefined);
 
         await moveAircraft(unit, {lat: -47, lon: -172}, {groundspeedKt: 0});
         await unit.panel.selectPage('L', 'STA 1');
@@ -173,6 +177,7 @@ describe('STA 1 page, tracked satellites with orbit data below the horizon', () 
 
         expect(shown.map(([prn]) => prn)).toEqual(below);
         expect(shown.map(([, ele]) => ele)).toEqual(below.map(() => '--'));
+        expect(start).toHaveBeenCalledTimes(1); // The restart the exception asks for, held off
     }, 60_000);
 });
 

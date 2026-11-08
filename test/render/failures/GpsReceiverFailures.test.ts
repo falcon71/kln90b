@@ -11,6 +11,8 @@ import {GpsGeometry} from '../../../kln90b/GpsSolution';
 import {FailureKey} from '../../../kln90b/failures/FailureCatalog';
 import {panelXml} from '../../harness/panelXml';
 import {inhibitAllBut} from '../../harness/gps';
+import {standardRoute} from '../../harness/fixtures';
+import {savedFlightplan} from '../../harness/storage';
 
 /**
  * #460: the receiver failures wired into the receiver (the design docs/superpowers/specs/2026-11-05-failures-gps-receiver-design.md,
@@ -237,37 +239,36 @@ describe('the receiver failures in the receiver (#460)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    // The runtime state of GpsFailures restarts at both power edges (design, "GpsFailures"): off, the level is 0; on, the
-    // first tick counts no time, so the ramp has not moved over the power-off
-    it('a power cycle restarts the runtime state of the failures: the jamming ramp counts nothing over the power-off', async () => {
+    // The runtime state of GpsFailures restarts at both power edges (#460 design, "GpsFailures"): on, the first tick counts
+    // no time, so the faulty satellite's ramp has not moved over the power-off. Ported from the jamming ramp (#465)
+    it('a power cycle restarts the runtime state of the failures: the faulty satellite ramp counts nothing over the power-off', async () => {
         const unit = await bootUnit({storage: HOME});
         await settle(unit);
         const failures = unit.props.sensors.in.gps.failures;
-        failures.wanderSigmaDb = 0; // The level is the ramp alone
-        const levels: number[] = [];
+        const biases: number[] = [];
         const original = failures.tick.bind(failures);
         vi.spyOn(failures, 'tick').mockImplementation((t: number) => {
             original(t);
-            levels.push(failures.jammingDb);
+            biases.push(failures.faultyBiasM);
         });
-        unit.props.failures.fail('gpsJamming');
+        unit.props.failures.fail('faultySatellite');
         await vi.advanceTimersByTimeAsync(30_000);
 
         await unit.panel.powerOff();
-        const beforeOff = levels.length;
-        const level = levels[beforeOff - 1];
-        expect(level).toBeGreaterThan(1); // Precondition: 30 s into a ramp of at most 360 s to at least 24 dB
-        expect(failures.jammingDb).toBe(0);
+        const beforeOff = biases.length;
+        const bias = biases[beforeOff - 1];
+        expect(bias).toBeGreaterThan(0); // Precondition: 30 s into a ramp of at most 300 s to at least 500 m
+        expect(bias).toBeGreaterThan(biases[beforeOff - 2]); // Precondition: the ramp was still rising
 
         await vi.advanceTimersByTimeAsync(20_000);
-        expect(levels.length).toBe(beforeOff); // Precondition: no tick while off
+        expect(biases.length).toBe(beforeOff); // Precondition: no tick while off
         await unit.panel.powerOn();
-        for (let i = 0; i < 8 && levels.length === beforeOff; i++) {
+        for (let i = 0; i < 8 && biases.length === beforeOff; i++) {
             await vi.advanceTimersByTimeAsync(250);
         }
 
-        expect(levels.length).toBe(beforeOff + 1);
-        expect(levels[beforeOff]).toBe(level);
+        expect(biases.length).toBe(beforeOff + 1);
+        expect(biases[beforeOff]).toBe(bias);
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
@@ -283,14 +284,17 @@ describe('the receiver failures in the receiver (#460)', () => {
         expect(Screen.read().rows('L')[5]).toBe('TEST FAIL  ');
     }, 30_000);
 
-    it('FLR 3 lists the four GPS failures', async () => {
+    it('FLR 3 lists the GPS failures', async () => {
         const unit = await bootUnit();
         await openFlr3(unit);
         await unit.panel.cursor('L');
-        await unit.panel.cursorTo('L', 'SATELLITE');
+        await unit.panel.cursorTo('L', 'SPOOFING');
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(rows()).toEqual(['  INACTIVE', 'GPS ANTENNA', 'GPS RCVR', 'JAMMING', 'OBS INPUT', 'SATELLITE']);
+        expect(rows()).toEqual(['  INACTIVE', 'GPS RCVR', 'JAMMING', 'OBS INPUT', 'SATELLITE', 'SPOOFING']);
+        await unit.panel.cursorTo('L', 'GPS ANTENNA');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(rows()[1]).toBe('GPS ANTENNA');
     }, 30_000);
 
     it('with nothing failed an engine-running boot inhibits no satellite, as before', async () => {
@@ -327,16 +331,16 @@ describe('the wiring of the failures into the receiver (#460)', () => {
         expect(atUpdate).toEqual([all]);
     }, 30_000);
 
-    // #467: tick order GpsFailures.tick (the level), the signals' tick, then the receiver's update. A tracked satellite
-    // whose signal is lost in a tick has left the tracked states when the receiver's update of that same tick returns
-    // (through its reachability, Gps.ts wrapReachability). The per-satellite skip of the unit's solution is in
-    // SatelliteReachability.test.ts
-    it('a tracked satellite lost under jamming in a tick is no longer tracked after the receiver updates in that tick', async () => {
+    // #467: tick order GpsFailures.tick, the signals' tick, then the receiver's update. A tracked satellite whose signal
+    // is lost in a tick has left the tracked states when the receiver's update of that same tick returns (through its
+    // reachability, Gps.ts wrapReachability). The per-satellite skip of the unit's solution is in
+    // SatelliteReachability.test.ts. #465: the noise rise, once #460's jamming ramp, is put into the signals' tick here:
+    // 26 dB over 240 s, so that the satellites are lost over several ticks
+    it('a tracked satellite lost to a rising noise floor in a tick is no longer tracked after the receiver updates in that tick', async () => {
         const unit = await bootUnit({storage: HOME});
         await settle(unit);
         const gps = unit.props.sensors.in.gps;
         const sdk = computer(unit);
-        gps.failures.wanderSigmaDb = 0; // The level rises with the ramp alone
         const all = allPrns(unit);
         const lost = () => all.filter(prn => gps.signals.isLost(prn));
         const isTracked = (prn: number) => TRACKED.has(sdk.getSatellites().find(s => s.prn === prn)!.state.get());
@@ -349,9 +353,11 @@ describe('the wiring of the failures into the receiver (#460)', () => {
         });
         const newlyLostTracked = new Map<number, number[]>();
         const signalsTick = gps.signals.tick.bind(gps.signals);
-        vi.spyOn(gps.signals, 'tick').mockImplementation((t, attitude, jammingDb) => {
+        let rising = 0;
+        vi.spyOn(gps.signals, 'tick').mockImplementation((t, attitude) => {
             const before = lost();
-            signalsTick(t, attitude, jammingDb);
+            rising++;
+            signalsTick(t, attitude, Math.min(26, rising * 26 / 240));
             const added = lost().filter(prn => !before.includes(prn) && isTracked(prn));
             if (added.length > 0) {
                 newlyLostTracked.set(tick, added);
@@ -364,7 +370,6 @@ describe('the wiring of the failures into the receiver (#460)', () => {
             trackedAfterUpdate.set(tick, all.filter(isTracked));
         });
 
-        unit.props.failures.fail('gpsJamming');
         await vi.advanceTimersByTimeAsync(240_000);
 
         expect(newlyLostTracked.size).toBeGreaterThan(1); // Precondition: the losses came over several ticks
@@ -403,7 +408,7 @@ describe('the wiring of the failures into the receiver (#460)', () => {
         unit.props.failures.fail('gpsJamming');
         await vi.advanceTimersByTimeAsync(12_000);
 
-        expect(gps.failures.jamming).toBe(true); // Precondition
+        expect(unit.props.failures.isEffective('gpsJamming')).toBe(true); // Precondition
         expect(messages(unit)).toEqual([RAIM, GEOMETRY]);
     }, 30_000);
 
@@ -411,7 +416,6 @@ describe('the wiring of the failures into the receiver (#460)', () => {
         const unit = await bootUnit({storage: HOME});
         await settle(unit);
         const gps = unit.props.sensors.in.gps;
-        gps.failures.wanderSigmaDb = 0;
         unit.props.failures.fail('gpsJamming');
         inhibitAllBut(unit, 0);
         for (let s = 0; s < 12 && gps.isValid(); s++) {
@@ -420,7 +424,101 @@ describe('the wiring of the failures into the receiver (#460)', () => {
         expect(gps.isValid()).toBe(false); // Precondition: the fix is lost
         await vi.advanceTimersByTimeAsync(2000);
 
-        expect(gps.failures.jamming).toBe(true); // Precondition
+        expect(unit.props.failures.isEffective('gpsJamming')).toBe(true); // Precondition
         expect(messages(unit)).toEqual([COVERAGE]);
     }, 30_000);
+});
+
+
+/**
+ * An engine-running unit at KAAA, 3000 ft, flying FPL 0 KAAA, ABC, KBBB. The position is the one stored at the last
+ * power-off, so the boot posts no POSITION DIFFERS message. STA 1 is on the left. Moved with the tests of STA 1 during a
+ * receiver failure from GpsJamming.test.ts (#465), under its name there, so that they moved unchanged; the jamming they
+ * once stored is gone
+ */
+async function jammedFlight(storage: Record<string, unknown>): Promise<HeadlessUnit> {
+    const r = standardRoute();
+    const unit = await bootUnit({
+        facilities: [r.kaaa, r.abc, r.kbbb], position: {lat: r.kaaa.lat, lon: r.kaaa.lon}, altitudeFt: 3000,
+        storage: {lastLatitude: r.kaaa.lat, lastLongitude: r.kaaa.lon, ...savedFlightplan(0, [r.kaaa, r.abc, r.kbbb]), ...storage},
+    });
+    await unit.panel.selectPage('L', 'STA 1');
+    return unit;
+}
+
+/** Brings the display one tick past a calculation tick, so that the screen shows what that calculation tick left */
+async function afterCalcTick(unit: HeadlessUnit): Promise<void> {
+    await untilCalcTick(unit);
+    await vi.advanceTimersByTimeAsync(250);
+}
+
+describe('STA 1 during a receiver failure (#460)', () => {
+    it('gpsAntenna in flight: STATE FAILR and no satellite rows, while the SDK still has the satellites in their channels', async () => {
+        const unit = await jammedFlight({});
+        const gps = unit.props.sensors.in.gps;
+        await afterCalcTick(unit);
+        expect(Screen.read().status().left).toBe('STA+1'); // Precondition: eight rows on two pages
+
+        unit.props.failures.fail('gpsAntenna');
+        await afterCalcTick(unit);
+
+        expect(gps.gpsSatComputer.getChannels().filter(s => s !== null && s.state.get() === GPSSatelliteState.InUse).length).toBe(8); // Precondition
+        expect(Screen.read().rows('L')).toEqual(['STATE FAILR', ' SV SNR ELE', '           ', '           ', '           ', '           ']);
+        expect(Screen.read().status().left).toBe('STA 1'); // No second page
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(Screen.read().rows('L')).toEqual(['STATE FAILR', ' SV SNR ELE', '           ', '           ', '           ', '           ']);
+        expect(Screen.read().status().left).toBe('STA 1');
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
+    // FAILR comes before every other state: also before the calculation tick that drops the fix
+    it('gpsAntenna: FAILR at the next display tick, while the fix is still valid', async () => {
+        const unit = await jammedFlight({});
+        await untilCalcTick(unit);
+
+        unit.props.failures.fail('gpsAntenna');
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(unit.props.sensors.in.gps.isValid()).toBe(true); // Precondition: no calculation tick yet
+        expect(Screen.read().rows('L')[0]).toBe('STATE FAILR');
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
+    // The page falls back from STA+1 (#466), so the failure shows on the first page
+    it('gpsAntenna while STA+1 is shown: STATE FAILR and no satellite rows', async () => {
+        const unit = await jammedFlight({});
+        await afterCalcTick(unit);
+        await unit.panel.inner('L', 1);
+        expect(Screen.read().rows('L')[0]).not.toMatch(/^STATE /); // Precondition: on the second page
+        expect(Screen.read().status().left).toBe('STA+1');
+
+        unit.props.failures.fail('gpsAntenna');
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(Screen.read().rows('L')).toEqual(['STATE FAILR', ' SV SNR ELE', '           ', '           ', '           ', '           ']);
+        expect(Screen.read().status().left).toBe('STA 1');
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
+    // No rows also during the start model's acquisition, whose predicted list would otherwise show
+    it("gpsAntenna during the start model's acquisition: STATE FAILR and no satellite rows", async () => {
+        const unit = await bootToSelfTest({storage: {...WARM_START, failure_gpsAntenna: '{}'}});
+        await unit.panel.approveSelfTest();
+        await unit.panel.selectPage('L', 'STA 1');
+
+        expect(unit.props.sensors.in.gps.search.mode).toBe(SearchMode.Acquisition); // Precondition
+        expect(Screen.read().rows('L')).toEqual(['STATE FAILR', ' SV SNR ELE', '           ', '           ', '           ', '           ']);
+        expect(Screen.read().status().left).toBe('STA 1');
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
+    it('gpsAntenna stored by an earlier session: STATE FAILR and no satellite rows', async () => {
+        const unit = await jammedFlight({failure_gpsAntenna: '{}'});
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(Screen.read().rows('L')).toEqual(['STATE FAILR', ' SV SNR ELE', '           ', '           ', '           ', '           ']);
+        expect(Screen.read().status().left).toBe('STA 1');
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
 });

@@ -2,7 +2,8 @@
  * The signal of a satellite at the receiver (#464, #467). A pure math module: it imports nothing from the project.
  *
  * The SNR of a satellite is the antenna's gain curve over the elevation above the antenna's plane, plus an offset for the
- * satellite's transmit power, a slow fade and the receiver's estimate jitter. The stateful parts live in the
+ * satellite's transmit power, a slow fade and the receiver's estimate jitter, less the rise of the noise floor that the
+ * ground transmitters cause (#465, GpsTransmitter.ts). The stateful parts live in the
  * SatelliteSignals service; this module holds the functions of one satellite at one moment.
  *
  * The antenna curve: the power that arrives from a GPS satellite is nearly the same at every elevation, as the satellite's
@@ -205,18 +206,25 @@ export class SatelliteSignals {
     ) {
     }
 
-    public tick(simTimeS: number, attitude: Readonly<AntennaAttitude>, jammingDb: number): void {
+    /**
+     * @param noiseRiseDb The rise of the noise floor from every transmitter (#465), lost from every satellite's SNR
+     */
+    public tick(simTimeS: number, attitude: Readonly<AntennaAttitude>, noiseRiseDb: number): void {
         const last = this.lastTimeS;
         this.lastTimeS = simTimeS;
         let dt = last === null ? 0 : simTimeS - last;
         if (!(dt > 0) || dt > MAX_SIGNAL_STEP_S) {
             dt = 0;
         }
-        this.compute(dt, attitude, jammingDb);
+        this.compute(dt, attitude, noiseRiseDb);
     }
 
-    public refresh(attitude: Readonly<AntennaAttitude>, jammingDb: number): void {
-        this.compute(0, attitude, jammingDb);
+    /**
+     * The SNRs and the lost set outside the calculation tick, counting no time
+     * @param noiseRiseDb The rise of the noise floor from every transmitter (#465), lost from every satellite's SNR
+     */
+    public refresh(attitude: Readonly<AntennaAttitude>, noiseRiseDb: number): void {
+        this.compute(0, attitude, noiseRiseDb);
     }
 
     public reset(): void {
@@ -236,7 +244,7 @@ export class SatelliteSignals {
         return this.lost[prn] === 1;
     }
 
-    private compute(dt: number, attitude: Readonly<AntennaAttitude>, jammingDb: number): void {
+    private compute(dt: number, attitude: Readonly<AntennaAttitude>, noiseRiseDb: number): void {
         const sats = this.receiver.satellites();
         const tau = attitude.onGround ? FADE_TAU_GROUND_S : FADE_TAU_AIR_S;
         for (let i = 0; i < sats.length; i++) {
@@ -258,7 +266,7 @@ export class SatelliteSignals {
             }
 
             const base = antennaCurveSnr(sinAntenna) + offset
-                + this.fade[prn] * fadeSigmaDb(sinAntenna, attitude.onGround) * this.fadeScale - jammingDb;
+                + this.fade[prn] * fadeSigmaDb(sinAntenna, attitude.onGround) * this.fadeScale - noiseRiseDb;
             if (dt > 0) {
                 this.jitter[prn] = this.normal();
             }

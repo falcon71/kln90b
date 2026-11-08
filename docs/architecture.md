@@ -306,7 +306,8 @@ prediction context of the main computer.
       warm starts.
     - **Sky search**: ACQ has no fix after `GIVE_UP_TIME` (5 min, install manual 2-66). Inhibits are lifted, the last
       known position is erased and the almanac check reports invalid, so the SDK runs its blind search in PRN order
-      (`BLIND_ACQUISITION`, 90 ± 30 s per satellite).
+      (`BLIND_ACQUISITION`, 90 ± 30 s per satellite). A fix lost for `GIVE_UP_TIME` starts a sky search too, one that
+      keeps the receiver's belief (#465, see "Recovery after a lost fix" below).
     - **Almanac search**: the almanac is six months old or more by the unit's clock, which also covers a clock that is
       years off (ORS 01 6-30). Blind search until one satellite is acquired (`ALMANAC_SEARCH_ACQUISITION`, 390 ± 60 s,
       calibrated so that the whole search lands near ORS 01's 20 minutes and the observed 21:36); all others are then
@@ -324,8 +325,8 @@ prediction context of the main computer.
       `SYSTEM TIME UPDATED TO GPS TIME` appears in FAST. Take-home mode skips the initialization. `GPS.startFast()`
       does the same when SET 10 is switched to FAST without a fix, then restarts the search; with a fix nothing
       happens, and a switch to REAL only saves the setting.
-    - `KLNGPSSatComputer.isAlmanacValid` reports the decision: ACQ true, almanac and sky search false, Idle the SDK's
-      own check.
+    - `KLNGPSSatComputer.isAlmanacValid` reports the decision: ACQ true, almanac search and the blind sky search false,
+      Idle and the sky search that keeps the belief (`GpsSearch.keepsBelief`, #465) the SDK's own check.
     - **Corrections during a search** (3-5, 3-17..3-19, #357). The Pilot's Guide gives the entry of the date and time
       or of the position as the remedy for a slow start. `GPS.reinitializeSearch()` copies the clock into
       `gpsSatComputer.internalTime` and calls `search.start(coords)` again, so the decision is made anew from the
@@ -336,11 +337,12 @@ prediction context of the main computer.
       real unit restarts at once or at its next search cycle is not documented.
     - **STA 1** (`Sta1Page`, #213) shows what the unit knows, not the true sky. During ACQ without a fix it lists
       `search.predictedSatellites()` with the predicted elevation, constant through the acquisition. Otherwise it lists
-      the channels; the elevation is the true one with a fix or once the satellite's orbit data is current
+      the unit's channels (`GPS.channelRows()`, which shows a channel a spoofer's fake satellite claims with that
+      satellite, #465); the elevation is the true one with a fix or once the satellite's orbit data is current
       (`GPS.simTimeUnix`), else `--`. A satellite below the horizon has no elevation and shows `--`.
     - Public SDK API used: `createPredictionContext`, `setSatelliteInhibit`, `syncLastKnownPosition` (the stored
-      position within 100 NM of the present one, so the SDK's 2 NM hot-start rule works on it; else the present
-      position), `eraseLastKnownPosition`, `eraseCachedEphemeris` (the harness's `coldGps`: the boot's power-on wrote the
+      position within 100 NM of the present one, so the SDK's 2 NM hot-start rule works on it, also when it is a
+      spoofer's false position; else the present position), `eraseLastKnownPosition`, `eraseCachedEphemeris` (the harness's `coldGps`: the boot's power-on wrote the
       truth, but the reset is no power-on, so nothing is written again after the ephemeris is erased and the search takes
       REAL timings in FAST too).
     - Beyond 100 NM the SDK's last known position is the present one, so its 2 NM rule would make every satellite with
@@ -357,7 +359,7 @@ prediction context of the main computer.
   satellite and is ticked in `GPS.tick` after `GpsFailures.tick` and before the search and the SDK's update. The SNR is
   the sum of the antenna's gain toward the satellite (the SNR curve evaluated at the elevation above the antenna's plane,
   which tilts with the aircraft), an offset by the satellite's block, a slow fade, the receiver's estimate jitter, minus
-  the jamming level. The antenna's attitude comes from the platform (`createAntennaAttitude`): `SimVarAntennaAttitude`
+  the rise of the noise floor from the jammer and the spoofer (#465, below). The antenna's attitude comes from the platform (`createAntennaAttitude`): `SimVarAntennaAttitude`
   in the sim (heading, pitch, bank and `SIM ON GROUND`, with the MSFS signs flipped there), a level antenna in the tests
   unless a boot opts in (`antennaAttitude`).
     - **One lock rule for every cause**: a tracked satellite is lost below SNR 30, a lost one comes back at 35 or more
@@ -382,9 +384,9 @@ prediction context of the main computer.
       while a lost satellite above the mask holds a channel.
 - **Receiver failures** (`kln90b/failures/GpsFailures.ts`, #460; specification in `docs/failures.md`). `GPS` builds
   `GpsFailures` from `Failures` (passed through `Sensors`) and ticks it first in `GPS.tick`, outside take-home mode. It
-  owns the jamming level, the values drawn for the failures, the faulty satellite's bias and its detection, and holds
-  no state `VolatileMemory` would reset: the persistent part is the failure's stored values (the ramp progress is saved
-  at most every 10 s), the rest restarts at every power-on.
+  owns the receiver failures and the faulty satellite's drawn PRN, bias and ramp, and holds no state `VolatileMemory`
+  would reset: the persistent part is the failure's stored values (the ramp progress is saved at most every 10 s), the
+  rest restarts at every power-on. Jamming and spoofing are not here: they come from the transmitters (below).
     - **Inhibit ownership.** `GpsSearch` keeps its own choice (the allowed PRNs) and is given one callback,
       `GpsFailures.receiverFailed`, asked once per application because it reads the settings. The SDK inhibit is set
       when the search does not allow the satellite or the receiver has failed; `GPS.tick` applies it once per tick.
@@ -392,14 +394,85 @@ prediction context of the main computer.
       above). Only the public `setSatelliteInhibit` is used.
     - **A lost satellite leaves the unit's solution at once.** The SDK releases a satellite from its channel only at its
       next position update (every 5 s), so `GPS.updateSolution` skips satellites with `receiverFailed ||
-      signals.isLost(prn)` itself, which covers the moment between the signals' tick and the SDK's update.
+      signals.isLost(prn)` itself, and those in a channel a fake satellite claims (#465), which covers the moment
+      between the signals' tick and the SDK's update.
     - **`FailingMeasurement`** decorates the measurement strategy `GPS` was given (exact in tests, simulated in the sim).
-      It always updates the inner strategy and passes its outputs through, adding only the faulty satellite's position
-      error from the solution's coefficients. Velocity and track are not touched.
-    - **Readers.** `receiverFailed` (antenna or receiver) makes `Sta1Page` show `FAILR` with no rows and silences the
-      #453 signal and RAIM messages; `jammingDb` is given to the signals, which lower every SNR by it;
-      `faultDetected(halNm)` feeds `RaimPositionErrorMessage`, `NavCalculator`'s integrity output and
-      `ModeController`'s approach gate.
+      It always updates the inner strategy and moves its outputs by the solution's shift from `RangeErrors` (#465,
+      below): the faulty satellite's bias and a spoofer's mixed solution. Without range errors the inner outputs pass
+      through unchanged.
+    - **Readers.** `receiverFailed` (antenna or receiver) makes `Sta1Page` show `FAILR` with no rows, silences the
+      #453 signal and RAIM messages and gives the fake receiver no spoofer level; `GPS.rangeErrorDetected(halNm)`
+      (below) feeds `RaimPositionErrorMessage`, `NavCalculator`'s integrity output and `ModeController`'s approach gate.
+- **Transmitters, the fake receiver and the mixed solution** (#465, design in
+  `docs/superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md`; specification in
+  `docs/failures.md`). Jamming and spoofing come from simulated ground transmitters; nothing in the receiver, the
+  solution or STA 1 is keyed on them.
+    - **The physics** (`kln90b/GpsTransmitter.ts`) is a pure math module beside `GpsSignal.ts`: the radio horizon, the
+      diffraction loss beyond it, the antenna's gain toward a transmitter (`transmitterGainDb`: the antenna curve of #467
+      above the antenna's plane but at least `PLANE_GAIN_DB`, below it `PLANE_GAIN_DB` less `BELOW_PLANE_DB_PER_DEG` per
+      degree of depression down to the curve's floor; `levelFlightGainDb` in level flight), a transmitter's level, the
+      noise rise `noiseRiseDb`, a fake satellite's SNR `fakeSnr` (with the C/A spectral separation
+      `SPECTRAL_SEPARATION_DBHZ`), the powers drawn for a jammer and a spoofer (calibrated in level flight at
+      `CALIBRATION_AGL_FT` with the gain at the transmitter's depression), the edges `jammerEdgeNm` and `spooferEdgeNm`
+      (bisection, with the gain at each distance's depression), and the range to a satellite from its elevation.
+    - **`Transmitters`** (`kln90b/failures/Transmitters.ts`) holds at most one jammer and one spoofer, one per active
+      failure. `GPS` fills its inputs once per calculation tick (the true position, the sim time, the antenna's attitude,
+      and `PLANE ALT ABOVE GROUND` and the ground elevation under the aircraft only while a transmitter failure is in
+      effect, `anyActive`, so that with failures off the tick reads the SimVars it read before #465) and ticks it after
+      the antenna. It places, replaces and persists the sites (`Failures.values`/`setValues`) and gives their levels at
+      the aircraft as power ratios (`jammerRatio`, `spooferRatio`) and the spoofer's slant range (`spooferSlantM`). A new
+      spoofer resolves its false position through an `AirportFinder`; `KLN90BCore` sets `NearestAirportFinder`
+      (`kln90b/data/navdata/`), a nearest airport search of `KLNFacilityLoader`. A search that has not answered after
+      `AIRPORT_SEARCH_TIMEOUT_S` of sim time is given up for the drawn point, and its late answer ignored. Before a
+      forced acquisition `refresh` loads a stored site and computes the levels without counting time or drawing anything;
+      with failures off that preparation reads no SimVar.
+    - **The order in `GPS.tick`**: the failures, the antenna's attitude, the transmitters, the signals with the noise
+      rise of both levels, the fake receiver, the search and its inhibits, the SDK's `onUpdate()`, then
+      `FakeReceiver.freeHeld`, then the solution.
+    - **`FakeReceiver`** (`kln90b/failures/FakeReceiver.ts`) keeps the spoofer's fake satellites in the unit's channels.
+      Two prediction contexts of the main computer give the fake sky (the false position and time) and the believed sky
+      (`GPS.coords` and `GPS.timeZulu`), predicted at most every 5 s of sim time. A fake satellite takes a channel by
+      claiming it; `claimsSdkPrn` is part of the reachability predicate `GPS` passes to `wrapReachability`, read from
+      the SDK's channels at each query, so the SDK's satellite in a claimed channel is seen as lost and the SDK keeps its
+      channel count. `freeHeld` gives a satellite that timed out to `Unreachable` while it sat in a claimed channel back
+      to the SDK once the claim is gone (`forgetUnreachableSatellite`). `GPS.channelRows()` merges the claimed and the
+      SDK's channels for STA 1 (`fillRows`). The state is in typed arrays by PRN and by channel: a tick allocates
+      nothing.
+    - **`RangeErrors`** (`kln90b/failures/RangeErrors.ts`) is the mixed solution. `GPS.updateSolution` builds the rows:
+      the SDK's satellites in use, then the fake ones in use (`inUsePrns`), then the altitude input. The satellite
+      rows vote for the reference state (`falseReferenceOf`), whose sky gives the lines of sight to `computeGeometry`,
+      which also writes the matrices `solveErrors` needs (`createSolutionMatrices`). `RangeErrors.update` computes each
+      row's range error against the reference state (a fake row's claimed range includes the spoofer's slant range, as
+      does the false reference state; whole milliseconds resolved when a row enters or the reference flips, the faulty
+      satellite's bias on its real row, the altitude row against the false altitude), the shift of the position, the
+      velocity (each claimed range's rate from its own steps, the slant range's from its change since the last update)
+      and the clock, and the sum of the squared residuals `sseM2`. It runs every tick, the geometry only when its inputs
+      changed.
+    - **The clock and the SDK.** With the false reference the unit's time is the false time plus the solution's clock
+      (`GPS.solutionTime`); the SDK's `internalTime` and its last known position always get the true time and position
+      while the unit has a fix (`syncLastKnownPosition` in `GPS.tick`, for a fix the SDK has no solution of its own
+      for).
+    - **RAIM detection**: `GPS.rangeErrorDetected(halNm)` is true while `raimStatus` is available for the limit and
+      `raimTestFails(sseM2, measurements)` (`GpsSolution.ts`): the residual statistic against the chi-square bound of
+      measurements − 4 degrees of freedom (`raimThreshold`, at the false-alarm probability `RAIM_PFA`). The thresholds
+      are solved by bisection in the `GPS` constructor and cached, so no tick pays for them. One rule for the faulty
+      satellite and a spoofer's fake satellites.
+    - **The general time check** (B-4): every calculation tick with a fix compares the solution's time with the unit's
+      clock and posts `SYSTEM TIME UPDATED` beyond 10 minutes (`GPS.timeUpdated`); before #465 only `gpsAcquired`
+      did. The clock is carried over a hot-swap disable as over a power-off: `TickController` calls
+      `onTicksStopped`, which keeps the first stop time while the ticks stand, and the first tick after it adds the
+      stopped sim time to `timeZulu`. A power-off while the ticks stand adds it at the power-off (`powerChanged`), and the
+      power-on adds the off time as always.
+    - **Recovery after a lost fix** (`GPS.fixLost`): with the clock off by more than `CLOCK_TOLERANCE` (era-wrapped,
+      `receiverTimeDifference`) or the position 100 NM or more from the truth, `search.start(coords)` restarts the start
+      model from that belief; otherwise `search.lostFix` marks the time, and after `GIVE_UP_TIME` without a fix the
+      idle search starts the sky search that keeps the belief (`startSkySearchKeepingBelief`): no inhibit of the
+      search's choice, but the SDK keeps its last known position, its almanac and the idle and hot timings. In every tick
+      of it, before the SDK's update, `tickSkySearchKeepingBelief` calls `KLNGPSSatComputer.forgetUnreachable()` and
+      inhibits a satellite below the horizon (the SDK's geometric signal strength) in a channel until the SDK has taken
+      it out, so that the channels go to satellites in view. The fake receiver still sees a sky search (`searchAll`, its
+      blind time). `gpsAcquired` calls `end()`, which also clears the give-up time of a lost fix and every inhibit of the
+      search. `forgetUnreachable` uses public SDK API only (`resetState`, `setTracked`).
 - **The receiver model** (`kln90b/GpsSolution.ts`, #453, design in
   `docs/superpowers/specs/2026-11-01-gps-signal-loss-design.md` 5.1). `GPS.solution` is a `GpsGeometry` computed by
   `computeGeometry` from the line of sight (`position.get()`) of the satellites the SDK has in use (`InUse`,
@@ -415,18 +488,19 @@ prediction context of the main computer.
     - **Take-home mode** never recomputes from satellites: its solution is a constant healthy one (eight satellites,
       HDOP 1), and only its `altitudeAided` follows the altitude input (`updateSolution`), so STA 1 shows NAV A with an
       altimeter as in flight.
-    - **The last known position**: while the unit has a fix and the SDK has none (three satellites plus the altitude),
-      `GPS.tick` passes `coords` to `gpsSatComputer.syncLastKnownPosition` every tick. Otherwise the SDK's last known
+    - **The last known position**: while the unit has a fix and the SDK has none (three satellites plus the altitude,
+      or fake satellites in the channels), `GPS.tick` passes the true position to `gpsSatComputer.syncLastKnownPosition`
+      every tick (#465: never `coords`, which may be a spoofer's false or mixed position). Otherwise the SDK's last known
       position stays where its own solution ended. Satellites that need a new channel (ones that rose, or came back
       after a loss) are then offered by its line-of-sight filter only within 100 NM of that position; beyond it the SDK
       searches blind in PRN order. `GpsSolution.test.ts` holds this: back from three satellites 150 NM on, it gets its
       fix in about 11 s with the sync and took about 9 minutes without it (slow acquisition).
 - **RAIM availability** (`raimStatus`, #453): five measurements are needed (the altitude counts as one), and the
   protection level (the largest slope of the geometry × 5 m × 5.3) must be within the alert limit of the flight phase
-  (`halForMode`: 2 NM en route, 1 NM in ARM, 0.3 NM in APR). The levels and K are our own choice (design 5.2). Satellite
-  failures use it: the faulty satellite of #460 is a range bias applied through the solution's coefficients with the
-  sign flipped (header of `GpsSolution.ts`, see the failures below), and a fault counts as detected only while RAIM is
-  available. The messages wait `RAIM_MESSAGE_DELAY` (10 s of GPS time, our own call) before `RAIM NOT AVAILABLE` and
+  (`halForMode`: 2 NM en route, 1 NM in ARM, 0.3 NM in APR). The levels and K are our own choice (design 5.2). Bad
+  ranges use it: the faulty satellite of #460 and a spoofer's fake satellites are range errors applied through the
+  solution's matrices (`solveErrors`, header of `GpsSolution.ts`, see the transmitters above), and a bad range counts
+  as detected only while RAIM is available and the residual test fails (`GPS.rangeErrorDetected`). The messages wait `RAIM_MESSAGE_DELAY` (10 s of GPS time, our own call) before `RAIM NOT AVAILABLE` and
   the geometry messages show; the coverage message has no delay.
 - **STA 2** (`Sta2Page`, #453) shows the unit's own error estimate: 2 × HDOP × 5 m in NM with two decimals (`formatEpe`),
   five dashes without a fix. The format follows a photographed real unit, not the figure of the Pilot's Guide (5-30). The

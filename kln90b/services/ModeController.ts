@@ -447,16 +447,16 @@ export class ModeController implements CalcTickable {
     /**
      * #453, 6-20, B-1, B-3: in APR the navigation is flagged at once when the fix is lost, and when RAIM has been unavailable
      * for the approach limit (0.3 NM) for APR_RAIM_FLAG_DELAY. The flag stays until the mode leaves APR, even when the fix
-     * or RAIM comes back: GPS APR brings the navigation back for the missed approach (6-20). #460: a faulty satellite RAIM
-     * detects for the approach limit flags it at once too, as a lost fix does (design, "The faulty satellite"). It is
-     * asked after the count, so that the count runs on every tick it ran before
+     * or RAIM comes back: GPS APR brings the navigation back for the missed approach (6-20). #460, #465: a bad range RAIM
+     * detects for the approach limit flags it at once too, as a lost fix does (Gps.rangeErrorDetected). It is asked after
+     * the count, so that the count runs on every tick it ran before
      */
     private updateIntegrityFlag(): void {
         const gps = this.sensors.in.gps;
         const hal = halForMode(NavMode.APR_LEG);
         this.navState.integrityFlag ||= !gps.isValid()
             || this.navState.aprRaimLoss.update(raimStatus(gps.solution, hal) !== Raim.Available, gps.timeZulu.getTimestamp())
-            || gps.failures.faultDetected(hal);
+            || gps.rangeErrorDetected(hal);
     }
 
     /** #453: the integrity flag belongs to APR and the inhibit of the ACTV gate to ARM */
@@ -617,9 +617,9 @@ export class ModeController implements CalcTickable {
         const fafEta = now + fafDist * msPerNm;
         const mapEta = fafEta + UnitType.GA_RADIAN.convertTo(fafPoint.distance(map.wpt), UnitType.NMILE) * msPerNm;
 
-        //#460: a faulty satellite RAIM detects for the approach limit is no integrity either (design, "The faulty satellite")
+        //#460, #465: a bad range RAIM detects for the approach limit is no integrity either (Gps.rangeErrorDetected)
         const available = raimStatus(gps.solution, hal) === Raim.Available
-            && !gps.failures.faultDetected(hal)
+            && !gps.rangeErrorDetected(hal)
             && predictRaim(gps.raimPrediction, fafPoint.lat, fafPoint.lon, fafEta, altitudeAided, hal)
             && predictRaim(gps.raimPrediction, map.wpt.lat, map.wpt.lon, mapEta, altitudeAided, hal);
         this.navState.aprIntegrityInhibit = !available;

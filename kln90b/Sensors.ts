@@ -1048,6 +1048,10 @@ export class Sensors implements CalcTickable {
         this.in.tick();
     }
 
+    public onTicksStopped(): void {
+        this.in.gps.onTicksStopped();
+    }
+
     private reset(evt: PowerEventData) {
         this.in.reset();
         //A power change writes the null state of every port, a failed one too (#458): a power-on while failed leaves the

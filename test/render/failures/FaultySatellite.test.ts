@@ -9,13 +9,15 @@ import {bootOnStandardRoute} from '../../harness/worldBoot';
 import {inhibitAllBut} from '../../harness/gps';
 import {NavMode} from '../../../kln90b/data/VolatileMemory';
 import {EARTH_RADIUS_M} from '../../../kln90b/GpsMeasurement';
+import {SIGMA_UERE_M} from '../../../kln90b/GpsSolution';
 
 /**
  * #460: the faulty satellite's message and what a detected fault does to the integrity (the design
  * docs/superpowers/specs/2026-11-05-failures-gps-receiver-design.md, "The faulty satellite"). RAIM detects the satellite's
  * pseudorange bias and posts RAIM POSITION ERROR (B-3); the integrity output fails, ACTV is refused and APR flags the
  * navigation at once (6-3, 6-20), while en route the navigation stays valid. The harness navigates on ExactMeasurement, so
- * the offset of the unit's position from the sim position is exactly the faulty satellite's error
+ * the offset of the unit's position from the sim position is exactly the faulty satellite's error. #465: RAIM detects it by
+ * the residual test of the solution's range errors (Gps.rangeErrorDetected), the rule of every bad range
  */
 
 const POSITION_ERROR = 'RAIM POSITION ERROR CROSS CHECK POSITION';
@@ -190,7 +192,94 @@ describe('the faulty satellite en route (#460)', () => {
         expect(Math.hypot(offset.north, offset.east)).toBeGreaterThan(50);
         expect(messages(unit)).toEqual([ALTITUDE_FAIL, RAIM]);
     }, 60_000);
+
+    // #465, design "RAIM detection": the residual test detects one bad range b of row i once b² (1 - h_ii) / σ² exceeds the
+    // chi-square bound T of the redundancy, that is once b > σ √(T / (1 - h_ii)): it depends on the geometry
+    it('posts RAIM POSITION ERROR once the bias exceeds the bound of the residual test for the geometry, and not before', async () => {
+        const unit = await bootOnStandardRoute({
+            panelXml: panelXml(NO_OBS),
+            // 0.1 m more bias per second, from 15 m
+            storage: {lastLatitude: 47, lastLongitude: 8, failure_faultySatellite: JSON.stringify({prn: FAULTY_PRN, biasM: 100, rampS: 1000, elapsedS: 150})},
+        });
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.failures.faultyPrn).toBe(FAULTY_PRN); // Preconditions
+        expect(gps.rangeErrorDetected(2)).toBe(false);
+        expect(messages(unit)).toEqual([]);
+
+        let crossedAt = -1;
+        let below = 0;
+        for (let s = 0; s < 400 && crossedAt < 0; s++) {
+            await untilCalcTick(unit);
+            const bias = gps.failures.faultyBiasM;
+            const bound = detectionBoundM(unit);
+            expect(gps.rangeErrorDetected(2)).toBe(bias > bound);
+            if (bias > bound) {
+                crossedAt = s;
+                expect(bias - bound).toBeLessThan(0.11); // The first tick past the bound
+            } else {
+                below++;
+                expect(messages(unit)).toEqual([]);
+            }
+        }
+        expect(below).toBeGreaterThan(10); // Precondition: it started below the bound
+        expect(crossedAt).toBeGreaterThanOrEqual(0);
+        expect(messages(unit)).toEqual([POSITION_ERROR]);
+        expect(unit.errors).toEqual([]);
+    }, 120_000);
 });
+
+/** The chi-square value that n degrees of freedom exceed with the probability 1/15000 (scipy chi2.isf, outside the project) */
+const CHI2_1_IN_15000: Record<number, number> = {
+    1: 15.903178, 2: 19.231611, 3: 21.954562, 4: 24.391392, 5: 26.652054, 6: 28.789895, 7: 30.835636, 8: 32.808911,
+};
+
+/**
+ * The bias of the faulty satellite at which the residual test detects it, for the unit's rows now: σ √(T / (1 - h_ii)), with
+ * h_ii the diagonal of the hat matrix G (GᵀG)⁻¹ Gᵀ for its row, worked out here from the SDK's directions of the satellites
+ * (rows [sin z cos a, sin z sin a, cos z, 1]) and the altitude row [0, 0, 5/30, 0]
+ */
+function detectionBoundM(unit: HeadlessUnit): number {
+    const gps = unit.props.sensors.in.gps;
+    const prns: number[] = [...(gps as any).solutionPrns];
+    const sats = gps.gpsSatComputer.getSatellites();
+    const g = prns.map(prn => {
+        const [z, a] = sats.find(s => s.prn === prn)!.position.get();
+        return [Math.sin(z) * Math.cos(a), Math.sin(z) * Math.sin(a), Math.cos(z), 1];
+    });
+    if (gps.solution.altitudeAided) {
+        g.push([0, 0, 5 / 30, 0]);
+    }
+    expect(gps.solution.measurements).toBe(g.length);
+    const row = prns.indexOf(FAULTY_PRN);
+    expect(row).toBeGreaterThanOrEqual(0);
+    // Solve (GᵀG) x = g_i by Gauss-Jordan; h_ii = g_i · x
+    const a = [0, 1, 2, 3].map(r => [0, 1, 2, 3].map(c => g.reduce((sum, gr) => sum + gr[r] * gr[c], 0)).concat([g[row][r]]));
+    for (let col = 0; col < 4; col++) {
+        let p = col;
+        for (let r = col + 1; r < 4; r++) {
+            if (Math.abs(a[r][col]) > Math.abs(a[p][col])) {
+                p = r;
+            }
+        }
+        [a[col], a[p]] = [a[p], a[col]];
+        const pivot = a[col][col];
+        for (let c = 0; c < 5; c++) {
+            a[col][c] /= pivot;
+        }
+        for (let r = 0; r < 4; r++) {
+            if (r !== col) {
+                const f = a[r][col];
+                for (let c = 0; c < 5; c++) {
+                    a[r][c] -= f * a[col][c];
+                }
+            }
+        }
+    }
+    const hii = g[row].reduce((sum, v, c) => sum + v * a[c][4], 0);
+    const t = CHI2_1_IN_15000[g.length - 4];
+    expect(t).toBeDefined();
+    return SIGMA_UERE_M * Math.sqrt(t / (1 - hii));
+}
 
 /**
  * The approach world of fixtures.ts, booted 7.5 NM north of KPRC between the IF and the FAF, with the approach loaded and
@@ -219,12 +308,12 @@ async function intoGate(unit: HeadlessUnit, w: ReturnType<typeof approachWorld>)
 
 /** Fails the faulty satellite and waits until RAIM detects it for the approach limit of 0.3 NM */
 async function untilDetectedForApproach(unit: HeadlessUnit): Promise<void> {
-    const failures = unit.props.sensors.in.gps.failures;
+    const gps = unit.props.sensors.in.gps;
     unit.props.failures.fail('faultySatellite');
-    for (let s = 0; s < 30 && !failures.faultDetected(0.3); s++) {
+    for (let s = 0; s < 30 && !gps.rangeErrorDetected(0.3); s++) {
         await vi.advanceTimersByTimeAsync(1000);
     }
-    expect(failures.faultDetected(0.3)).toBe(true);
+    expect(gps.rangeErrorDetected(0.3)).toBe(true);
 }
 
 /** In APR 1.95 NM before the FAF, the faulty satellite failed and detected for the approach limit, one calculation tick later */
@@ -287,7 +376,7 @@ describe('the faulty satellite at the approach (#460)', () => {
             const before = messages(unit);
             expect(before).not.toContain(POSITION_ERROR); // Preconditions: a healthy unit
             expect(integrityWarn(unit)).toBe(0);
-            vi.spyOn(unit.props.sensors.in.gps.failures, 'faultDetected').mockImplementation(hal => hal === 1);
+            vi.spyOn(unit.props.sensors.in.gps, 'rangeErrorDetected').mockImplementation(hal => hal === 1);
             await vi.advanceTimersByTimeAsync(2000);
             return {unit, before};
         }
@@ -309,7 +398,7 @@ describe('the faulty satellite at the approach (#460)', () => {
     // unit is still armed (1 NM)
     describe('the approach limit at the gate and in APR', () => {
         const detectedForApproachOnly = (unit: HeadlessUnit) =>
-            vi.spyOn(unit.props.sensors.in.gps.failures, 'faultDetected').mockImplementation(hal => hal === 0.3);
+            vi.spyOn(unit.props.sensors.in.gps, 'rangeErrorDetected').mockImplementation(hal => hal === 0.3);
 
         it('refuses ACTV for a fault detected for the approach limit only', async () => {
             const {unit, nav, w} = await armedBeforeFaf();
@@ -358,7 +447,7 @@ describe('the faulty satellite during TRAN (#460)', () => {
         expect(gps.isTransition()).toBe(true);
         expect(gps.isValid()).toBe(false);
         expect(gps.failures.faultyPrn).toBe(FAULTY_PRN);
-        expect(gps.failures.faultDetected(2)).toBe(true);
+        expect(gps.rangeErrorDetected(2)).toBe(true);
 
         expect(messages(unit)).not.toContain(POSITION_ERROR);
 

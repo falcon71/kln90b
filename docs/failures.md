@@ -12,10 +12,13 @@ the interface failures (`arinc429Out`, `rs232Out`, `rmiOutput`, `obsResolver`, `
 [superpowers/specs/2026-11-04-failures-framework-design.md](superpowers/specs/2026-11-04-failures-framework-design.md)).
 The annunciator lamps (`…Driver`, `…Wiring`, `…Bulb`), the NAV superflag and the EEPROM are built too (#459, design
 [superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md](superpowers/specs/2026-11-05-failures-lamps-superflag-eeprom-design.md)).
-The GPS receiver failures (`gpsAntenna`, `gpsReceiver`), jamming and the faulty satellite are built (#460, design
+The GPS receiver failures (`gpsAntenna`, `gpsReceiver`) and the faulty satellite are built (#460, design
 [superpowers/specs/2026-11-05-failures-gps-receiver-design.md](superpowers/specs/2026-11-05-failures-gps-receiver-design.md)).
-The other failures of the catalog are specified here and built by the later parts of #366: the battery by #461, spoofing
-by #465. The source of truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
+Jamming and spoofing are built from simulated ground transmitters (#465, design
+[superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md](superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md)),
+which replaced the jamming ramp of #460. The other failures of the catalog are specified here and built by the later
+parts of #366: the battery by #461. The source of truth for what the catalog holds is
+`kln90b/failures/FailureCatalog.ts`.
 
 Page numbers without a prefix are the KLN 90B Pilot's Guide (006-08773-0000). "IM" is the Installation Manual
 (006-10521-0005 Rev 5), "CMM" the Component Maintenance Manual (006-15521-0003 Rev 3) by its printed page numbers.
@@ -55,7 +58,10 @@ manuals stop, the behavior is an informed guess, and this document says so.
   every existing test stays green and every output is written exactly as today, with one exception decided by the
   maintainer: with `Output.WriteGPSSimVars` set, a power-off empties the SDK planner `"kln90b"` (see "A failed port in
   general"), so the tests that pin the planner across a power-off change with it. With the option off the planner is
-  left alone, as before.
+  left alone, as before. #465 adds three more, each a plausible behavior of the real unit that hardly occurs without a
+  failure (see "Recovery and the time check" under spoofing): the general `SYSTEM TIME UPDATED` check while a fix is
+  held, the restart of the search after a lost fix when the unit's belief is far off, and the sky search after
+  5 minutes without a fix.
 - Anti-goal: `DATA BASE CHECKSUM ERR` from a simulated failure. That message stays reserved for the real start-up
   self-test failure of #416, so that a pilot's report of it always means a bug.
 
@@ -79,7 +85,7 @@ FLR 3). The FLR names are fictional. The table lists every failure; the sections
 | `gpsAntenna` | `GPS ANTENNA` | `RCVR HARDWARE ERROR:` / `0010` | always | yes | yes |
 | `gpsReceiver` | `GPS RCVR` | `NO RCVR DATA` | always | yes | yes |
 | `gpsJamming` | `JAMMING` | none (the #453 messages follow) | always | no | no |
-| `gpsSpoofing` (#465, not built yet) | `SPOOFING` | none (`SYSTEM TIME UPDATED` / `TO GPS TIME`) | always | no | no |
+| `gpsSpoofing` | `SPOOFING` | none of its own (`RAIM POSITION ERROR` / `CROSS CHECK POSITION` and `SYSTEM TIME UPDATED` / `TO GPS TIME` follow) | always | no | no |
 | `faultySatellite` | `SATELLITE` | `RAIM POSITION ERROR` / `CROSS CHECK POSITION` while detectable | always | no | no |
 | `eeprom` | `EEPROM` | `EEPROM FAILURE: IC1045` / `EXTERNAL D-BAR INVALID` | always | yes | yes |
 | `arinc429Out` | `429 OUTPUT` | `ARINC 429 OUTPUT FAIL` | always | yes | yes |
@@ -203,7 +209,8 @@ A failed output port sends nothing, so the receiving equipment loses its data, f
 A loose or shorted antenna coax, the RF failure of IM C-4. The receiver sees no satellites. The unit:
 
 - loses every satellite at once (inhibited in the SDK, and skipped by the unit's own solution in the same tick), and
-  the navigation flags as with any loss of the fix;
+  the navigation flags as with any loss of the fix. No signal reaches a dead antenna or receiver, so a spoofer's fake
+  satellites go too: no fake satellite claims a channel or enters the solution (#465);
 - shows `FAILR` as the STA 1 state (5-29) with no satellite rows on either page, and dashes for the EPE on STA 2;
 - runs its clock on, as without a fix;
 - posts none of the #453 signal and RAIM messages (see "Detection, messages and TEST FAIL"); the hardware message
@@ -217,54 +224,289 @@ failure (5-29), which covers this case too, and documents no other state for it.
 repairing one leaves the unit in `FAILR`: every satellite stays blocked until both are repaired. After the repair the
 receiver reacquires as after any loss of signal.
 
+### Ground transmitters (`gpsJamming`, `gpsSpoofing`)
+
+Jamming and spoofing are simulated from physical causes, not scripted (#465, design
+[superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md](superpowers/specs/2026-11-07-gps-jamming-spoofing-transmitters-design.md)).
+A jammer and a spoofer are transmitters on the ground with a place and a power, and everything the pilot sees comes out
+of the distance, the line of sight, the antenna and the receiver's normal rules. Nothing in the receiver, the solution or
+STA 1 is keyed on jamming or spoofing: they key on signal levels and on which signal a channel tracks, so jamming and
+spoofing active together combine through the same physics, with no rule for the combination. A real jammer or spoofer
+is at full power within milliseconds; what a pilot experiences as a ramp comes from flying closer.
+
+Both are triggered manually only. Regional triggers from real-world jamming and spoofing areas are a later issue. Each
+active failure has at most one transmitter at a time (`Transmitters`); with both active there are two independent ones,
+each with its own place and its own replacement. Take-home mode has none (#460).
+
+- **The site:** a latitude and longitude, on a mast of 100 ft (guess) at the ground level of the aircraft's
+  surroundings, and a power drawn at the generation.
+- **The level at the aircraft** (`GpsTransmitter.ts`), in dB over the receiver's thermal noise: the power, less the
+  free-space spreading over the slant range (20 × log10 of the distance), less the diffraction loss, plus the antenna's
+  gain toward the transmitter.
+  - **The radio horizon** of mast and aircraft over a 4/3 earth radius is `1.23 × (sqrt(100) + sqrt(h))` NM for a height
+    `h` above the ground in feet: about 12 NM on the ground, 99 NM at 5,000 ft, 135 NM at 10,000 ft and 242 NM at
+    FL350. The height is `PLANE ALT ABOVE GROUND`, read once per calculation tick while a transmitter failure is in
+    effect (with failures off the unit reads no height), so that a jet parked at a high airport is on the ground. The
+    earth is smooth: terrain masking is not modeled.
+  - **The diffraction loss** is 0 within the horizon and 2 dB per NM beyond it (guess), so a transmitter does not
+    appear at a hard edge but comes in over a band of a few NM to a few tens of NM.
+  - **The antenna's gain** toward the transmitter depends on the transmitter's elevation above the antenna's plane, from
+    its bearing, its elevation over the local horizon and the aircraft's heading, pitch and bank (`transmitterGainDb`).
+    Above the plane it is the antenna curve of #467 (`GpsSignal.ts`), but at least 12 dB under the zenith; below the
+    plane it is 12 dB under the zenith less 0.5 dB per degree, down to the curve's floor of 25 dB under the zenith
+    (guesses, decided at the final review of 2026-11-08). A real top-mounted L1 antenna is some 8 to 11 dB under its
+    zenith at its horizon (the minimum gains of RTCA DO-301 and ICAO Annex 10: -7 dBic at 0 degrees, -5.5 at 5, -4 at
+    10, against +2 to +4 at the zenith) and rolls off gradually below it, to the -20 to -25 dBic near the nadir of the
+    EEC 337 measurements. In level flight a distant transmitter is a few degrees under the plane, some 12 to 14 dB under
+    the zenith; one nearly under the aircraft gets the floor, so a high aircraft is shielded from a transmitter it
+    overflies. A bank of 20 degrees toward a transmitter raises its level by about 6 to 8 dB, one away lowers it by
+    about 10. Unlike a satellite, a transmitter below the local horizon is not blocked by the earth.
+- **The noise floor.** Every transmitter's level adds to the receiver's noise: with `J` the jammer's level and `F` the
+  sum of the spoofer's fake signals, both as power ratios, the noise rise is `10 × log10(1 + J + F)` dB. Every real
+  satellite's SNR is that of the signal model of #467 less the rise.
+- **Placement.** The effect of a transmitter is measured by one quantity: for a jammer the noise rise of its level
+  alone, for a spoofer the SNR of its fake signals. Its **edge** at a height is the distance in level flight at which
+  that quantity reaches a small threshold: a 1 dB noise rise, or a fake SNR of 35, the acquisition threshold (guesses).
+  The edges are solved by bisection, at a generation and when the reference altitude grows, never per tick.
+  - **Switched on while on the ground** (`SIM ON GROUND`): a random bearing, at 2 NM (guess) to the smaller of 15 NM
+    (maintainer) and the ground radio horizon, so that the transmitter is in line of sight and its effect is there at
+    once.
+  - **Switched on in flight, and every new transmitter:** ahead on the track within ±30 degrees (guess), at a random
+    bearing without a track (below 2 kt, 3-35). The distance is drawn between the edge at the **present** height and
+    the distance at which the effect is a little stronger: a noise rise of 3 dB for a jammer, a fake SNR of 38 for a
+    spoofer (guesses). So the effect is not noticeable yet and becomes so as the aircraft closes in. The placement is
+    by the effect, not by a share of the distance: in the diffraction band a tenth of the distance is tens of dB. The
+    present height, so that a prop at 5,000 ft is not placed far beyond its own horizon.
+  - **Leaving.** Each transmitter keeps a **reference altitude**: the highest height above the ground seen since its
+    generation, at least 10,000 ft (guess), stored with it. A jammer is left once the horizontal distance exceeds its
+    edge at the reference altitude. A spoofer is left once its fake SNR at the reference altitude would be below 25,
+    5 below the lock-loss level (guess), so that the lock rule has lost its fake satellites before it is replaced. Then
+    a new transmitter is generated at once by the in-flight rule. A descent below the horizon never replaces one: the
+    old transmitter comes back on the climb.
+  - **A session start** with an active failure loads the stored transmitter. Beyond its leave edge at the reference
+    altitude a new one is generated, so a session continued in the same area keeps its transmitter.
+- **The repair** removes the transmitter at once.
+
 ### GPS jamming (`gpsJamming`)
 
-Triggered manually only. Regional triggers from real-world jamming areas are a later issue; the manual toggle stands for
-flying into a jammer's range. It is a ramp, not a switch, so that it looks different from the receiver failures: the
-satellites go weakest first and some come back, and the unit shows the states of a loss of signal on its own.
+A jammer is a transmitter (above) whose level only raises the noise floor. The satellites go weakest first as the
+aircraft closes in, and some come back as the attitude and the fades change, so the unit shows the states of a loss of
+signal on its own.
 
-- **The level** rises linearly in dB over a ramp of 180 to 360 s up to 24 to 28 dB (drawn at the failure, guesses),
-  with a wander of sigma 3 dB and a correlation time of 10 s on top (guesses; it starts at 0 at every power-on and is
-  not saved). The ramp progress is saved, so a power cycle or a new session continues it and a finished ramp stays
-  finished. A power-on while jammed after the ramp starts at the final level, also the forced acquisition of an
-  engine-running start, which runs before the first calculation tick and acquires no satellite the level takes.
-- **Every satellite's SNR** drops by the level; the SNR itself, with its per-satellite differences, belongs to the
+- **The power** is drawn so that, in level flight at FL350 as if in line of sight, with the antenna's gain at the
+  jammer's depression there, the jammer takes the weakest typical satellite (a noise rise of 7 dB, a satellite at SNR 37
+  dropping to 30) at 100 to 600 NM (guess; the maintainer widened it from 250 NM at the final review, 2026-11-08). From
+  there the satellites go one by one as the distance shrinks, which at realistic speeds is minutes to tens of minutes.
+  For a jet the horizon often limits first: the jammer arrives over the diffraction band and then creeps. Near a weak
+  jammer the antenna's roll-off toward the nadir eats most of what the shorter distance gives, so at FL350 the strong
+  satellites go only in the last few NM before it: a jet flying at a jammer whose first loss is at 150 NM loses its
+  weakest satellite (SNR 39) at about 121 NM and the weak ones by about 74 NM, then the strong ones (SNR 47 to 51)
+  within about 10 NM, the last at about 4.5 NM (the jet flight of `GpsJamming.test.ts`, 2026-11-08). Lower down the
+  jammer is less shielded and takes them sooner.
+- **A strong jammer**, drawn beyond the horizon of FL350 (about 242 NM), is limited by the horizon: it takes the first
+  satellites near the horizon, a few NM before the aircraft is in its line of sight, while the diffraction loss falls
+  away, and the strong ones still far out, so it blacks out a wide area. One drawn at 600 NM takes every satellite of a
+  jet at FL350 about 110 NM out, and of a prop at 8,000 ft within a few NM of the prop's horizon, about 120 NM out
+  (measured 2026-11-08).
+- **Every satellite's SNR** drops by the noise rise; the SNR itself, with its per-satellite differences, belongs to the
   receiver's signal model (`GpsSignal.ts`, #467, `docs/architecture.md`). Jamming is only one more cause that lowers
-  the signal: the satellites it takes spread out by those differences, weakest first.
+  the signal: the satellites it takes spread out by those differences, weakest first. The variation comes from the
+  antenna's attitude toward the jammer and the satellites' own fades.
 - **Lock** is the receiver's normal rule for every cause, not a jamming rule (IM C-7: 30 and below unusable, 30 to 35
   marginal): a satellite the receiver tracks is lost below SNR 30; one it does not track is acquired only at SNR 35 or
-  more. The gap keeps a satellite from flickering, and the wander makes the losses intermittent near the thresholds. A
-  reacquired satellite takes the SDK's normal acquisition time. A lost satellite sets no inhibit: it is unreachable for
-  the SDK, so it keeps its channel and is searched.
+  more. The gap keeps a satellite from flickering. A reacquired satellite takes the SDK's normal acquisition time. A
+  lost satellite sets no inhibit: it is unreachable for the SDK, so it keeps its channel and is searched.
 - **STA 1.** A satellite jamming took stays in its channel and shows `*xx 00` with its elevation, as a satellite still
   being searched does (guess from the real-unit video cited in `Sta1Page.tsx`). A total loss shows every row so, with
   the state ACQ. FAST and REAL share the timings (#468), so this holds in both.
 - **What follows** is what any loss of signal shows (#453): the EPE grows, RAIM is lost while the fix holds, and finally
   the fix goes with `SATELLITE COVERAGE INADEQUATE FOR NAV` and the NAV flag. `RAIM NOT AVAILABLE` shows only if RAIM
-  stays lost for more than 10 s before the fix goes, which depends on the sky. There is no message of its own.
-- The repair sets the level to 0; the satellites come back by the lock rule and the receiver acquires again.
+  stays lost for more than 10 s before the fix goes, which depends on the sky. There is no message of its own. Turns
+  toward the jammer make it worse. A descent below the jammer's horizon brings GPS back; a climb takes it away again.
+- After 5 minutes without a fix the receiver searches the whole sky, keeping its belief (see "Recovery and the time
+  check" under spoofing): once four satellites are back, the fix returns as a reacquisition would, in about 40 s.
+- The repair removes the jammer; the satellites come back by the lock rule and the receiver acquires again.
 
 ### GPS spoofing (`gpsSpoofing`)
 
-Not built yet. Issue #465 rewrites this section with a realistic spoofer (a fake sky, capture and recovery) and takes the
-general `SYSTEM TIME UPDATED` check while a fix is held. What follows is the earlier specification, kept until then.
+A spoofer is a transmitter (above) that broadcasts the sky of a GPS signal simulator: the signals a receiver would get
+standing still at a **false position** at a **false time**. It follows the pattern airline crews report from area
+spoofing (OPSGROUP 2023 and the other sources the design cites): the position ends at a fixed false location near the
+transmitter, often an airport, after the error estimate has climbed for a short while, and the time jumps by hours.
 
-Triggered manually only. It follows the pattern airline crews report from area spoofing (for
-example over the eastern Mediterranean, OPSGROUP 2023): **the position jumps to a fixed false location and the GPS
-time jumps by hours.**
+- **The power** is drawn high enough that the fake signals would drown the real satellites (a noise rise of 20 dB) at
+  300 to 600 NM at FL350 as if in line of sight (the horizon left out), with the antenna's gain at the spoofer's
+  depression there (guess).
+  Spoofers are therefore limited by the horizon: the horizon and the
+  diffraction band decide where a spoofer takes effect, abruptly. At FL350 that is about 242 NM, in line with the
+  reported capture 200 to 250 NM from the false location.
+- **The false position** is drawn at the spoofer's generation, 30 to 150 NM from the transmitter at a random bearing
+  (guess; a broadcast spoofer shows every aircraft the same place). It snaps to the nearest airport of the sim's
+  database within 30 NM of the drawn point (guess) that has a hard surface and a runway of at least 1500 m
+  (maintainer), through the nearest airport search of `KLNFacilityLoader` (`NearestAirportFinder`). Its reference
+  point and its elevation give the false position and the false altitude. User waypoints are no candidates. Without a
+  match the drawn point is used, at the ground elevation under the aircraft at the generation. The search is
+  asynchronous: the spoofer sends nothing until it has resolved, and its result is stored with it. A search that has not
+  answered after 30 s of sim time (guess) is given up for the drawn point, and a late answer is ignored.
+- **The time shift** is drawn at the generation, 2 to 12 hours, either sign (crew reports). **The spoofer's clock
+  offset**, within ±0.5 ms (guess), is common to every fake signal: it disappears into the receiver's clock once every
+  satellite is fake and matters only while real and fake satellites mix.
+- **The fake sky** is an SDK prediction context at the false position and the false time, predicted again every 5 s of
+  sim time, never every tick. It gives the PRNs above the false position's horizon and their directions there. With a
+  shift of hours it is largely another set of satellites than the real sky.
+- **The fake signals.** Every fake signal arrives over the same path, so each has the same level: the spoofer's level
+  at the aircraft divided among the fake sky's PRNs. A fake satellite's SNR is that level over the thermal noise, the
+  jammer and the other fake signals, scaled by the spectral separation of one C/A code from another
+  (`SPECTRAL_SEPARATION_DBHZ`, 60 dB-Hz; Betz gives about 61.8 for C/A on C/A). The fake signals jam each other, so with
+  eight of them the SNR levels off at about 51.5 however strong the spoofer is: a flat, high column on STA 1, the same
+  for every elevation. The fake signals also
+  raise the noise floor of the real satellites (above): close in they drown every real satellite, which is why capture
+  happens.
 
-- At the failure, draw a false position (guess: a random bearing, 30 to 150 NM from the present position) and a
-  time shift (guess: 2 to 12 hours, either sign). Both are persisted with the failure.
-- The receiver reports the false position, ground speed 0 and no track change, with a normal EPE. RAIM sees nothing:
-  every satellite is spoofed consistently. Everything the unit computes and outputs uses the false position,
-  including the GPS SimVars, so the aircraft's moving map shows it too.
-- The time shift makes the unit's GPS time jump, which shows `SYSTEM TIME UPDATED TO GPS TIME` (more than 10 minutes,
-  B-4). Today that message is posted only when a fix is acquired (`GPS.gpsAcquired`), and spoofing keeps the fix, so
-  the check also runs while a fix is held: whenever the GPS time differs from the unit's clock by more than 10
-  minutes. Without a failure the GPS time never jumps during a fix, so this changes nothing else.
-- At the repair the true position and time return the same way: a jump, and the time message again.
-- The unit stores the false position as its last position, as it stores any position it navigates on, so a new
-  session while spoofed shows no `POSITION DIFFERS` message.
+**The fake receiver and the shared channels** (`FakeReceiver`). The unit has 8 channels. Each tracks one PRN, and the
+signal it locks onto is that PRN's real signal or its fake one.
+
+- **The belief** is the position the unit navigates on and its clock, not a captured flag. The receiver searches the
+  PRNs its almanac puts in the sky at its belief, or every PRN during a sky or an almanac search of the start model.
+- **One search rule:** a channel searching a PRN locks whichever of its two signals is at 35 or more and the stronger. A
+  channel tracking a signal keeps it until the lock rule loses it (below 30): a tracking loop does not jump to another
+  correlation peak. So real satellites can come back while the unit is captured, as fake ones can come in while it is
+  not.
+- **Shared PRNs.** Before a sky search, the fake signals the receiver finds are those of the PRNs up both in the
+  believed (true) sky and in the fake sky. How many there are depends on the time shift: with about 6 hours roughly a
+  third of the visible satellites, with about 12 hours almost none. With few shared PRNs the drowned receiver has no fix
+  until its sky search finds the rest of the fake sky.
+- **Taking a channel.** A fake satellite claims a channel: the one of its own PRN, else an empty one, one whose
+  satellite was lost, or one still searching, never one that tracks. The SDK's satellite in a claimed channel is seen as
+  lost through the reachability wrapper of #467, so the SDK neither tracks it nor gives the channel away while the claim
+  lasts. The SDK keeps its channel count and STA 1 shows exactly 8 channels. A real satellite the SDK marked
+  Unreachable while it sat in a claimed channel is made searchable again once the claim is gone: the real receiver
+  never searched it there.
+- **Acquisition of a fake satellite** takes the start model's times (`GpsSearch.ts`), judged against the fake signals'
+  own truth: the hot time when the unit already believes the false time, within 2 NM of the false position, with the
+  fake ephemeris collected from this spoofer; the almanac search's time during an almanac search, as for a real
+  satellite; the blind time during a sky search; otherwise the idle time. A fake satellite whose ephemeris has not been
+  collected from this spoofer then takes 30 s (one data frame) to it. A fake satellite is lost by the lock rule like any
+  satellite.
+- **STA 1** shows a channel a fake satellite claims with that satellite: its fake SNR, and the elevation the unit
+  predicts for it, from the fake sky once the unit believes the false time and from the believed sky before, unknown
+  during a sky or an almanac search until its ephemeris is in. Without a fix, a channel searching a fake satellite
+  makes the state ACQ. No PRN is shown twice.
+
+**The mixed solution** (`RangeErrors`, `GpsSolution.solveErrors`). Every satellite in use is a row of the unit's
+solution, real or fake.
+
+- **Two claimed states.** A real signal claims the true position and time; a fake signal claims the false position on
+  the ground there and the false time plus the spoofer's clock offset. A fake signal also travels the spoofer's slant
+  range to the aircraft, so its claimed range includes it, as does the false state (final review, 2026-11-08). It is
+  common to every fake row: in a captured solution it goes into the clock (at most a few ms), and in the mixed phase the
+  aircraft's speed toward the spoofer enters the velocity error.
+- **The reference state** is the one most satellite rows claim, the true one on a tie (our call). The lines of sight
+  are the directions from it: the real sky for the true state, the fake sky for the false one. Rows that claim the
+  reference state carry no error; each other row carries the range its signal claims minus the range from the
+  reference state, less the whole milliseconds the receiver resolved for the row when it entered the solution or the
+  reference state last changed. Between those moments the row is tracked, so its error drifts and does not wrap. The
+  solution is the reference state moved by the least-squares response to those errors. The resolution of the whole
+  milliseconds against the reference state is a receiver assumption: a receiver that resolves its code phases from its
+  own time and position (coarse time) places a row within half a millisecond of the predicted range, while one that
+  took the transmit time from the decoded time of week would reject such a row instead.
+- **The altitude row** (NAV A, 5-29). The fake signals describe a receiver on the ground at the false position, so with
+  an altitude input the altitude disagrees with them by the aircraft's height above that ground. Under the false
+  reference the row carries the altitude input against the false altitude; it moves the solution and enters the
+  residual test like any row.
+- **The velocity** comes from the range-rate errors: each claimed range's rate is taken from its own steps (the skies
+  move their satellites every 5 s) and held between them. Under the true reference the true velocity is moved by the
+  fake rows; under the false reference a velocity of 0 (a receiver standing still) is moved by the real rows. The
+  ground speed and the track follow from that velocity.
+- **The clock** is the reference state's time moved by the clock part of the solution, so the unit takes the false
+  time once most rows are fake, and the true time back once most are real.
+- **Every row fake (captured):** the false position, ground speed 0, no track change, the false time, and an EPE from
+  the geometry of the rows. The receiver gives up on nothing: there is no residual-scaled EPE and no gross residual
+  limit (maintainer: the receiver was built for selective availability, not for spoofing).
+- `FailingMeasurement` applies the result to whichever measurement strategy runs: under the true reference it moves the
+  measured position and velocity, under the false reference the false position takes the measured position's place.
+  Everything the unit outputs uses the position it navigates on, the false or the mixed one included, the GPS SimVars
+  too.
+
+**RAIM detection.** RAIM detects a bad range from the residuals of the solution, as a real receiver's RAIM does
+(`raimTestFails`): the sum of the squared residuals in units of the ranging error against the chi-square bound for
+the redundancy (measurements − 4 degrees of freedom) at a false-alarm probability of 1 in 15000 (`RAIM_PFA`, guess).
+While RAIM is available for the alert limit of the mode and the test fails, `RAIM POSITION ERROR` / `CROSS CHECK
+POSITION` shows (B-3), with the consequences given under the faulty satellite. With 4 measurements there is no RAIM,
+and the wrong position goes undetected. The unit detects and does not exclude.
+
+- **Captured with an altitude input,** the altitude row disagrees with the fake rows, so while RAIM is available a
+  captured unit in flight shows `RAIM POSITION ERROR` for as long as it is captured. Without an altitude input RAIM sees
+  nothing (maintainer). On the ground near the spoofer with an altitude input it sees nothing only while the false
+  airport's elevation is within roughly 500 ft of the field's: the altitude input disagrees with the false altitude by
+  that difference.
+
+**What the pilot sees.**
+
+- **Flying toward a spoofer:** at the horizon the real satellites lose SNR fast. In a mixed phase the position wanders
+  by several to tens of NM with `RAIM POSITION ERROR` (silently with 4 measurements), the ground speed and the track are
+  wrong, and fixes come and go as the geometry changes; at jet speeds the band can be crossed with no mixed phase at
+  all. Then every real satellite is drowned. If the two skies share enough PRNs the fake satellites are acquired within
+  a minute or two; with few shared PRNs the unit has no fix until its sky search finds the fake sky, 5 to about 15
+  minutes later. Then the unit is captured: the false position, ground speed 0, a normal EPE, a flat high SNR on STA 1,
+  and `SYSTEM TIME UPDATED TO GPS TIME` from the time shift.
+- **Flying out:** the fake satellites fade below 30 and are lost. Real satellites of the PRNs the receiver searches (the
+  fake sky's, from its false belief) can come back into a mixed phase, and with enough of them the true position returns
+  directly. Otherwise the real satellites come back slowly (below). At the true fix the true time returns with
+  `SYSTEM TIME UPDATED`.
+- **Jamming and spoofing together:** the jammer lowers the fake satellites as it lowers the real ones. Near a strong
+  spoofer and far from the jammer the unit is captured; near a strong jammer the fakes are drowned too and there is no
+  fix; in between, a captured unit can lose its fake fix to the jammer and regain it.
+
+**Recovery and the time check** (`GPS.fixLost`, `GpsSearch`). The SDK's receiver is omniscient: it always assigns the
+satellites that are really up. The start model steps in where the real receiver would not know them, and two rules
+extend it to a loss of the fix. Neither is a spoofing rule.
+
+- **A far-off belief.** When the unit loses its fix while its clock is off by more than 10 minutes (IM 2-66) or its
+  position is 100 NM or more from the truth (the SDK's own limit), the receiver starts its search again from that
+  belief, as at a power-on (`GpsSearch.start`). The satellites it predicts are not there, and after the give-up time it
+  searches the sky. That is the slow recovery after a spoofer. Within those limits a loss of the fix reacquires as
+  before. Without a failure this is reached by a teleport, a slew or a move on the map of 100 NM or more that loses the
+  fix; a sim time change during a fix does not lose it.
+- **No fix for 5 minutes** (the give-up time, IM 2-66): the receiver searches the whole sky, every PRN, as the start
+  model does after a power-on (3-17; `GpsSearch.lostFix`). This is how a drowned receiver finds a fake sky that shares
+  few PRNs with the believed one. It also applies after a long loss to jamming or an antenna failure, on the ground too;
+  without a failure it does not happen.
+  - **It keeps the receiver's belief** (decided at the final review, 2026-11-08). A jammed receiver's clock and position
+    stay right, so it does not search blind: the SDK keeps its last known position, its almanac and the idle and hot
+    acquisition times. Once four satellites are back the fix returns as a reacquisition would, in about 40 s (the
+    jammed A321 of Felux et al., NAVIGATION 71(3), 2024, was back about 2 minutes after the interference ended). The
+    fake receiver still uses the blind time during it, so a capture by a spoofer whose sky shares few PRNs with the
+    believed one still takes 5 to about 15 minutes. STA 1 shows INIT.
+  - The SDK gives up on a satellite it searched in vain for 4 minutes for an hour (Unreachable), and fills a channel it
+    has nothing in view for with satellites in PRN order, below the horizon too. Neither is what a receiver does that
+    knows where it is: during this sky search the Unreachable marks are forgotten in every tick (`forgetUnreachable`),
+    and a satellite below the horizon in a channel is inhibited until the SDK has taken it out, so that the channels go
+    to the satellites in view.
+- **The general time check** (B-4): in every calculation tick with a fix, when the GPS time differs from the unit's
+  clock by more than 10 minutes, `SYSTEM TIME UPDATED` / `TO GPS TIME` shows. Before #465 the check ran only at the
+  acquisition of a fix. It also fires when the pilot changes the sim's time of day during a fix (accepted by the
+  maintainer). The unit's clock runs on over a hot-swap disable as it does over a power-off (3-53), so a resume does
+  not post it; a power-off while disabled counts the disabled time too.
+
+**Power cycles, sessions and the SDK.**
+
+- **The stored position** is the false one while captured, as for any position the unit navigates on. With REAL
+  acquisition, a power cycle with the same spoofer finds the stored false position and the battery clock in agreement
+  with the fake signals and the fake ephemeris kept: the fake satellites come back with the hot time and no
+  `POSITION DIFFERS FROM LAST POSITION BY >2NM` shows. A new session is no hot start on the fakes: the unit's clock
+  starts from the sim's time (`E:ABSOLUTE TIME`), and the fake ephemeris is not stored. With FAST, the default, every power-on writes the
+  true state into the memory (#468): the receiver searches the real sky's PRNs from the truth and meets their fake
+  signals. Inside a spoofer a power cycle is then no hot start on the fakes, and the capture after it shows
+  `POSITION DIFFERS` as well as `SYSTEM TIME UPDATED`.
+- **The SDK's last known position** is never the false position while the unit has a fix: where `GPS.tick` syncs it
+  (a fix the SDK has no solution of its own for, as with fake satellites in the channels), it gets the true position.
+  At a power-on the start model gives the SDK the stored position, false or not, only within 100 NM of the present one,
+  so that #62's 2 NM hot-start rule stays honest; beyond 100 NM it gives the present one. A false position beyond
+  100 NM would send the SDK into a blind search.
+- **A receiver failure** (`gpsAntenna`, `gpsReceiver`) silences the fake receiver too: no fake rows and no claims.
+- **The repair** removes the spoofer at once. The fake satellites go, their claims are released, and the unit recovers
+  as when flying out.
 
 ### Faulty satellite (`faultySatellite`)
 
@@ -280,17 +522,21 @@ used), because a flagged satellite is simply excluded and has no measurable effe
   500 to 3000 m, as a clock jump does). The position error follows from the bias through the geometry of the solution
   (the coefficients `GpsSolution` computes, which its header anticipates for this), so it depends on the satellites in
   use and can be larger than the bias.
-- While it is in use **and RAIM is available** (the existing availability of `GpsSolution`, which says whether a fault
-  could be detected), the unit shows `RAIM POSITION ERROR` / `CROSS CHECK POSITION` (B-3). The KLN 90B detects the
-  fault but does not exclude the satellite (guess: the manuals describe only detection). Without RAIM the error is
-  undetected. The detection threshold is the smallest bias the protection level is built to catch,
-  `RAIM_K × SIGMA_UERE_M` (`FAULT_DETECTION_BIAS_M`, about 27 m): during the ramp the fault is detected only once
-  the bias has grown to it.
+- While it is in use **and RAIM is available** (the existing availability of `GpsSolution` for the alert limit of the
+  mode) **and the residual test fails**, the unit shows `RAIM POSITION ERROR` / `CROSS CHECK POSITION` (B-3). The
+  residual test (`raimTestFails`, #465) is the one rule for every bad range, a spoofer's fake satellites included (see
+  "RAIM detection" under spoofing): the sum of the squared residuals of the solution in units of the ranging error
+  against the chi-square bound of measurements − 4 degrees of freedom. So the detection depends on the geometry, as in
+  a real receiver: during the ramp the fault is detected once its bias stands out of the residuals. It replaced #460's
+  fixed threshold. The KLN 90B detects the fault but does not exclude the satellite (guess: the manuals describe only
+  detection). Without RAIM the error is undetected.
 - A detected fault has the consequences of a loss of RAIM (#453; guess, the manuals give only the message):
   `L:KLN90B_IntegrityWarn` is true, approach active cannot be entered, and in approach active the NAV flag and `PRESS
   GPS APR FOR NAV` follow (6-20). En route the navigation stays valid.
-- The bias is added by `FailingMeasurement` to whichever measurement strategy runs; velocity and track are not touched.
-  A satellite the receiver has lost is not in the solution, so it adds no error and is not detected.
+- The bias is a range error on the satellite's row (`RangeErrors`), and `FailingMeasurement` moves the position of
+  whichever measurement strategy runs by the solution's response to it. Velocity and track are not touched: the ramp
+  is a clock jump, which has no Doppler. A satellite the receiver has lost is not in the solution, so it adds no error
+  and is not detected.
 - When the satellite sets or leaves the solution, the error and the message go. The repair ends it.
 - **The fault moves on** (guess): after the faulty satellite has been out of the solution for 120 s of sim time while
   the unit has a fix, a new satellite is picked by the same rule with a new bias and ramp. A short dropout or the
@@ -301,8 +547,8 @@ used), because a flagged satellite is simply excluded and has no measurable effe
 
 Every failure acts on the KLN alone, the external events included. Each GPS unit of the aircraft, a Working Title GNS
 430/530 in a hot swap or as a second GPS, runs its own copy of the SDK's `GPSSatComputer` in its own instrument page.
-The KLN's inhibits live in the KLN's copy, and the faulty satellite's bias and the false position of spoofing in its
-measurement (`GpsMeasurement`). Since #463 the receiver's events stay on a bus of its own, so a KLN failure no longer
+The KLN's inhibits live in the KLN's copy, and the transmitters, the fake satellites and the range errors of the faulty
+satellite and of spoofing in the KLN's own receiver model (`GPS`, `Transmitters`, `FakeReceiver`, `RangeErrors`). Since #463 the receiver's events stay on a bus of its own, so a KLN failure no longer
 reaches the display of another unit: before, a KLN jamming would have shown `SEARCHING` and NO GPS POSITION on the GNS.
 A failure persists with the KLN's settings, so it is still there after a hot swap away and back; while the other unit is
 in use, the KLN is disabled and its failure clock stands still.
@@ -542,11 +788,18 @@ The internal lithium battery keeps the user memory while the unit is off (CMM). 
 ## Persistence
 
 - The failure state is persisted per aircraft model, under the same profile key as the user settings
-  (`"<ATC MODEL>.profile_1"`): the MTBF, the active failures with their drawn values (spoofing position and time
-  shift; the jamming ramp: its length `rampS`, its final level `finalDb` and its progress `elapsedS`; the faulty
-  satellite: its PRN `prn`, its bias `biasM` and its ramp `rampS` and `elapsedS`), and the battery state (the health
-  and the latest sim date seen). The EEPROM's calibration values are properties of the unit, not of a failure, and
-  have a settings category of their own (see the EEPROM).
+  (`"<ATC MODEL>.profile_1"`): the MTBF, the active failures with their drawn values, and the battery state (the
+  health and the latest sim date seen). The EEPROM's calibration values are properties of the unit, not of a failure,
+  and have a settings category of their own (see the EEPROM). The drawn values are numbers in the failure's setting
+  text (`Failures.values`, `setValues`):
+  - the jammer: its place `lat` and `lon`, its power `powerDb` and its reference altitude `refAglFt`;
+  - the spoofer: the same, plus the false position `falseLat`, `falseLon` and `falseAltFt`, the time shift `shiftMs`
+    and the clock offset `clockM`;
+  - the faulty satellite: its PRN `prn`, its bias `biasM` and its ramp `rampS` and `elapsedS`.
+- A jammer is saved at its generation, a spoofer once its airport search has resolved. The reference altitude is saved
+  again when it has grown by 500 ft. Values that do not parse (a hand-edited profile) are drawn anew by the placement
+  rules. #460's jamming ramp (`rampS`, `finalDb`, `elapsedS` of `gpsJamming`) was never released, so no stored ramp
+  needs handling.
 - **It lives in its own settings manager**, added to `KLN90BSettingSaveManager`, so that the battery's wipe of the
   user memory leaves it alone.
 - New keys only, with defaults that mean "nothing failed, MTBF off, new battery". Changes are saved when they happen.
@@ -659,11 +912,9 @@ as a detected failure, TEST FAIL for an active failure and the injectable random
    the almanac time (`lastAlamanacTime`) and each satellite's `data.lastEphemerisTime`, which `GPS` sets only at
    construction from the stored settings (`Gps.ts`). The clock has no stored value at all: `GPS` takes it from
    `E:ABSOLUTE TIME` at construction. The wipe needs a way to erase the first and to set the second at a power-on.
-2. **`SYSTEM TIME UPDATED` is checked only at acquisition** (`GPS.gpsAcquired`); spoofing needs the check while a fix
-   is held (see spoofing). It belongs to #465.
 
-Already possible without new structure: the screen shift (a style change in a display tick). Spoofing builds on the
-measurement decorator of #460. The FLR pages exist (#458).
+Already possible without new structure: the screen shift (a style change in a display tick). The FLR pages exist
+(#458).
 
 ## Public contract
 
@@ -688,17 +939,27 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
 
 - Unit: the trigger (rate, equal choice, eligibility, no double failure) with an injected random source; the battery
   aging (forward only, set back, the rate range, the 1.5 % warning); the eligibility rules against the plane settings; the persistence round
-  trip of every key.
+  trip of every key. For #465: the transmitter physics (`GpsTransmitter.test.ts`: the horizon, the diffraction loss,
+  the antenna's gain in level flight and banked, the noise rise, the fake SNR's cap, the edges); the transmitters'
+  placement, leaving, reference altitude and persistence (`failures/Transmitters.test.ts`); the fake receiver's search
+  rule, claims, acquisition times and lock rule (`failures/FakeReceiver.test.ts`); the range errors, the reference
+  state and the velocity error (`failures/RangeErrors.test.ts`); the residual test and its thresholds
+  (`GpsSolution.test.ts`); the recovery rules of the start model (`GpsSearch.test.ts`).
 - Render: FLR 1 to 3 (fields, prompts, lists, SERVICED), SET 10's button, the messages and TEST FAIL, OTH 9/10 dashes,
-  the screen shift.
-- Flight: each failure's effect on the outputs (`test/render/Interconnect.test.ts` holds the SimVar-to-port table; a
-  failed port must drop exactly its SimVars), the receiver failures, jamming and the faulty satellite against the
-  receiver model (spoofing is #465), the battery wipe at a power-on.
+  the screen shift; STA 1 with fake satellites, their flat SNR and their fake-sky elevations once captured, and in the
+  mixed phase (`pages/Sta1Spoofing.test.ts`).
+- A booted unit flown on simulated time: each failure's effect on the outputs (`test/render/Interconnect.test.ts` holds
+  the SimVar-to-port table; a failed port must drop exactly its SimVars), the receiver failures, jamming, spoofing and
+  the faulty satellite against the receiver model (`test/render/failures/`: flying into a jammer's range and below its
+  horizon; flying into a spoofer, the mixed phase, capture with and without an altitude input and with many and few
+  shared PRNs; flying out; a new transmitter after leaving; both together; power cycles, sessions, hot swapping and
+  the repair; the airport search), the general time check and the recovery after a lost fix (`test/render/Gps.test.ts`),
+  the battery wipe at a power-on.
 - With MTBF off and nothing failed, the whole existing suite stays green unchanged, except the tests that pin the
-  planner across a power-off with `Output.WriteGPSSimVars` set (the exception of the anti-goals).
+  planner across a power-off with `Output.WriteGPSSimVars` set and those the exceptions of #465 touch (the anti-goals).
 - Sim, before release: the failed ports with a hot swap to another GPS unit (the zeroing itself was tested on
-  2026-11-03, #462), and jamming and an antenna failure with a Working Title GNS beside the KLN, which must keep its
-  position.
+  2026-11-03, #462); jamming, spoofing and an antenna failure with a Working Title GNS beside the KLN, which must keep its
+  position; a jammer approached in a jet and in a prop.
 
 ## Out of scope
 
