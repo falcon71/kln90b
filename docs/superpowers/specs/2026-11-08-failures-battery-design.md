@@ -24,7 +24,11 @@ maintainer that the rollover happens and is hard to correct).
 ## Non-goals
 
 - No change to the failure framework beyond what the battery needs (the catalog, the trigger, the FLR pages exist).
-- No charge model of the battery module's ride-through (`PowerSupply.RIDE_THROUGH_TIME`): it is a different part.
+- No charge model of the battery module's ride-through (`PowerSupply.RIDE_THROUGH_TIME`): it is a different part. The
+  CMM has two batteries: the Battery Module, an internal rechargeable pack that carries an interruption of the aircraft
+  power of up to about 1 s and is recharged in operation (CMM pages 17, 18 and 43), and the remote-mounted lithium
+  battery that holds the nonvolatile RAM while the unit is off, with a comparator for a voltage below 2.5 V (CMM page
+  22). This design is about the second.
 - Nothing about the unit's EEPROM (#459) or the failure state changes at a wipe.
 
 ## Anti-goals (the maintainer's, 2026-11-08)
@@ -37,6 +41,9 @@ maintainer that the rollover happens and is hard to correct).
   the first fix is in the current GPS era. The 1988 clock belongs to a loss of the user memory only. The existing restore
   failure of a corrupt profile (`USER DATA LOST` in `KLN90BCore.asyncInit`) keeps its present behavior too.
 - With MTBF off, the battery never failed and a health above 1.5 %, nothing changes: every existing test stays green.
+  One deliberate exception (the maintainer, 2026-11-08): the unit's clock is now kept across sessions (see "The clock
+  across sessions"), so a clock that is wrong at the end of a session stays wrong in the next one. A unit whose clock is
+  right, and a first start, behave as today.
 
 ## Constraints
 
@@ -92,9 +99,14 @@ The maintainer chose 1 (2026-11-08).
 - Random only at 0 %: the entry is `random: true`, and the random candidates leave it out while the health is above 0.
   How the catalog says so is left to the builder (a field on the definition that `Failures.randomCandidates` asks, say);
   the catalog stays the source of truth, and `Failures` must be able to read the health for it.
-- FLR 3 lists it while it is not active (eligible always) and fails it at any health. FLR 2 repairs the failure only:
-  the health stays where it is, so a battery at 0 % may be drawn again by the trigger. `SERVICE?` repairs every failure
-  and sets the health to 100 %; it keeps `batteryDate`.
+- FLR 3 lists it while it is not active (eligible always) and fails it at any health.
+- **FLR 2 is no service** (the maintainer, 2026-11-08): it repairs the failure only. The battery works again, but the
+  health stays where it is (a battery at 0 % may be drawn again by the trigger), the data already lost stays lost, and
+  the unit's clock is not corrected: a wrong era stays (see the clock below).
+- **`SERVICE?` stands for the unit brought to a shop** (the maintainer, 2026-11-08): it repairs every failure, sets the
+  health to 100 % (it keeps `batteryDate`), and the shop sets the unit's clock to the true date and time, in the current
+  era. The clock is set at once, also with a fix: while the unit has a fix, every tick takes the era from the unit's own
+  clock (`Gps.tick`, `calculateGPSTime`), so a corrected clock stays corrected. The data lost by a wipe stays lost.
 
 ### `BATTERY LOW`
 
@@ -139,7 +151,7 @@ given the failure service (or a query) in its props.
 - **The GPS** (`Gps.ts`):
   - the clock: `timeZulu` and the receiver's `internalTime` are set to **1 JAN 1988 00:00:00 UTC** (the year the
     unit's date editors default to, `DateEditor`), and `lastPowerOffTime` is set to now, so that the off-time carry of
-    `powerChanged` adds nothing to it;
+    `powerChanged` adds nothing to it; the stored clock offset is written for it (see "The clock across sessions");
   - the receiver's memory: the almanac and every satellite's ephemeris are erased through the SDK's public
     `GPSSatComputer.eraseAlamanac()` and `eraseCachedEphemeris()`; no private access is needed. At an engine-running
     start the wipe usually comes before the satellites are loaded, and the constructor's `awaitInit().then(...)` would
@@ -167,6 +179,14 @@ given the failure service (or a query) in its props.
     2026-11-08): it stands for a unit that was on before the session started, which would have collected its almanac by
     then. In REAL and FAST alike it gives the instant fix, and that fix computes its date in the era of the 1988 clock:
     the rollover date.
+- **`RCVR HARDWARE ERROR:` / `0008`** (IM C-3, the maintainer, 2026-11-08): the receiver's battery-backed RAM failed its
+  sum-check and is cleared; IM C-3 names the loss of the receiver's battery backup among the causes, and says the code
+  shows until satellite signals are received. It is a persistent message, valid from a power-on with a wipe until the
+  receiver tracks its first satellite in that power-on, and posted no earlier than the first navigation page, like the
+  unit's own failure messages. So at an engine-running start, whose forced acquisition tracks satellites at once, it
+  does not show; at a cold-and-dark start it shows during the almanac search's blind search for the first satellite.
+  It shares its first line with the antenna's `0010` (#460) and is a message of its own; both can be listed. What counts
+  as tracking is left to the builder (a real satellite in a channel in a tracked state, as STA 1 shows it).
 - **`USER DATA LOST`**: a one-time message posted by the wipe, which clears the message list first. After a power-off
   the list is empty anyway; at the first power-on of a session it can hold messages the boot's restore posted about the
   data the wipe just erased (`WAYPOINT xxx DELETED` for the last active waypoint, the flight plan loader's messages),
@@ -192,6 +212,30 @@ given the failure service (or a query) in its props.
 
 **The date 1988 and the database.** `Database.isAiracCurrent` counts a date before the end of the cycle as current, so
 a clock in 1987 or 1988 posts no `DATA BASE OUT OF DATE`.
+
+### The clock across sessions
+
+The unit's clock is battery-backed, and on a real unit a wrong era stays until the pilot enters the date on SET 2 before
+the next fix (the real owner's notes behind #62; docs/kln89-trainer-record.md does not cover it). Today the simulation
+keeps no clock: every session takes it from `E:ABSOLUTE TIME` at the construction of `GPS` (`Gps.ts`, with a random
+±2.5 s), so a session restart would quietly correct a rollover. The maintainer decided (2026-11-08) to keep it:
+
+- A new key in `KLN90BUserSettings`, the battery-backed memory: the offset of the unit's clock from the sim time, in
+  milliseconds (`clockOffset`, say), default 0. A wipe resets it with every other key and then writes the offset of the
+  1988 clock.
+- At the construction of `GPS` the clock is the sim time plus the stored offset. The random ±2.5 s stays (the builder's
+  call: the drift of the clock while the unit was off).
+- It is saved whenever the clock is set other than by running: a fix and its time update, a pilot's date or time entry
+  (SET 2), `SERVICE?`, the wipe, FAST; and at a power-off. The builder may save it with the position (`savePosition`) as
+  long as each of these is covered.
+- The default 0 keeps the anti-goal: a first start, and every unit whose clock was right, start in the current era as
+  today.
+- **FAST keeps the unit's era** (the builder's call, the one way the maintainer's rules hold together):
+  `initializeFromTruth` sets the true date and time moved into the era of the unit's clock (the true time minus the
+  whole eras the unit is off), not the true time itself. The receiver, which works modulo the era, then sees an exact
+  clock and the start stays hot, and the first fix keeps the unit's era. Otherwise every normal FAST power-on, and the
+  SET 10 switch to FAST, would correct a wrong era kept after an FLR 2 repair. With the clock in the current era, which
+  is every unit that never lost its memory, nothing changes. After a wipe FAST does nothing at all (above).
 
 ### FLR 1
 
@@ -228,13 +272,21 @@ Each behavior at the cheapest stage that observes it (CLAUDE.md):
   - the first power-on of a session with a failure stored by an earlier session, cold and dark and engine-running;
   - the ride-through and the hot-swap resume wipe nothing;
   - **the anti-goal**: a first-ever start (empty storage) is no wipe and has the clock of the sim date;
-  - data entered after a wipe survives the next session once the battery is repaired.
+  - data entered after a wipe survives the next session once the battery is repaired;
+  - `RCVR HARDWARE ERROR: 0008` from the first navigation page of a cold-and-dark power-on with a wipe until the first
+    satellite is tracked, and not at an engine-running start;
+  - the clock across sessions: a rollover date kept over a session restart after an FLR 2 repair, in REAL and in FAST
+    (FAST hot and on the wrong era); corrected by `SERVICE?`, with and without a fix, and by a SET 2 date entry before a
+    fix; a first start and a unit with a right clock in the current era, as today.
 
 ## Docs
 
 - `docs/failures.md`: the Status names the battery as built; "What the code needs first" item 1 and the default date in
   "Left to the implementation" go, and the Battery section gets the default date, the two anti-goals and the facts
-  above that it lacks (the event, FAST). If #366 then has nothing left, the two sections are removed as they say.
+  above that it lacks (the event, FAST after a wipe and FAST keeping the era, the clock across sessions, `0008`, FLR 2
+  versus `SERVICE?`), and its claim that entering the date, the time or the position avoids the almanac search is
+  corrected. The catalog table's message column for `battery` gets `0008` beside `USER DATA LOST`. If #366 then has
+  nothing left, the two sections are removed as they say.
 - `docs/architecture.md`: the `userMemoryLost` event in the power-on order.
 - The wiki page for the failures (the maintainer updates it): the battery.
 
