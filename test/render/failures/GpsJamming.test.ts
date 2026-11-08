@@ -8,6 +8,7 @@ import {flyStraight, jammerAt, secondsToFix, spooferAt} from '../../harness/gps'
 import {courseDeg, distanceNm, LatLon, pointFrom} from '../../harness/flight/geo';
 import {GPS} from '../../../kln90b/Gps';
 import {Raim, raimStatus} from '../../../kln90b/GpsSolution';
+import {IDLE_ACQUISITION, WARM_ACQUISITION_RANGE} from '../../../kln90b/GpsSearch';
 import {halForMode} from '../../../kln90b/services/ModeController';
 import {
     dbToRatio,
@@ -482,6 +483,28 @@ describe('jamming by distance (#465)', () => {
         expect(gps.isValid()).toBe(false);
         expect(messages(unit).filter(m => SIGNAL_MESSAGES.includes(m))).toEqual([]);
         expect(Screen.read().rows('L')[0]).toBe('STATE   ACQ');
+        expect(unit.errors).toEqual([]);
+    }, 60_000);
+
+    // #469: the forced acquisition marks every satellite it cannot reach Unreachable, and the SDK keeps those out of the
+    // channel assignment until their unreachable time expires, so the fix returns about 242 s after the jammer is repaired.
+    // A satellite lost in flight comes back after IDLE_ACQUISITION plus TRAN (the sibling above holds the setup)
+    it.fails('an engine-running start inside a total signal loss reacquires like a satellite lost in flight (#469)', async () => {
+        const site = jammer(HOME, 200, 5, 150);
+        const unit = await bootUnit({storage: {...STORED_HOME, ...jammerAt(site)}});
+        const gps = unit.props.sensors.in.gps;
+        await afterCalcTick(unit);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(gps.isValid()).toBe(false); // Precondition: the jammer holds every satellite
+
+        unit.props.failures.repair('gpsJamming');
+        await untilCalcTick(unit);
+        expect(gps.transmitters.jammer).toBeNull();
+
+        // The acquisition time with half its range of spread, one calculation tick of TRAN, and a margin of 15 s
+        const boundS = (IDLE_ACQUISITION + WARM_ACQUISITION_RANGE / 2) / 1000 + 1 + 15;
+        expect(boundS).toBeLessThan(120);
+        expect(await secondsToFix(unit, 300)).toBeLessThan(boundS);
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
