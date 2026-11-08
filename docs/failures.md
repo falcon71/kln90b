@@ -483,6 +483,15 @@ extend it to a loss of the fix. Neither is a spoofing rule.
     knows where it is: during this sky search the Unreachable marks are forgotten in every tick (`forgetUnreachable`),
     and a satellite below the horizon in a channel is inhibited until the SDK has taken it out, so that the channels go
     to the satellites in view.
+- **A long loss before the first fix** (#470). A receiver that knows its position, time and almanac keeps searching a
+  satellite it predicts in view however long its signal is lost, so after an engine-running start, during the start
+  model's acquisition and whenever the unit is idle, a lost satellite that is up never times out to `Unreachable`
+  (`wrapReachability`), and the fix returns in the acquisition time after the signals do: the hot time with a current
+  ephemeris near the stored position, otherwise the idle or warm time. The blind searches (the almanac search and the
+  power-on sky search) search each PRN in turn and keep the SDK's timeout, as they do not know which satellites are in
+  view; they start a new pass once every PRN was searched in vain (`GpsSearch.nextPassWhenAllGivenUp`). After a jamming
+  that outlasts the give-up time of a cold power-on, the next satellite in view is found within about one pass (some
+  16 to 18 minutes) instead of up to an hour.
 - **The general time check** (B-4): in every calculation tick with a fix, when the GPS time differs from the unit's
   clock by more than 10 minutes, `SYSTEM TIME UPDATED` / `TO GPS TIME` shows. Before #465 the check ran only at the
   acquisition of a fix. It also fires when the pilot changes the sim's time of day during a fix (accepted by the

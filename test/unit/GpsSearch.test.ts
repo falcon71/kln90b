@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {GPSSatelliteState} from '@microsoft/msfs-sdk';
 import {GPS_ERA_DURATION, GpsSearch, receiverTimeDifference, SearchMode} from '../../kln90b/GpsSearch';
 import type {KLNGPSSatComputer} from '../../kln90b/Gps';
 
@@ -35,6 +36,10 @@ describe('receiverTimeDifference', () => {
     });
 });
 
+/** A satellite outside the unit's interest: searched (None), or given up on by the SDK (Unreachable) */
+const searched = (prn: number) => ({prn, state: {get: () => GPSSatelliteState.None}});
+const givenUp = (prn: number) => ({prn, state: {get: () => GPSSatelliteState.Unreachable}});
+
 /**
  * A satellite computer with the few members the search calls, and no satellites in channels. Records the acquisition
  * times, the erasures of the last known position and the forgotten Unreachable marks, which a sky search after a lost fix
@@ -59,7 +64,7 @@ class FakeComputer {
         };
     }
     public getLastAlmanacTime = (): number | undefined => undefined;
-    public getSatellites = () => [{prn: 1}, {prn: 2}];
+    public getSatellites: () => { prn: number, state?: { get: () => GPSSatelliteState } }[] = () => [searched(1), searched(2)];
     public setSatelliteInhibit(prn: number, inhibit: boolean): void {
         this.inhibited.set(prn, inhibit);
     }
@@ -149,7 +154,7 @@ describe('GpsSearch: the sky search after a lost fix (#465)', () => {
     it('the sky search that keeps the belief takes satellites below the horizon out of the channels', () => {
         const {search, computer} = idleSearch();
         const sat = (prn: number, strength: number) => ({prn, signalStrength: {get: () => strength}});
-        computer.getSatellites = () => [{prn: 1}, {prn: 2}, {prn: 3}];
+        computer.getSatellites = () => [searched(1), searched(2), searched(3)];
         computer.channels = [sat(1, 0.5), sat(2, 0.05), sat(3, 0)];
         search.lostFix(LOST_AT);
         search.tick(LOST_AT + FIVE_MINUTES, HERE, LOST_AT);
@@ -172,7 +177,7 @@ describe('GpsSearch: the sky search after a lost fix (#465)', () => {
         const computer = new FakeComputer();
         computer.ready = true;
         computer.getLastAlmanacTime = () => LOST_AT;
-        computer.getSatellites = () => [{prn: 1}, {prn: 2}];
+        computer.getSatellites = () => [searched(1), searched(2)];
         computer.channels = [{prn: 2, signalStrength: {get: () => 0}}];
         const search = new GpsSearch(computer as unknown as KLNGPSSatComputer, () => false);
         search.start(HERE);
@@ -183,6 +188,96 @@ describe('GpsSearch: the sky search after a lost fix (#465)', () => {
         search.applyInhibits();
         expect(search.mode).toBe(SearchMode.SkySearch); // Precondition
         expect([...computer.inhibited.entries()].filter(([, v]) => v).map(([p]) => p)).toEqual([]);
+    });
+
+    // #470: a blind search sweeps through the PRNs; the SDK gives up on one it searched in vain after 4 minutes and leaves
+    // it out for an hour. Once every PRN the search may search outside the channels was given up on, the next pass starts:
+    // the marks are forgotten. Not while one is still waiting for a channel, and an inhibited one does not count
+    describe('the next pass of a blind search (#470)', () => {
+        async function blindSkySearch(allBlocked = () => false): Promise<{ search: GpsSearch, computer: FakeComputer }> {
+            const computer = new FakeComputer();
+            computer.ready = true;
+            computer.getLastAlmanacTime = () => LOST_AT;
+            const search = new GpsSearch(computer as unknown as KLNGPSSatComputer, allBlocked);
+            search.start(HERE);
+            await Promise.resolve();
+            search.tick(LOST_AT, HERE, LOST_AT);
+            search.tick(LOST_AT + FIVE_MINUTES, HERE, LOST_AT);
+            expect(search.mode).toBe(SearchMode.SkySearch); // Precondition
+            expect(search.searchesBlind).toBe(true);
+            computer.forgotten = 0;
+            return {search, computer};
+        }
+
+        it('forgets the marks once every PRN outside the channels was given up on', async () => {
+            const {search, computer} = await blindSkySearch();
+            computer.channels = [{prn: 3, signalStrength: {get: () => 0}}];
+            computer.getSatellites = () => [givenUp(1), givenUp(2), searched(3)];
+
+            search.tick(LOST_AT + FIVE_MINUTES + 1000, HERE, LOST_AT);
+
+            expect(computer.forgotten).toBe(1);
+        });
+
+        it('waits while a PRN outside the channels has not been searched in this pass', async () => {
+            const {search, computer} = await blindSkySearch();
+            computer.channels = [{prn: 3, signalStrength: {get: () => 0}}];
+            computer.getSatellites = () => [givenUp(1), searched(2), searched(3)];
+
+            search.tick(LOST_AT + FIVE_MINUTES + 1000, HERE, LOST_AT);
+
+            expect(computer.forgotten).toBe(0);
+        });
+
+        it('a satellite in a channel that was given up on is not waiting', async () => {
+            const {search, computer} = await blindSkySearch();
+            computer.channels = [{prn: 2, signalStrength: {get: () => 0}}];
+            computer.getSatellites = () => [givenUp(1), givenUp(2)];
+
+            search.tick(LOST_AT + FIVE_MINUTES + 1000, HERE, LOST_AT);
+
+            expect(computer.forgotten).toBe(1);
+        });
+
+        it('an inhibited PRN does not count: with every PRN blocked there is no pass to restart', async () => {
+            const {search, computer} = await blindSkySearch(() => true); // A receiver failure blocks every PRN
+            computer.getSatellites = () => [givenUp(1), givenUp(2)];
+
+            search.tick(LOST_AT + FIVE_MINUTES + 1000, HERE, LOST_AT);
+
+            expect(computer.forgotten).toBe(0);
+        });
+
+        it('nothing is forgotten when no PRN was given up on', async () => {
+            const {search, computer} = await blindSkySearch();
+            computer.channels = [{prn: 1, signalStrength: {get: () => 0}}, {prn: 2, signalStrength: {get: () => 0}}];
+            computer.getSatellites = () => [searched(1), searched(2)];
+
+            search.tick(LOST_AT + FIVE_MINUTES + 1000, HERE, LOST_AT);
+
+            expect(computer.forgotten).toBe(0);
+        });
+
+        it("the start model's acquisition and Idle do not search blind", async () => {
+            const computer = new FakeComputer();
+            computer.ready = true;
+            computer.getLastAlmanacTime = () => LOST_AT;
+            const search = new GpsSearch(computer as unknown as KLNGPSSatComputer, () => false);
+            expect(search.searchesBlind).toBe(false); // Idle
+            search.start(HERE);
+            await Promise.resolve();
+            search.tick(LOST_AT, HERE, LOST_AT);
+            expect(search.mode).toBe(SearchMode.Acquisition);
+            expect(search.searchesBlind).toBe(false);
+        });
+
+        it('the sky search after a lost fix keeps its belief: not blind', () => {
+            const {search} = idleSearch();
+            search.lostFix(LOST_AT);
+            search.tick(LOST_AT + FIVE_MINUTES, HERE, LOST_AT);
+            expect(search.keepsBelief).toBe(true); // Precondition
+            expect(search.searchesBlind).toBe(false);
+        });
     });
 
     it('without a lost fix it stays idle', () => {

@@ -206,7 +206,8 @@ export class FakeReceiver {
     }
 
     /**
-     * The SDK's satellites that a claim held lost until the SDK's acquisition timeout made them Unreachable: the real
+     * The SDK's satellites that a claim held lost until the SDK's acquisition timeout made them Unreachable (one below the
+     * horizon, or any in a blind search: with a belief a held satellite in view never times out, #470): the real
      * receiver never searched them there, so once a satellite is out of the claimed channel, or the claim is released, and
      * its own signal is not lost, it is given back to the SDK as searchable (free). Without it the SDK would keep a healthy
      * satellite out of its channel assignment for an hour. Called after the SDK's update, which times satellites out and

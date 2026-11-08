@@ -58,7 +58,7 @@ export const ALMANAC_SEARCH_ACQUISITION = 390 * 1000;
 export const ALMANAC_SEARCH_ACQUISITION_RANGE = 120 * 1000;
 
 /** The SDK's own line of sight: a satellite with a geometric signal strength above this is in view (GPSSat.ts) */
-const SDK_REACHABLE_STRENGTH = 0.05;
+export const SDK_REACHABLE_STRENGTH = 0.05;
 const PRN_SLOTS = 256;
 
 const ACQUIRED_STATES = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
@@ -176,6 +176,15 @@ export class GpsSearch {
         return this._keepsBelief;
     }
 
+    /**
+     * The receiver searches blind, without a belief in its position, time and almanac: the almanac search and the power-on
+     * sky search. Otherwise it searches the satellites it predicts, and keeps searching one in view whose signal is lost
+     * (#470, Gps.ts wrapReachability)
+     */
+    public get searchesBlind(): boolean {
+        return this.mode === SearchMode.AlmanacSearch || (this.mode === SearchMode.SkySearch && !this._keepsBelief);
+    }
+
     /** The satellites the unit predicts during ACQ, for STA 1 (#213) */
     public predictedSatellites(): readonly GPSPredictionSatellite[] {
         return this.predicted;
@@ -206,10 +215,13 @@ export class GpsSearch {
                 break;
             case SearchMode.AlmanacSearch:
                 this.tickAlmanacSearch(simTime, present);
+                this.nextPassWhenAllGivenUp();
                 break;
             case SearchMode.SkySearch:
                 if (this._keepsBelief) {
                     this.tickSkySearchKeepingBelief();
+                } else {
+                    this.nextPassWhenAllGivenUp();
                 }
                 break;
             case SearchMode.Idle:
@@ -305,8 +317,8 @@ export class GpsSearch {
      * in vain for its acquisition timeout (4 minutes) for an hour, and fills a channel it has nothing in view for with
      * satellites in PRN order, below the horizon too (GPSSat.ts). Neither is what a receiver does that knows where it is,
      * its time and its almanac:
-     * - the Unreachable marks are forgotten (KLNGPSSatComputer.forgetUnreachable), so that a satellite in view whose signal
-     *   is lost stays in its channel, searched, and one out of a channel can be given one;
+     * - the Unreachable marks are forgotten (KLNGPSSatComputer.forgetUnreachable), so that a satellite out of a channel can
+     *   be given one (a satellite in view whose signal is lost never times out here, #470: it stays in its channel);
      * - a satellite below the horizon in a channel is inhibited until the SDK has taken it out at its next channel
      *   assignment (every 5 s), so that the channel goes to a satellite in view. The SDK's own line of sight stands in for
      *   the receiver's almanac at its belief, which is within the SDK's 100 NM and the start model's clock tolerance of the
@@ -333,6 +345,41 @@ export class GpsSearch {
             if (prn < PRN_SLOTS && this.releasing[prn] === 1 && inChannel[prn] === 0) {
                 this.releasing[prn] = 0;
             }
+        }
+    }
+
+    /**
+     * #470: a blind search, in every tick before the SDK's update. The SDK puts the satellites into the channels in PRN
+     * order, gives up on one it searched in vain for its acquisition timeout (4 minutes) and moves on to the next; that is
+     * the blind search's sweep through the PRNs. But it leaves a satellite it gave up on out for an hour, so once every PRN
+     * had been searched in vain, during a long jamming for example, the sweep stood still. The real receiver searches a PRN
+     * again on its next pass: once no PRN the search may search is left outside the channels, the Unreachable marks are
+     * forgotten (KLNGPSSatComputer.forgetUnreachable) and the sweep starts over. Allocates nothing
+     */
+    private nextPassWhenAllGivenUp(): void {
+        const channels = this.computer.getChannels();
+        const inChannel = this.inChannel;
+        inChannel.fill(0);
+        for (let i = 0; i < channels.length; i++) {
+            const sat = channels[i];
+            if (sat !== null && sat.prn < PRN_SLOTS) {
+                inChannel[sat.prn] = 1;
+            }
+        }
+        let givenUp = 0;
+        const sats = this.computer.getSatellites();
+        for (let i = 0; i < sats.length; i++) {
+            const prn = sats[i].prn;
+            if (prn >= PRN_SLOTS || inChannel[prn] === 1 || this.applied[prn] === 1) {
+                continue;
+            }
+            if (sats[i].state.get() !== GPSSatelliteState.Unreachable) {
+                return; //A PRN is still waiting for a channel in this pass
+            }
+            givenUp++;
+        }
+        if (givenUp > 0) {
+            this.computer.forgetUnreachable();
         }
     }
 

@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {GPSSatellite, GPSSatelliteState} from '@microsoft/msfs-sdk';
-import {bootUnit, HeadlessUnit, settle, untilCalcTick} from '../../harness/boot';
+import {bootToSelfTest, bootUnit, HeadlessUnit, settle, untilCalcTick} from '../../harness/boot';
 import {Screen} from '../../harness/render/screen';
 import {messages} from '../../harness/readers';
 import {panelXml} from '../../harness/panelXml';
@@ -8,7 +8,18 @@ import {flyStraight, jammerAt, secondsToFix, spooferAt} from '../../harness/gps'
 import {courseDeg, distanceNm, LatLon, pointFrom} from '../../harness/flight/geo';
 import {GPS} from '../../../kln90b/Gps';
 import {Raim, raimStatus} from '../../../kln90b/GpsSolution';
-import {IDLE_ACQUISITION, WARM_ACQUISITION_RANGE} from '../../../kln90b/GpsSearch';
+import {
+    ALMANAC_SEARCH_ACQUISITION,
+    ALMANAC_SEARCH_ACQUISITION_RANGE,
+    BLIND_ACQUISITION,
+    BLIND_ACQUISITION_RANGE,
+    HOT_ACQUISITION,
+    HOT_ACQUISITION_RANGE,
+    IDLE_ACQUISITION,
+    SearchMode,
+    WARM_ACQUISITION_RANGE,
+} from '../../../kln90b/GpsSearch';
+import {DEFAULT_START} from '../../harness/sim/clock';
 import {halForMode} from '../../../kln90b/services/ModeController';
 import {
     dbToRatio,
@@ -38,6 +49,7 @@ const SIGNAL_MESSAGES = [COVERAGE, RAIM_MESSAGE, 'BAD SATELLITE GEOMETRY SEE EPE
 
 const TRACKED = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
 const byNumber = (a: number, b: number) => a - b;
+const DAY = 24 * 60 * 60 * 1000;
 
 /** Where the units boot, and the position stored at the last power-off, so that no boot posts POSITION DIFFERS */
 const HOME: LatLon = {lat: 47, lon: 8};
@@ -516,6 +528,123 @@ describe('jamming by distance (#465)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
+    // #470: a receiver that knows its position, time and almanac does not give up on a satellite it predicts in view; it
+    // keeps searching it, however long the signal is lost. The SDK's acquisition timeout (4 minutes) would make every lost
+    // satellite Unreachable and keep it out of the channels for an hour, and after an engine-running start nothing forgets
+    // the marks. Lengths past the timeout, and one where the SDK had moved the channels to satellites below the horizon
+    it.each([300, 420])('an engine-running start inside a total signal loss of %i s reacquires like a satellite lost in flight (#470)', async (jamS) => {
+        const site = jammer(HOME, 200, 5, 150);
+        const unit = await bootUnit({storage: {...STORED_HOME, ...jammerAt(site)}});
+        const gps = unit.props.sensors.in.gps;
+        await vi.advanceTimersByTimeAsync(jamS * 1000);
+        expect(gps.isValid()).toBe(false); // Precondition: the jammer held every satellite
+
+        unit.props.failures.repair('gpsJamming');
+        await untilCalcTick(unit);
+        expect(gps.transmitters.jammer).toBeNull();
+
+        // The boot leaves a current ephemeris and the stored position is where the unit stands, so the SDK's hot-start rule
+        // applies (#62): the hot acquisition time with half its range of spread, one tick of TRAN, 15 s of margin
+        const boundS = (HOT_ACQUISITION + HOT_ACQUISITION_RANGE / 2) / 1000 + 1 + 15;
+        expect(await secondsToFix(unit, 600)).toBeLessThan(boundS);
+        expect(unit.errors).toEqual([]);
+    }, 120_000);
+
+    // #470: a cold-and-dark power-on inside a jammer. The start model searches the satellites it predicts from the stored
+    // position for its give-up time (Install manual 2-66: 5 minutes) and keeps searching a lost one past the SDK's 4 minute
+    // timeout; once the jammer is gone it acquires them in the start model's time, here the hot one: the boot leaves a current
+    // ephemeris and the stored position is where the unit stands (#62)
+    it("a cold power-on jammed past the acquisition timeout acquires in the start model's time once the jammer is gone (#470)", async () => {
+        const site = jammer(HOME, 200, 5, 150);
+        const unit = await bootToSelfTest({storage: {...STORED_HOME, ...jammerAt(site)}});
+        const gps = unit.props.sensors.in.gps;
+        await vi.advanceTimersByTimeAsync(230_000); // About 250 s after power-on: past the timeout, before the give-up
+        expect(gps.isValid()).toBe(false); // Preconditions: jammed, still the start model's acquisition
+        expect(gps.search.mode).toBe(SearchMode.Acquisition);
+
+        unit.props.failures.repair('gpsJamming');
+        await untilCalcTick(unit);
+
+        // The hot acquisition time with half its range of spread, one tick of TRAN, 15 s of margin
+        const boundS = (HOT_ACQUISITION + HOT_ACQUISITION_RANGE / 2) / 1000 + 1 + 15;
+        expect(await secondsToFix(unit, 600)).toBeLessThan(boundS);
+        expect(unit.errors).toEqual([]);
+    }, 120_000);
+
+    // #470: a cold-and-dark power-on inside a jammer for 25 minutes. After the give-up time the receiver searches the sky
+    // (3-17), every PRN in turn; the SDK gives up on each for an hour after its 4 minute timeout, so once every PRN had been
+    // searched in vain the sweep stood still. The real receiver searches a PRN again on its next pass. Bound: one whole pass,
+    // 32 PRNs on 8 channels of 4 minutes each, then the blind acquisition time with half its range, one tick of TRAN and
+    // 15 s of margin
+    it('a cold power-on jammed for 25 minutes gets its fix within one sky search pass once the jammer is gone (#470)', async () => {
+        const site = jammer(HOME, 200, 5, 150);
+        const unit = await bootToSelfTest({storage: {...STORED_HOME, ...jammerAt(site)}});
+        const gps = unit.props.sensors.in.gps;
+        await vi.advanceTimersByTimeAsync(25 * 60_000);
+        expect(gps.isValid()).toBe(false); // Preconditions: jammed, in the power-on sky search
+        expect(gps.search.mode).toBe(SearchMode.SkySearch);
+        expect(gps.search.keepsBelief).toBe(false);
+
+        unit.props.failures.repair('gpsJamming');
+        await untilCalcTick(unit);
+
+        const passS = 32 / 8 * 240;
+        const boundS = passS + (BLIND_ACQUISITION + BLIND_ACQUISITION_RANGE / 2) / 1000 + 1 + 15;
+        expect(await secondsToFix(unit, 1800)).toBeLessThan(boundS);
+        expect(unit.errors).toEqual([]);
+    }, 300_000);
+
+    // #470: the blind sky search keeps the SDK's acquisition timeout. It does not know which satellites are in view, so it
+    // gives up on a jammed satellite that is up after 4 minutes as on any other PRN and moves the channel on; keeping the
+    // satellites that are truly up would be knowledge the blind receiver does not have
+    it('the power-on sky search gives up on a jammed satellite in view after the acquisition timeout (#470)', async () => {
+        const site = jammer(HOME, 200, 5, 150);
+        const unit = await bootToSelfTest({storage: {...STORED_HOME, ...jammerAt(site)}});
+        const gps = unit.props.sensors.in.gps;
+        for (let s = 0; s < 400 && gps.search.mode !== SearchMode.SkySearch; s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(gps.search.mode).toBe(SearchMode.SkySearch); // Preconditions: the power-on sky search, jammed
+        expect(gps.search.keepsBelief).toBe(false);
+        const upInChannels = gps.gpsSatComputer.getChannels()
+            .filter(c => c !== null && c.signalStrength.get() > 0.05 && gps.signals.isLost(c.prn)).map(c => c!.prn);
+        expect(upInChannels.length).toBeGreaterThan(0);
+
+        await vi.advanceTimersByTimeAsync(250_000); // The 4 minute timeout and the SDK's next channel assignment
+
+        const stillSearched = upInChannels.filter(prn => inChannels(unit).includes(prn) && satellite(unit, prn).state.get() === GPSSatelliteState.None);
+        expect(stillSearched).toEqual([]);
+        expect(gps.isValid()).toBe(false);
+        expect(unit.errors).toEqual([]);
+    }, 120_000);
+
+    // #470: the almanac search is blind too, and sweeps through the PRNs until it acquires one satellite to collect the
+    // almanac from (ORS 01 6-30). The jammer holds every satellite for 35 minutes, more than one pass (32 PRNs on 8 channels
+    // of 4 minutes each). Once it is gone, the next pass finds a satellite in view: within one pass, the almanac search's
+    // acquisition time with half its range, one tick and 15 s of margin. Without a new pass the SDK would keep every PRN
+    // it gave up on out for an hour
+    it('an almanac search jammed for 35 minutes acquires a satellite within one pass once the jammer is gone (#470)', async () => {
+        const site = jammer(HOME, 200, 5, 150);
+        const unit = await bootToSelfTest({storage: {...STORED_HOME, fastGpsAcquisition: false, lastAlmanacDownload: DEFAULT_START.getTime() - 200 * DAY, ...jammerAt(site)}});
+        const gps = unit.props.sensors.in.gps;
+        expect(gps.search.mode).toBe(SearchMode.AlmanacSearch); // Precondition: the almanac is over six months old
+        await vi.advanceTimersByTimeAsync(35 * 60_000);
+        expect(gps.search.mode).toBe(SearchMode.AlmanacSearch); // Precondition: nothing acquired while jammed
+        expect(gps.gpsSatComputer.getSatellites().filter(s => TRACKED.has(s.state.get()))).toEqual([]);
+
+        unit.props.failures.repair('gpsJamming');
+        await untilCalcTick(unit);
+
+        const passS = 32 / 8 * 240;
+        const boundS = passS + (ALMANAC_SEARCH_ACQUISITION + ALMANAC_SEARCH_ACQUISITION_RANGE / 2) / 1000 + 1 + 15;
+        let s = 0;
+        for (; s < 3600 && !gps.gpsSatComputer.getSatellites().some(sat => TRACKED.has(sat.state.get())); s++) {
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        expect(s).toBeLessThan(boundS);
+        expect(unit.errors).toEqual([]);
+    }, 300_000);
+
     // A minute of jamming on the ground: the lost satellites are still searched in their channels when the jammer goes
     it('the repair: the rise 0, no satellite lost, a fix again within 120 s', async () => {
         const unit = await bootOnGround();
@@ -572,8 +701,8 @@ describe('jamming by distance (#465)', () => {
 
     // Design, "Recovery": with no fix for the start model's give-up time (Install manual 2-66: 5 minutes) the receiver gives
     // up on the satellites it predicts and searches the sky (3-17), STA 1 INIT as after a power-on, and searches every PRN
-    // again (KLNGPSSatComputer.forgetUnreachable). Without it the SDK marks every lost satellite Unreachable after its
-    // acquisition timeout (4 minutes) and leaves it out for an hour, so that the fix would not come back here at all. The
+    // again (KLNGPSSatComputer.forgetUnreachable). A lost satellite in view never times out to Unreachable while the unit
+    // keeps its belief (#470, Gps.ts wrapReachability), so the channels still hold the satellites in view. The
     // jammer 10 NM ahead takes every satellite at 10,000 ft; the aircraft holds 6 minutes, then flies away 1 NM a tick beyond
     // the jammer's edge and holds there. Final review (2026-11-08): the sky search keeps the receiver's belief, whose clock
     // and position a jammer leaves right (Felux et al., NAVIGATION 71(3), 2024: an A321 back about 2 minutes after the

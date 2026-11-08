@@ -307,19 +307,23 @@ describe('STA 1 with a spoofer (#465)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    // A real satellite the SDK puts into a claimed channel is held lost there, so the SDK's 4-minute acquisition timeout
-    // makes it Unreachable and keeps it out of its channel assignment for an hour, although the receiver never searched it.
-    // Once it is out of the claimed channel and its own signal is fine, it is searchable again (FakeReceiver.freeHeld)
+    // A real satellite the SDK puts into a claimed channel is held lost there. #470: one that is up is searched without
+    // end, as any lost satellite the receiver predicts in view, so the SDK's 4-minute acquisition timeout never makes it
+    // Unreachable; one below the horizon still times out, and once it is out of the claimed channel and its own signal is
+    // fine, it is searchable again (FakeReceiver.freeHeld)
     it('a healthy real satellite held by a claim is not left Unreachable', async () => {
         const unit = await mixedPhaseUnit();
         const gps = unit.props.sensors.in.gps;
-        let heldTimedOut = 0;
+        let heldUp = 0;
+        let heldUpTimedOut = 0;
         const leftUnreachable = new Set<number>();
         for (let s = 0; s < 17 * 60; s++) {
             await vi.advanceTimersByTimeAsync(1000);
             const channels = gps.gpsSatComputer.getChannels();
             const fakeRows = gps.channelRows().filter(r => r.fake).length;
-            heldTimedOut += channels.filter(c => c !== null && c.state.get() === GPSSatelliteState.Unreachable && gps.fakeReceiver.claimsSdkPrn(c.prn)).length > 0 ? 1 : 0;
+            const held = channels.filter(c => c !== null && gps.fakeReceiver.claimsSdkPrn(c.prn) && c.signalStrength.get() > 0.05);
+            heldUp += held.length;
+            heldUpTimedOut += held.filter(c => c!.state.get() === GPSSatelliteState.Unreachable).length;
             for (const sat of gps.gpsSatComputer.getSatellites()) {
                 if (sat.state.get() === GPSSatelliteState.Unreachable && !gps.signals.isLost(sat.prn) && !gps.fakeReceiver.claimsSdkPrn(sat.prn)) {
                     leftUnreachable.add(sat.prn);
@@ -327,7 +331,8 @@ describe('STA 1 with a spoofer (#465)', () => {
             }
             expect(fakeRows).toBeGreaterThan(0); // Precondition: the mixed phase lasts
         }
-        expect(heldTimedOut).toBeGreaterThan(0); // Precondition: a held satellite timed out
+        expect(heldUp).toBeGreaterThan(0); // Precondition: claims held real satellites that are up
+        expect(heldUpTimedOut).toBe(0);
         expect([...leftUnreachable]).toEqual([]);
         expect(unit.errors).toEqual([]);
     }, 120_000);
