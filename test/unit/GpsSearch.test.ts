@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {GPSSatelliteState} from '@microsoft/msfs-sdk';
 import {GPS_ERA_DURATION, GpsSearch, receiverTimeDifference, SearchMode} from '../../kln90b/GpsSearch';
 import type {KLNGPSSatComputer} from '../../kln90b/Gps';
@@ -310,5 +310,85 @@ describe('GpsSearch: the sky search after a lost fix (#465)', () => {
         expect(search.mode).toBe(SearchMode.Idle);
         search.tick(LOST_AT + 60_000 + FIVE_MINUTES, HERE, LOST_AT);
         expect(search.mode).toBe(SearchMode.SkySearch);
+    });
+});
+
+// #471, design "rcvrEeprom": with 0800 latched the receiver has lost its oscillator calibration, and every acquisition time
+// the search sets for the start of the power-on (warm, hot, the blind sky search and the almanac search, mean and range) is
+// multiplied by the factor drawn at the latch. The factor ends with the first fix (builder's call): end() and the sky
+// search that keeps the belief set the normal times. The expectations are literals: factor 3 times the constants
+describe('GpsSearch: the acquisition factor of rcvrEeprom (#471)', () => {
+    const NOW = 1_000_000_000;
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const HERE = {lat: 47, lon: 8};
+    const FAR = {lat: -47, lon: -172};
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    /** A search with factor 3, begun from the stored position; almanacTime undefined starts an almanac search */
+    async function begun(stored: { lat: number, lon: number }, almanacTime: number | undefined): Promise<{ search: GpsSearch, computer: FakeComputer }> {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5); // The warm draw: 2 s + 0.5 * 73 s = 38.5 s
+        const computer = new FakeComputer();
+        computer.ready = true;
+        computer.getLastAlmanacTime = () => almanacTime;
+        const search = new GpsSearch(computer as unknown as KLNGPSSatComputer, () => false, () => 3);
+        search.start(stored);
+        await Promise.resolve();
+        search.tick(NOW, HERE, NOW);
+        return {search, computer};
+    }
+
+    it('the warm start near the stored position: warm and hot times three times', async () => {
+        const {search, computer} = await begun(HERE, NOW);
+
+        expect(search.mode).toBe(SearchMode.Acquisition); // Precondition
+        expect(computer.acquisitionTime).toEqual([115_500, 18_000]);
+        expect(computer.acquisitionTimeWithEphemeris).toEqual([27_000, 18_000]);
+    });
+
+    it('the warm start far from the stored position: no hot start, the warm time three times for both', async () => {
+        const {search, computer} = await begun(FAR, NOW);
+
+        expect(search.mode).toBe(SearchMode.Acquisition); // Precondition
+        expect(computer.acquisitionTime).toEqual([115_500, 18_000]);
+        expect(computer.acquisitionTimeWithEphemeris).toEqual([115_500, 18_000]);
+    });
+
+    it('the almanac search: three times', async () => {
+        const {search, computer} = await begun(HERE, undefined);
+
+        expect(search.mode).toBe(SearchMode.AlmanacSearch); // Precondition
+        expect(computer.acquisitionTime).toEqual([1_170_000, 360_000]);
+    });
+
+    it('the blind sky search after the give-up time: three times', async () => {
+        const {search, computer} = await begun(HERE, NOW);
+        search.tick(NOW + FIVE_MINUTES, HERE, NOW);
+
+        expect(search.mode).toBe(SearchMode.SkySearch); // Precondition
+        expect(search.keepsBelief).toBe(false); // Precondition: the power-on sky search
+        expect(computer.acquisitionTime).toEqual([270_000, 180_000]);
+    });
+
+    it('the first fix ends it: end() sets the idle and hot times unscaled', async () => {
+        const {search, computer} = await begun(HERE, NOW);
+
+        search.end();
+
+        expect(computer.acquisitionTime).toEqual([40_000, 6_000]);
+        expect(computer.acquisitionTimeWithEphemeris).toEqual([9_000, 6_000]);
+    });
+
+    it('the sky search that keeps the belief after a lost fix is unscaled', () => {
+        const computer = new FakeComputer();
+        const search = new GpsSearch(computer as unknown as KLNGPSSatComputer, () => false, () => 3);
+        search.lostFix(NOW);
+        search.tick(NOW + FIVE_MINUTES, HERE, NOW);
+
+        expect(search.keepsBelief).toBe(true); // Precondition
+        expect(computer.acquisitionTime).toEqual([40_000, 6_000]);
+        expect(computer.acquisitionTimeWithEphemeris).toEqual([9_000, 6_000]);
     });
 });

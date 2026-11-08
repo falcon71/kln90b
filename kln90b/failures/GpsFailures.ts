@@ -3,6 +3,7 @@ import {Failures, FailureChangedEvents} from "./Failures";
 import {MAX_TRIGGER_STEP_S} from "./FailureTrigger";
 import {MASK_ZENITH_RAD} from "../GpsSignal";
 import {GpsGeometry} from "../GpsSolution";
+import {ReceiverErrors} from "./ReceiverErrors";
 
 /** The ramp progress is saved at most this often, in seconds of progress */
 export const RAMP_SAVE_INTERVAL_S = 10;
@@ -83,7 +84,11 @@ export class GpsFailures {
 
     private readonly saveFaultFn = () => this.saveFault();
 
+    /** #471: the receiver's error word, latched by GPS at every power-on */
+    public readonly receiverErrors: ReceiverErrors;
+
     constructor(bus: EventBus, private readonly failures: Failures, private readonly receiver: ReceiverView, private readonly takeHomeMode: boolean, public random: () => number = Math.random) {
+        this.receiverErrors = new ReceiverErrors(bus, failures, takeHomeMode, random);
         bus.getSubscriber<FailureChangedEvents>().on("failureChanged").handle(e => {
             if (e.key === 'faultySatellite') {
                 if (e.active) {
@@ -103,9 +108,12 @@ export class GpsFailures {
         this.outOfSolutionS = 0;
     }
 
-    /** Take-home mode has no receiver failures */
+    /**
+     * Take-home mode has no receiver failures. #471: a dead receiver is one whose error word has a bit after which it
+     * delivers nothing (the antenna's 0010 and 0110 among them, IM C-7); NO RCVR DATA is the receiver not answering at all
+     */
     public get receiverFailed(): boolean {
-        return !this.takeHomeMode && (this.failures.isEffective('gpsAntenna') || this.failures.isEffective('gpsReceiver'));
+        return !this.takeHomeMode && (this.receiverErrors.receiverDead || this.failures.isEffective('gpsReceiver'));
     }
 
     private get faultActive(): boolean {

@@ -106,7 +106,7 @@ describe('persisted user setting keys', () => {
         // The internal battery (#461): its charge in percent and the sim date of the last session, 0 = never run
         expected[`${PREFIX}batteryHealth`] = '100';
         expected[`${PREFIX}batteryDate`] = '0';
-        for (const key of ['arinc429Out', 'rs232Out', 'rmiOutput', 'obsResolver', 'rs232In', 'rs232Data', 'airdata429', 'altitude', 'eeprom', 'superflag', 'msgBulb', 'wptBulb', 'armBulb', 'actvBulb', 'msgWiring', 'wptWiring', 'armWiring', 'actvWiring', 'msgDriver', 'wptDriver', 'armDriver', 'actvDriver', 'gpsAntenna', 'gpsReceiver', 'gpsJamming', 'gpsSpoofing', 'faultySatellite', 'battery']) expected[`${PREFIX}failure_${key}`] = '""';
+        for (const key of ['arinc429Out', 'rs232Out', 'rmiOutput', 'obsResolver', 'rs232In', 'rs232Data', 'airdata429', 'altitude', 'eeprom', 'superflag', 'msgBulb', 'wptBulb', 'armBulb', 'actvBulb', 'msgWiring', 'wptWiring', 'armWiring', 'actvWiring', 'msgDriver', 'wptDriver', 'armDriver', 'actvDriver', 'gpsAntenna', 'gpsReceiver', 'gpsJamming', 'gpsSpoofing', 'faultySatellite', 'battery', 'rcvrMemory', 'rcvrHardware', 'rcvrInit', 'rcvrEeprom', 'antennaGain']) expected[`${PREFIX}failure_${key}`] = '""';
         // The unit's EEPROM (#459): the CRT centering and the D-bar calibration points, 0 = not drawn yet
         for (const key of ['eepromCrtCenterX', 'eepromCrtCenterY', 'eepromDbarCalPlus', 'eepromDbarCalMinus']) expected[`${PREFIX}${key}`] = '0';
 

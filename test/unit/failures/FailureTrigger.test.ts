@@ -29,7 +29,8 @@ function plane(): KLN90PlaneSettings {
 
 const ALWAYS_HIT = () => 0;
 /** The eligible random failures of plane(): ARINC 429 output, OBS resolver, altitude, EEPROM and the superflag */
-const ELIGIBLE: FailureKey[] = ['arinc429Out', 'obsResolver', 'altitude', 'eeprom', 'superflag', 'gpsAntenna', 'gpsReceiver'];
+const ELIGIBLE: FailureKey[] = ['arinc429Out', 'obsResolver', 'altitude', 'eeprom', 'superflag', 'gpsAntenna', 'gpsReceiver',
+    'rcvrMemory', 'rcvrHardware', 'rcvrInit', 'rcvrEeprom', 'antennaGain'];
 
 let events: { key: FailureKey, active: boolean }[];
 let now: number;
@@ -105,7 +106,7 @@ describe('FailureTrigger', () => {
         const {trigger, failures} = build(() => (n++ % 2 === 0 ? 0 : rng()));
         trigger.tick();
         const counts: Record<string, number> = {};
-        for (let i = 0; i < 3000; i++) {
+        for (let i = 0; i < 12000; i++) {
             now += 1;
             trigger.tick();
             failures.repairAll();
@@ -114,7 +115,7 @@ describe('FailureTrigger', () => {
             counts[e.key] = (counts[e.key] ?? 0) + 1;
         }
         expect(Object.keys(counts).sort()).toEqual([...ELIGIBLE].sort());
-        const expected = 3000 / ELIGIBLE.length;
+        const expected = 12000 / ELIGIBLE.length;
         for (const key of ELIGIBLE) {
             expect(counts[key]).toBeGreaterThan(expected * 0.9);
             expect(counts[key]).toBeLessThan(expected * 1.1);
@@ -129,6 +130,7 @@ describe('FailureTrigger', () => {
         failures.fail('superflag');
         failures.fail('gpsAntenna');
         failures.fail('gpsReceiver');
+        for (const key of ['rcvrMemory', 'rcvrHardware', 'rcvrInit', 'rcvrEeprom', 'antennaGain'] as const) failures.fail(key);
         events.length = 0;
         // rs232Out is ineligible on this plane and stays out; only arinc429Out is left, and it is active too
         failures.fail('arinc429Out');

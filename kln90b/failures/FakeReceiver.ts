@@ -38,6 +38,8 @@ export interface FakeReceiverInputs {
     spooferRatio: number;
     /** The jammer's level at the aircraft as a ratio */
     jammerRatio: number;
+    /** The antennaGain failure's loss in dB, which the fake signals suffer in the same antenna as the real ones (#471, IM C-7) */
+    antennaLossDb: number;
     /** The position the unit navigates on and its clock (UNIX ms) */
     beliefLat: number;
     beliefLon: number;
@@ -46,6 +48,11 @@ export interface FakeReceiverInputs {
     searchAll: boolean;
     /** The start model's almanac search, whose blind search has its own acquisition time (GpsSearch) */
     almanacSearch: boolean;
+    /**
+     * The factor of the acquisition times: the rcvrEeprom factor until the first fix of the power-on, else 1 (#471, IM C-4,
+     * 0800). The same receiver searches the fake signals as the real ones, so GpsSearch's times and these scale alike
+     */
+    acquisitionFactor: number;
     /** The SDK's channels, the live array */
     sdkChannels: readonly (GPSSatellite | null)[];
     /** The SNR of a real satellite */
@@ -400,7 +407,7 @@ export class FakeReceiver {
         if (n === 0 || !(inputs.spooferRatio > 0)) {
             return;
         }
-        const base = fakeSnr(inputs.spooferRatio / n, n, inputs.jammerRatio);
+        const base = fakeSnr(inputs.spooferRatio / n, n, inputs.jammerRatio) - inputs.antennaLossDb;
         const sigma = jitterSigmaDb(base) * this.jitterScale;
         for (let i = 0; i < n; i++) {
             this.snrs[this.fakePrns[i]] = base + sigma * this.normal();
@@ -528,6 +535,11 @@ export class FakeReceiver {
      * for a real satellite; blind in a sky search; otherwise the idle time
      */
     private acquisitionTime(prn: number, inputs: Readonly<FakeReceiverInputs>, spoofer: Readonly<SpooferSite>): number {
+        //#471, rcvrEeprom: the whole time, mean and spread, as GpsSearch scales the real satellites' times
+        return this.unscaledAcquisitionTime(prn, inputs, spoofer) * inputs.acquisitionFactor;
+    }
+
+    private unscaledAcquisitionTime(prn: number, inputs: Readonly<FakeReceiverInputs>, spoofer: Readonly<SpooferSite>): number {
         if (this.believedFalse && this.collected[prn] === 1
             && this.belief.set(inputs.beliefLat, inputs.beliefLon).distance(spoofer.falseLat, spoofer.falseLon) <= HOT_DISTANCE_RAD) {
             return HOT_ACQUISITION + (this.random() - 0.5) * HOT_ACQUISITION_RANGE;

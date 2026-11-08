@@ -3,6 +3,7 @@ import {EventBus, GPSSatellite, GPSSatelliteState} from '@microsoft/msfs-sdk';
 import {Failures} from '../../../kln90b/failures/Failures';
 import {ReceiverView, GpsFailures, FAULT_SWITCH_S} from '../../../kln90b/failures/GpsFailures';
 import {GpsGeometry} from '../../../kln90b/GpsSolution';
+import {FailureKey} from '../../../kln90b/failures/FailureCatalog';
 import {KLN90BFailureSettings} from '../../../kln90b/settings/KLN90BFailureSettings';
 import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from '../../../kln90b/settings/KLN90BPlaneSettings';
 import {clearStatic} from '../../harness/singletons';
@@ -41,10 +42,14 @@ let settings: ReturnType<typeof KLN90BFailureSettings.getManager>;
 let failures: Failures;
 let gf: GpsFailures;
 
-function build(takeHome = false, random: () => number = () => 0.5) {
+/** @param stored failure settings saved before the construction, as from an earlier session */
+function build(takeHome = false, random: () => number = () => 0.5, stored: Partial<Record<`failure_${FailureKey}`, string>> = {}) {
     clearStatic(KLN90BFailureSettings, 'INSTANCE', false);
     const bus = new EventBus();
     settings = KLN90BFailureSettings.getManager(bus);
+    for (const name of Object.keys(stored) as (keyof typeof stored)[]) {
+        settings.getSetting(name).set(stored[name]!);
+    }
     failures = new Failures(bus, settings, plane(takeHome));
     const receiver: ReceiverView = {
         satellites: () => sats,
@@ -100,6 +105,28 @@ describe('GpsFailures receiver failures', () => {
     it('take-home mode has no receiver failures', () => {
         build(true);
         failures.fail('gpsAntenna');
+        expect(gf.receiverFailed).toBe(false);
+        failures.fail('gpsReceiver');
+        expect(gf.receiverFailed).toBe(false);
+    });
+
+    // #471: a live hardware code (2000, 8000) kills the receiver as soon as it is there
+    it('rcvrHardware with a live code is a receiver failure at once', () => {
+        build(false, () => 0.5, {failure_rcvrHardware: '{"code":8192}'});
+        expect(gf.receiverFailed).toBe(true);
+    });
+
+    // #471: a power-on code (0002, 0004, 0080) is found by the power-on test: the receiver dies at the latch
+    it('rcvrHardware with a power-on code is a receiver failure only after the latch', () => {
+        build(false, () => 0.5, {failure_rcvrHardware: '{"code":2}'});
+        expect(gf.receiverFailed).toBe(false);
+        gf.receiverErrors.latchPowerOn(false);
+        expect(gf.receiverFailed).toBe(true);
+    });
+
+    it('take-home mode: rcvrHardware is no receiver failure, latched or not', () => {
+        build(true, () => 0.5, {failure_rcvrHardware: '{"code":8192}'});
+        gf.receiverErrors.latchPowerOn(false);
         expect(gf.receiverFailed).toBe(false);
     });
 });

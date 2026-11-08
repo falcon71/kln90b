@@ -48,6 +48,8 @@ interface World {
     /** GPS.solution: only what the RAIM messages read (#453) */
     measurements: number;
     maxSlope: number;
+    /** ReceiverErrors.reportedCode: the receiver error word the host reads (#471) */
+    receiverCode: number;
 }
 
 /** A page object that passes the instanceof checks of PersistentMessages without being rendered */
@@ -82,6 +84,7 @@ function quietWorld(): World {
         hadFix: true,
         measurements: 8,
         maxSlope: 0,
+        receiverCode: 0,
     };
 }
 
@@ -157,7 +160,15 @@ function harness(w: World) {
                         return {valid: w.solutionValid, measurements: w.measurements, maxSlope: w.maxSlope};
                     },
                     // #460: the #453 messages are not valid during a receiver failure, and RAIM POSITION ERROR needs a detected fault
-                    failures: {receiverFailed: false},
+                    failures: {
+                        receiverFailed: false,
+                        // #471: the receiver error word of RCVR HARDWARE ERROR:
+                        receiverErrors: {
+                            get reportedCode() {
+                                return w.receiverCode;
+                            },
+                        },
+                    },
                     rangeErrorDetected: () => false,
                 },
             },
@@ -199,6 +210,63 @@ describe('the quiet world', () => {
         const h = harness(quietWorld());
         expect(h.tick()).toEqual([]);
         expect(h.tick()).toEqual([]);
+    });
+});
+
+describe('RCVR HARDWARE ERROR: (#471)', () => {
+    // The main page of this harness has always shown (memory.failureDetection.mainPageShown), as at an engine-running
+    // start, so the condition never lapses over the power cycle: only the code remembered for the re-alert, which starts
+    // at 0 at a power-on, makes the message unread again (design, "The message")
+    it('comes back unread after a power cycle with the same code', () => {
+        const w = quietWorld();
+        w.receiverCode = 0x0010;
+        const h = harness(w);
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 0010']); // Precondition
+        h.handler.getMessages()[0].seen = true;
+
+        h.handler.clear(); // The power-off
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 0010']);
+
+        expect(h.handler.getMessages()[0].seen).toBe(false);
+    });
+
+    // A gained bit re-alerts also when the code is lower as a number, and a bit that ends keeps the read state
+    it('a gained bit with a lower code makes it unread: 8000 to 0010', () => {
+        const w = quietWorld();
+        w.receiverCode = 0x8000;
+        const h = harness(w);
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 8000']); // Precondition
+        h.handler.getMessages()[0].seen = true;
+
+        w.receiverCode = 0x0010;
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 0010']);
+
+        expect(h.handler.getMessages()[0].seen).toBe(false);
+    });
+
+    it('a bit that ends keeps it read: 8010 to 0010', () => {
+        const w = quietWorld();
+        w.receiverCode = 0x8010;
+        const h = harness(w);
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 8010']); // Precondition
+        h.handler.getMessages()[0].seen = true;
+
+        w.receiverCode = 0x0010;
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 0010']);
+
+        expect(h.handler.getMessages()[0].seen).toBe(true);
+    });
+
+    it('stays read while the code does not change', () => {
+        const w = quietWorld();
+        w.receiverCode = 0x0010;
+        const h = harness(w);
+        h.tick();
+        h.handler.getMessages()[0].seen = true;
+
+        expect(h.tick()).toEqual(['RCVR HARDWARE ERROR: 0010']);
+
+        expect(h.handler.getMessages()[0].seen).toBe(true);
     });
 });
 

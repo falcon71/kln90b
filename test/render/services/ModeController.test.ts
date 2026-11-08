@@ -96,9 +96,10 @@ const fafaa = intersection('FAFAA', fafPos.lat, fafPos.lon);
 
 /**
  * The IF is 5 NM and the IAF 10 NM before the FAF on the inbound track, which may differ from the final course; the
- * unit starts 1.6 NM before the FAF on that track with the FAF active and the mode ARM. `panel` adds panel.xml options.
+ * unit starts 1.6 NM before the FAF on that track with the FAF active and the mode ARM. `panel` adds panel.xml options,
+ * `storage` saved settings.
  */
-async function armedNearFaf(inboundTrack: number, panel: PanelOptions = {}) {
+async function armedNearFaf(inboundTrack: number, panel: PanelOptions = {}, storage: Record<string, unknown> = {}) {
     const ifPos = pointFrom(fafaa, inboundTrack + 180, 5);
     const iafPos = pointFrom(fafaa, inboundTrack + 180, 10);
     const ifaaa = intersection('IFAAA', ifPos.lat, ifPos.lon);
@@ -113,7 +114,7 @@ async function armedNearFaf(inboundTrack: number, panel: PanelOptions = {}) {
     const unit = await bootUnit({
         facilities: [apt, iafaa, ifaaa, fafaa, mapaa], position: pointFrom(fafaa, inboundTrack + 180, 1.6),
         panelXml: panelXml({...APR_ARM_SWITCH, ...panel}),
-        storage: {...savedFlightplan(0, [apt]), turnAnticipation: false},
+        storage: {...savedFlightplan(0, [apt]), turnAnticipation: false, ...storage},
     });
     await settle(unit);
     await unit.panel.loadProcedure('APT 8');
@@ -528,6 +529,24 @@ describe('integrity at the approach (6-3, 6-20, #453)', () => {
         it('stays in ARM with the inhibit message with four satellites predicted and no altitude input', async () => {
             const {unit, nav, inboundTrack} = await armedNearFaf(80, NO_ALTIMETER);
             const gps = unit.props.sensors.in.gps;
+            vi.spyOn(gps.raimPrediction, 'getSatellites').mockReturnValue(stubSatellites(FOUR_IN_USE));
+            expect(raimStatus(gps.solution, 0.3)).toBe(Raim.Available); // Precondition: RAIM now is not what refuses
+
+            await flyOn(unit, inboundTrack);
+
+            expect(nav.navmode).toBe(NavMode.ARM_LEG);
+            expect(messages(unit)).toContain(INHIBITED);
+        });
+
+        // #471, rcvrInit (IM C-4, 0400): the altitude input does not reach the receiver while 0400 is latched, so the
+        // receiver navigates without the altitude row (5-29), and the predictions at the FAF and the MAP must not assume
+        // it: the gate would otherwise pass on a forecast the receiver cannot meet there. The live solution is the real
+        // one, without the altitude row, and healthy
+        it('stays in ARM with the inhibit message with four satellites predicted and an altitude input while 0400 is latched (#471)', async () => {
+            const {unit, nav, inboundTrack} = await armedNearFaf(80, {}, {failure_rcvrInit: '{"transient":0}'});
+            const gps = unit.props.sensors.in.gps;
+            expect(gps.failures.receiverErrors.hostBlocked).toBe(true); // Preconditions: 0400 latched, an altitude input
+            expect(unit.props.sensors.in.airdata.pressureAltitude).not.toBeNull();
             vi.spyOn(gps.raimPrediction, 'getSatellites').mockReturnValue(stubSatellites(FOUR_IN_USE));
             expect(raimStatus(gps.solution, 0.3)).toBe(Raim.Available); // Precondition: RAIM now is not what refuses
 

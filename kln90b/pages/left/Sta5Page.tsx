@@ -119,8 +119,11 @@ export class Sta5Page extends SixLineHalfPage {
         this.refDebounce.schedule(async () => { //we need to simulate the calculation time anyway
             await prediction.awaitInit();
             let result = "";
-            //#453, 6-20: RAIM for the approach limit, with the altitude input when the unit has one (design 5.2, 5.5)
-            const altitudeAided = this.props.sensors.in.airdata.pressureAltitude !== null;
+            //#453, 6-20: RAIM for the approach limit, with the altitude input when the unit has one (design 5.2, 5.5).
+            //#471: the altitude input reaches the receiver over the host's link, which rcvrInit (IM C-4, 0400) blocks for the
+            //power-on, so the receiver has no altitude aiding (5-29), and the prediction must not assume it either
+            const altitudeAided = this.props.sensors.in.airdata.pressureAltitude !== null
+                && !this.props.sensors.in.gps.failures.receiverErrors.hostBlocked;
             for (let timeOffset = -15; timeOffset <= 15; timeOffset += 5) {
                 //6-19, 6-20: the satellite geometry at the destination at the ETA and around it (#214)
                 const isRaimAvailable = predictRaim(prediction, wpt.lat, wpt.lon, actualTimeStamp + timeOffset * 60 * 1000, altitudeAided, halForMode(NavMode.APR_LEG));

@@ -168,6 +168,34 @@ describe('STA 5 page, the defaults of the RAIM prediction (6-20)', () => {
         expect(Screen.read().rows('L')[4]).toBe('  ééééééé  ');
     });
 
+    // #471, rcvrInit (IM C-4, 0400): the altitude input does not reach the receiver while 0400 is latched, so its solution
+    // has no altitude aiding (5-29), and the prediction follows the receiver. Four satellites predicted in use at zenith 45
+    // degrees, 90 degrees apart, give RAIM for the approach limit only with the altitude row (ModeController.test.ts,
+    // "the altitude input in the predictions")
+    describe('with rcvrInit (#471)', () => {
+        const FOUR_IN_USE: readonly [number, number][] = [[45, 0], [45, 90], [45, 180], [45, 270]];
+        const RCVR_INIT = {failure_rcvrInit: '{"transient":0}'};
+
+        async function barsWithFourPredicted(blocked: boolean): Promise<string> {
+            const {unit} = await onStandardRouteAtSta5(blocked ? {storage: RCVR_INIT} : {});
+            expect(unit.props.sensors.in.gps.failures.receiverErrors.hostBlocked).toBe(blocked); // Precondition
+            expect(unit.props.sensors.in.airdata.pressureAltitude).not.toBeNull(); // Precondition: the unit has an altitude input
+            vi.spyOn(unit.props.sensors.in.gps.raimPrediction, 'getSatellites').mockReturnValue(stubSatellites(FOUR_IN_USE));
+            await unit.panel.selectPage('L', 'STA 5');
+            await vi.advanceTimersByTimeAsync(11_000);
+            return Screen.read().rows('L')[4];
+        }
+
+        it('predicts without the altitude input while 0400 is latched (6-20, 5-29, #471)', async () => {
+            expect(await barsWithFourPredicted(true)).toBe('  ééééééé  ');
+        });
+
+        // The sibling: the same sky and altitude input without the failure
+        it('predicts with the altitude input without 0400 (6-20, 5-29, #471)', async () => {
+            expect(await barsWithFourPredicted(false)).toBe('  èèèèèèè  ');
+        });
+    });
+
     // 6-19, 6-20: the prediction is for the destination at the ETA, not for here and now (#214)
     it('predicts at the destination for the ETA and the six offsets around it (6-20, #214)', async () => {
         const {unit, kbbb, hhmm} = await onStandardRouteAtSta5();

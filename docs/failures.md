@@ -19,6 +19,9 @@ Jamming and spoofing are built from simulated ground transmitters (#465, design
 which replaced the jamming ramp of #460. The internal battery, its aging and the loss of the user memory at a power-on
 are built too (#461, design
 [superpowers/specs/2026-11-08-failures-battery-design.md](superpowers/specs/2026-11-08-failures-battery-design.md)).
+The receiver error word with its combined `RCVR HARDWARE ERROR` code and the receiver failures `rcvrMemory`,
+`rcvrHardware`, `rcvrInit`, `rcvrEeprom` and `antennaGain` are built too (#471, design
+[superpowers/specs/2026-11-08-receiver-hardware-errors-design.md](superpowers/specs/2026-11-08-receiver-hardware-errors-design.md)).
 The source of truth for what the catalog holds is `kln90b/failures/FailureCatalog.ts`.
 
 Page numbers without a prefix are the KLN 90B Pilot's Guide (006-08773-0000). "IM" is the Installation Manual
@@ -83,8 +86,13 @@ FLR 3). The FLR names are fictional. The table lists every failure; the sections
 
 | Key | FLR name | Message (MSG page lines) | May fail when | Random | TEST FAIL |
 |---|---|---|---|---|---|
-| `gpsAntenna` | `GPS ANTENNA` | `RCVR HARDWARE ERROR:` / `0010` | always | yes | yes |
+| `gpsAntenna` | `GPS ANTENNA` | `RCVR HARDWARE ERROR:` / `0010` open or `0110` short, in the combined code | always | yes | yes |
 | `gpsReceiver` | `GPS RCVR` | `NO RCVR DATA` | always | yes | yes |
+| `rcvrMemory` | `RCVR MEMORY` | `RCVR HARDWARE ERROR:` / `0008` from the next power-on until a satellite is tracked, in the combined code | always | yes | at that power-on |
+| `rcvrHardware` | `RCVR HW` | `RCVR HARDWARE ERROR:` / `0002`, `0004`, `0080` from the next power-on, or `2000`, `8000` at once, in the combined code | always | yes | yes |
+| `rcvrInit` | `RCVR INIT` | `RCVR HARDWARE ERROR:` / `0400` from the next power-on, in the combined code | always | yes | at that power-on |
+| `rcvrEeprom` | `RCVR EEPROM` | `RCVR HARDWARE ERROR:` / `0800` from the next power-on, in the combined code | always | yes | at that power-on |
+| `antennaGain` | `ANT GAIN` | none (low SNRs; the #453 messages follow) | always | yes | no |
 | `gpsJamming` | `JAMMING` | none (the #453 messages follow) | always | no | no |
 | `gpsSpoofing` | `SPOOFING` | none of its own (`RAIM POSITION ERROR` / `CROSS CHECK POSITION` and `SYSTEM TIME UPDATED` / `TO GPS TIME` follow) | always | no | no |
 | `faultySatellite` | `SATELLITE` | `RAIM POSITION ERROR` / `CROSS CHECK POSITION` while detectable | always | no | no |
@@ -95,7 +103,7 @@ FLR 3). The FLR names are fictional. The table lists every failure; the sections
 | `msgDriver`, `wptDriver`, `armDriver`, `actvDriver` | `MSG DRIVER`, `WPT DRIVER`, `ARM DRIVER`, `ACTV DRIVER` | `MSG ANNUNCIATOR FAIL` and so on | the lamp is declared (`…Installed`); for ARM and ACTV also `Output.WriteGPSSimVars` | yes | yes |
 | `msgWiring`, `wptWiring`, `armWiring`, `actvWiring` | `MSG WIRING` … `ACTV WIRING` | `CHECK MSG ANNUNCIATOR` and so on | as the driver | yes | no |
 | `msgBulb`, `wptBulb`, `armBulb`, `actvBulb` | `MSG BULB` … `ACTV BULB` | none | as the driver | yes | no |
-| `battery` | `BATTERY` | `USER DATA LOST` at the next power-on, then `RCVR HARDWARE ERROR:` / `0008` until a satellite is tracked | always (random only at 0 %) | at 0 % | no |
+| `battery` | `BATTERY` | `USER DATA LOST` at the next power-on, and `RCVR HARDWARE ERROR:` / `0008` in the combined code until a satellite is tracked | always (random only at 0 %) | at 0 % | at a power-on with a wipe (0008) |
 | `rs232In` | `RS-232 IN` | `NO RS-232 DATA` | a fuel computer, RS-232 air data, a baro source (`Input.Airdata.BaroSource` not 0, also with 429 air data) or an RS-232 heading is interfaced | yes | no |
 | `rs232Data` | `RS-232 DATA` | `RS-232 DATA ERROR` | as `rs232In` | yes | no |
 | `airdata429` | `429 AIRDATA` | `ARINC 429 AIR DATA FAIL` | air data is interfaced on `ARINC429` | yes | no |
@@ -113,9 +121,13 @@ not in use. ARM and ACTV reach the aircraft only through `GPS APPROACH MODE`, wh
 ### Message lines
 
 The MSG page lines are display strings from Appendix B. Two of them do not fit one line of 23 characters and are
-split as the table shows. `RCVR HARDWARE ERROR` carries one of the RF failure codes of IM C-4 (0010; 0080, 0100, 0400
-and 0800 are the same fault class). `IC1045` is the designator of the unit's 256-bit EEPROM in the CMM parts list;
-designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
+split as the table shows. `RCVR HARDWARE ERROR` carries the receiver error word as four hex digits (see "The receiver
+error word"). Each code of the receiver test table (IM C-3 to C-5) is a fault of its own, one bit of the word; the
+KLN 900 Pilot's Guide (B-6) lists the same tests in the same order. Several faults at once show as one message whose
+code is the OR of their bits (IM C-3), so an open antenna at a power-on that wiped the memory shows `0018`. Not
+simulated: 1000 (the receiver's test mode only) and the 0008 after a software upgrade. `IC1045` is the designator of the
+unit's 256-bit EEPROM in the CMM parts list; designators 1xxx mean the unit and 03xx/04xx the database cartridge
+(IM C-6).
 
 ## Detection, messages and TEST FAIL
 
@@ -131,8 +143,10 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
     about 5 s later (00:41). The MSG page then lists both, the newest first, and the MSG prompt stays on. So at a
     power-on the RS-232 input is checked when the first navigation page shows and the ARINC 429 receivers 5 s later;
     in operation, a loss shows after a delay drawn from 2 to 10 s (guess).
-  - Unit-internal failures (`gpsAntenna`, `gpsReceiver`, `eeprom`, `arinc429Out`, `rs232Out`): in the next calculation
-    tick, but at a power-on not before the first navigation page. Detection starts with that page for every failure
+  - Unit-internal failures (`gpsReceiver`, `eeprom`, `arinc429Out`, `rs232Out`, and the receiver error word's live
+    codes 0010, 0100, 2000 and 8000): in the next calculation tick, but at a power-on not before the first navigation
+    page. The word's power-on codes are found at the power-on and posted with the first navigation page (see "The
+    receiver error word"). Detection starts with that page for every failure
     (the design's choice), so the Self Test page shows `TEST FAIL` and no failure message yet. `eeprom` is detected only
     from the first navigation page after a power-on whose read of the EEPROM failed, and stays detected until the
     next power-on (see the EEPROM).
@@ -151,15 +165,17 @@ designators 1xxx mean the unit and 03xx/04xx the database cartridge (IM C-6).
     EEPROM until the next power-on), so setting the sim clock back does not hide its message.
 - **TEST FAIL** (3-4): while a failure marked "TEST FAIL" in the catalog is active, the Self Test page shows the
   flashing `TEST FAIL` in place of `ANNUN ON`. For the EEPROM it is the read of this power-on that counts, not the
-  failure as it stands now (see the EEPROM). This path is separate from the start-up failure of #416:
+  failure as it stands now (see the EEPROM). The receiver error word shows `TEST FAIL` while it has any code (see "The
+  receiver error word"), the battery's 0008 included. This path is separate from the start-up failure of #416:
   it posts no `DATA BASE CHECKSUM ERR` and does not touch `memory.selfTestFailure`. The pilot can still approve the
   page, and the failure's own message is on the MSG page.
 - **`ALTITUDE FAIL`** was a static check of the configuration (`AltitudeFailMessage`: an IFR unit with no
   altitude input). It is now: the existing configuration case, **or** a configured altitude input that delivers no
   altitude, on any unit (guess). An air data failure (`rs232In`, `rs232Data`, `airdata429`) that takes the altitude
   away therefore shows `ALTITUDE FAIL` as well as its own message (B-1).
-- While `gpsAntenna` or `gpsReceiver` is active, the signal and RAIM messages of #453 are not posted; the hardware
-  message names the cause (guess).
+- While the receiver is dead (`gpsReceiver`, or a code of the receiver error word after which the receiver delivers
+  nothing: `gpsAntenna` and `rcvrHardware`), the signal and RAIM messages of #453 are not posted; the hardware message
+  names the cause (guess).
 
 ## The failures
 
@@ -205,9 +221,75 @@ A failed output port sends nothing, so the receiving equipment loses its data, f
 - A failed input port reports `isReceiving` false. Its readers treat the value as missing (null, shown as dashes).
 - After a repair the port works again from the next tick.
 
+### The receiver error word
+
+The receiver module reports a 16-bit error word to the host; the RS-232 self-test record carries it as a field of its
+own (IM A-7). `RCVR HARDWARE ERROR:` (B-3) shows it as four hex digits, and each bit is one receiver test (IM C-3 to
+C-5). It lives with the receiver (`ReceiverErrors`, owned by `GpsFailures`), not in `VolatileMemory`: it has to be
+decided before the search of a power-on starts, which `VolatileMemory.reset` runs too late for. Take-home mode has no
+receiver failures (#460) and so no word.
+
+- **Power-on bits** are latched once, at the start of `GPS.powerChanged` for a power-on, before the search and FAST
+  decide their start. The battery's wipe has already run then (`userMemoryLost` comes first). They stay until the next
+  power-on, whatever the failures do meanwhile; the hot-swap resume and the battery's ride-through publish no power
+  event, so they latch nothing and keep the word:
+  - 0008: the battery wiped the user memory at this power-on, or `rcvrMemory` acts at it;
+  - 0002, 0004, 0080: `rcvrHardware` with that drawn code is active at the power-on;
+  - 0400: `rcvrInit` is active at the power-on;
+  - 0800: `rcvrEeprom` is active at the power-on.
+- **0008 ends** in the first calculation tick in which the receiver tracks a satellite (`GPS.tracksSatellite`: a real
+  satellite in a channel in an acquired state, as STA 1 shows it), also one before the first navigation page. So at an
+  engine-running start, whose forced acquisition tracks satellites at once, it does not show. The manual ties the code's end
+  at the first satellites to another cause of the same code (IM C-3); that it holds for every cause is the design's
+  reading (#461, 2026-11-08).
+- **Live bits** follow the failures as they are now, and a repair ends them at once: 0010 for an open `gpsAntenna`,
+  0110 for a short one, 2000 and 8000 for `rcvrHardware` with that drawn code.
+- **A dead receiver.** With any of 0002, 0004, 0080, 0010, 0100, 2000 or 8000 the receiver delivers nothing:
+  `GpsFailures.receiverFailed` is that or `gpsReceiver`, and everything that follows it (the inhibits, `FAILR` on
+  STA 1, the #453 messages held back, the spoofer's fake satellites kept out) follows any of them alike.
+- **The message** `RCVR HARDWARE ERROR:` / `xxxx` (`ReceiverHardwareMessage`) shows the word as it is now, in uppercase
+  hex (`0018`, `0110`, `2010`), while it is not 0 and the first navigation page of the power-on has shown (the rule for
+  the unit's own failures). It is checked at 1 Hz, so a live bit shows in the next calculation tick.
+  - **Re-alert by bits** (the maintainer, 2026-11-08): when the code gains a bit it did not have at the last check, the
+    message becomes unread and the MSG prompt flashes, also when another bit ends at the same time. A bit that ends
+    only changes the text; the message keeps its read state. It goes when no bit is left.
+  - **Across a power cycle** it comes back unread, as every hardware message does: its condition is false until the
+    first navigation page, and the code remembered for the re-alert restarts at 0 at a power-off.
+  - **While `gpsReceiver` is effective** (`NO RCVR DATA`) the receiver does not talk to the host, so the host cannot
+    read the word: the message is hidden and `TEST FAIL` counts no receiver bit (`gpsReceiver` has its own). The
+    receiver still runs its own tests, so the latch happens as always; after the repair the word shows at the next
+    check, unread (guess).
+- **`TEST FAIL`** shows on the Self Test page while the power-on bits **as latched** or the live bits are not 0
+  (`testFailCode`), read once when the page is built. The 0008 counts as latched, so a hot start that tracks a
+  satellite during the self-test still shows the `TEST FAIL` of its wipe.
+- **The drawn values** (the antenna's open or short, `rcvrHardware`'s code, the transient flag, `antennaGain`'s loss)
+  are drawn when the failure starts, from FLR 3 or the MTBF trigger, and saved with the failure (`Failures.setValues`).
+  A failure whose values are missing or unusable (a profile from before #471 with `gpsAntenna` active, a hand-edited
+  profile) draws them at its next read and saves them. They are cached at every failure change, so neither the
+  calculation tick nor the 1 Hz message check reads the setting text.
+
+| Codes | Detected | `TEST FAIL` |
+|---|---|---|
+| 0002, 0004, 0008, 0080, 0400, 0800 | latched at a power-on; the message posts with the first navigation page | yes, on that power-on's Self Test page |
+| 0010, 0100, 2000, 8000 | live; the message's next check, at a power-on not before the first navigation page | yes, while active |
+
+### The transient rule
+
+`rcvrMemory`, `rcvrInit` and `rcvrEeprom` draw a transient flag (50 %) when they start:
+
+- Their effect shows only at a power-on, so a failure that starts while the unit runs acts from the next power-on,
+  transient or not.
+- **Transient:** the latch applies the effect and latches the bit, then repairs the failure. The bit, its message and
+  `TEST FAIL` stay for that power-on, and the next power-on finds the unit working fully.
+- **Not transient:** the effect is applied at every power-on until the failure is repaired.
+- A repair before the next power-on cancels the failure without any effect.
+- Once repaired, the MTBF trigger may pick the failure again.
+
 ### GPS antenna (`gpsAntenna`)
 
-A loose or shorted antenna coax, the RF failure of IM C-4. The receiver sees no satellites. The unit:
+A loose or shorted antenna coax, the RF failure of IM C-4. When it starts it is drawn open or short, 50 % each (guess).
+Open gives 0010; short gives 0110, as the short takes the 5 V antenna supply and stops the oscillator, so the 1 ms
+baseband timer fails with it (the issue's guess from IM C-4). The receiver sees no satellites either way. The unit:
 
 - loses every satellite at once (inhibited in the SDK, and skipped by the unit's own solution in the same tick), and
   the navigation flags as with any loss of the fix. No signal reaches a dead antenna or receiver, so a spoofer's fake
@@ -221,9 +303,99 @@ A loose or shorted antenna coax, the RF failure of IM C-4. The receiver sees no 
 
 The receiver module stops talking to the host (`NO RCVR DATA`, B-3: no navigation at all). The effect on the screen is
 the same as `gpsAntenna`: STA 1 shows `FAILR` with no satellite rows. The guide describes `FAILR` simply as a receiver
-failure (5-29), which covers this case too, and documents no other state for it. With both receiver failures active,
-repairing one leaves the unit in `FAILR`: every satellite stays blocked until both are repaired. After the repair the
-receiver reacquires as after any loss of signal.
+failure (5-29), which covers this case too, and documents no other state for it. With several receiver failures active
+(`gpsReceiver` and a dead code of the receiver error word), repairing one leaves the unit in `FAILR`: every satellite
+stays blocked until none is left. After the repair the receiver reacquires as after any loss of signal. While it is
+effective, the host cannot read the receiver error word (see there).
+
+### Receiver memory (`rcvrMemory`)
+
+The receiver module loses its backup power: a bad flex cable or bad RAM in the receiver (IM C-3, 0008). At a power-on
+while it acts, the receiver's battery-backed memory is cleared and 0008 is latched. **The unit's own memory is kept**:
+no `userMemoryLost`, no `USER DATA LOST`, no reset of the user settings, waypoints, flight plans, remarks, the unit's
+clock or its last position, and `VolatileMemory.reset` treats the power-on as it otherwise would.
+
+**Where the data lives** (the maintainer's question, 2026-11-08). The manuals put the date, the time and the last
+position in the host and the almanac and ephemeris in the receiver. The host has its own clock chip and nonvolatile RAM
+held by the lithium battery (CMM 22, 1026), and take-home mode shows the last position without a receiver at work
+(IM 2-4, 5-46). The host sends the receiver its initialization data at the start (IM C-4, 0400; CMM 12). The receiver
+gathers the date, the time and the position in its INIT state and keeps the ephemeris and almanac it collects in its own
+memory (5-29); that memory is backed through the flex cable (IM C-3), so the battery's failure loses both memories and a
+bad flex cable or receiver RAM only the receiver's. So `rcvrMemory` erases only what the receiver alone holds:
+
+- The almanac and every ephemeris are erased, the fake ephemeris collected from a spoofer included: the receiver's half
+  of the battery's wipe (`GPS.forgetReceiverMemory`). The unit's half (the 1988 clock, the 0/0 position, no stored
+  position) runs only for the battery.
+- The clock and the position come from the host at the same power-on, as at every power-on, so the receiver runs an
+  almanac search (ORS 01 6-30) from a right date and position, and the first fix keeps the unit's era.
+- With `rcvrInit` (0400) latched at the same power-on that initialization does not arrive: the receiver starts with the
+  1988 clock (`WIPED_CLOCK_MS`) and a last known position of 0/0, while the unit's clock and position stay right. The
+  almanac search is blind either way, so the start is the same; the first fix still takes the unit's era.
+- **FAST does nothing at that power-on, nor does a switch to FAST on SET 10 in it** (the maintainer, 2026-11-08), as
+  for the battery's wipe: a receiver without an almanac has no memory to be hot from. FAST and REAL behave the same.
+- With the battery's wipe at the same power-on, the whole memory is gone already; the receiver's half changes nothing
+  more.
+
+It follows the transient rule above.
+
+### Receiver hardware (`rcvrHardware`)
+
+An internal fault of the receiver module. When it starts, one code is drawn with equal chance: 0002 (ROM), 0004 (RAM),
+0080 (correlator), 2000 or 8000 (the 1 ms baseband loop), IM C-4. The effect is that of `gpsAntenna`: the receiver is
+dead (see the receiver error word). 0002, 0004 and 0080 are power-on tests: a failure in operation acts from the next
+power-on, and a repair in operation (FLR 2, `SERVICE?`) acts at the next power-on too, as the EEPROM's read does (the
+design's choice: the receiver found the fault at its power-on test and stays down until it runs that test again). 2000
+and 8000 are found in operation: they act at once and end at once with a repair.
+
+### No initialization data (`rcvrInit`)
+
+The receiver gets no initialization data from the host (IM C-4, 0400). While 0400 is latched, nothing from the host
+reaches the receiver for the whole power-on (guess, from the code's name):
+
+- The start mode follows the receiver's own memory, as at every power-on.
+- **FAST sends nothing either** (the maintainer, 2026-11-08): FAST does nothing at that power-on, nor does a switch from
+  REAL to FAST on SET 10 (`GPS.startFast`). FAST and REAL behave the same.
+- **The receiver's clock runs on its own.** Without a fix the unit's clock is not copied into the receiver's
+  (`gpsSatComputer.internalTime`) in the calculation tick or at the resume of a hot swap; the receiver's clock counts
+  the same time from its own value.
+- The date and time entries (SET 2, the Self Test page), the SET 1 position and `SERVICE?` set and save the unit's
+  clock and position, but neither set the receiver's (no `syncLastKnownPosition`) nor restart its search
+  (`GPS.reinitializeSearch`, #357).
+- The altitude input does not reach the receiver: the solution, the measurement and the range errors get no altitude,
+  so there is no altitude aiding, no `NAV A` on STA 1 and no fix from three satellites (5-29). The RAIM predictions
+  follow the receiver: STA 5 (6-20) and the approach gate's predictions at the FAF and the MAP (6-3) are made without
+  the altitude input too, so the gate does not pass on a forecast the receiver cannot meet (the maintainer,
+  2026-11-08). Everything else that reads the altitude (the ALT page, VNAV, `ALTITUDE FAIL`) is unchanged.
+- 0400 and its effect stay for the power-on, also after a repair.
+
+It follows the transient rule above.
+
+### Receiver EEPROM (`rcvrEeprom`)
+
+The receiver module's own EEPROM fails its sum check (IM C-4, 0800); not the unit's EEPROM (see the EEPROM). While 0800
+is latched, the receiver has lost its oscillator calibration and searches a wider frequency range (guess): every
+acquisition time `GpsSearch` sets for the start of the power-on (the hot and warm start, the blind sky search and the
+almanac search, mean and range) is multiplied by a factor drawn at the latch from 2 to 4 (guess). FAST's hot start is
+slower by the same factor, as it runs the same search. A spoofer's fake satellites are searched by the same receiver,
+so their acquisition times (`FakeReceiver`, every branch) take the same factor under the same rule (the maintainer,
+2026-11-08).
+
+The factor ends with the first fix of the power-on (the design's choice): a receiver with a fix has solved its clock
+drift, so a satellite reacquired later (the idle timings), a search started again after a lost fix with a far-off
+belief and the sky search after 5 minutes without a fix take the normal timings. An engine-running start's forced
+acquisition is instant as always. 0800 stays for the power-on, also after a repair.
+
+It follows the transient rule above.
+
+### Antenna sensitivity (`antennaGain`)
+
+A loss of sensitivity in the antenna, the coax or the receiver module (IM C-7; KLN 900 Pilot's Guide B-6). Every
+satellite's SNR (#467) drops by a loss drawn when the failure starts, 6 to 15 dB (guess), while the failure is effective;
+it is subtracted with the transmitters' noise rise (`GPS.currentNoiseRiseDb`), which itself is unchanged. The spoofer's
+fake satellites lose it too, as they enter through the same antenna (the design's choice). There is no code, no message
+and no `TEST FAIL`: low SNRs on STA 1 (IM C-7: 30 and below unusable, 30 to 35 marginal), satellites lost at low
+elevation by the lock rule, and the RAIM and geometry messages of #453 follow from the physics. A repair ends the loss
+at the next signal tick.
 
 ### Ground transmitters (`gpsJamming`, `gpsSpoofing`)
 
@@ -505,8 +677,9 @@ extend it to a loss of the fix. Neither is a spoofing rule.
   acquisition, a power cycle with the same spoofer finds the stored false position and the battery clock in agreement
   with the fake signals and the fake ephemeris kept: the fake satellites come back with the hot time and no
   `POSITION DIFFERS FROM LAST POSITION BY >2NM` shows. A new session is no hot start on the fakes: the unit's clock
-  starts from the sim's time (`E:ABSOLUTE TIME`) plus the stored `clockOffset` (see the battery), and the fake ephemeris is not stored. With FAST, the default, every power-on writes the
-  true state into the memory (#468): the receiver searches the real sky's PRNs from the truth and meets their fake
+  starts from the sim's time (`E:ABSOLUTE TIME`) plus the stored `clockOffset` (see the battery), and the fake ephemeris is not stored. With FAST, the default, a power-on writes the
+  true state into the memory (#468), except one that lost the receiver's memory (the battery's wipe or `rcvrMemory`) or
+  latched 0400, which leave the receiver without it. Otherwise: the receiver searches the real sky's PRNs from the truth and meets their fake
   signals. Inside a spoofer a power cycle is then no hot start on the fakes, and the capture after it shows
   `POSITION DIFFERS` as well as `SYSTEM TIME UPDATED`.
 - **The SDK's last known position** is never the false position while the unit has a fix: where `GPS.tick` syncs it
@@ -514,7 +687,8 @@ extend it to a loss of the fix. Neither is a spoofing rule.
   At a power-on the start model gives the SDK the stored position, false or not, only within 100 NM of the present one,
   so that #62's 2 NM hot-start rule stays honest; beyond 100 NM it gives the present one. A false position beyond
   100 NM would send the SDK into a blind search.
-- **A receiver failure** (`gpsAntenna`, `gpsReceiver`) silences the fake receiver too: no fake rows and no claims.
+- **A dead receiver** (`gpsReceiver`, `gpsAntenna`, `rcvrHardware`) silences the fake receiver too: no fake rows and no
+  claims.
 - **The repair** removes the spoofer at once. The fake satellites go, their claims are released, and the unit recovers
   as when flying out.
 
@@ -624,6 +798,11 @@ values and shows its own uncorrected errors, the same ones at every failure.
   `GPS WP CROSS TRK` carries the deviation with that gain and that zero point (as a share of the 150 mV of full scale)
   after a power-on whose read failed. The internal CDI, the XTK on the pages and the digital outputs stay right. The
   points are drawn from a gain of 0.7 to 1.3 and a zero point of up to ±45 mV, ±30 % of full scale (guesses).
+- **Not the receiver's EEPROM.** `EEPROM FAILURE: IC1045` and the receiver's code 0800 (`rcvrEeprom`) are different
+  parts. The unit's EEPROM is I45 on the main module (CMM 22-23), whose designators are the 1000 series (CMM 10), hence
+  IC1045, and IM C-6 ties `EEPROM FAILURE: IC1xxx` to the unit's processor; the receiver module's designators are the
+  500 series. The RS-232 self-test record carries the receiver error word and the EEPROM's IC designator in separate
+  fields (IM A-7). So `eeprom` keeps its own message, and 0800 belongs to the receiver error word.
 - Not affected: OBS CAL (STA 3). It calibrates the OBS resolver input to the installed indicator (IM 2-65), nothing
   says it is kept in the EEPROM, and Appendix B names only the external D-bar.
 - The STA 4 counters are not in the EEPROM: they are reset when the nonvolatile memory is cleared (5-31), which is the
@@ -815,13 +994,12 @@ Design: [superpowers/specs/2026-11-08-failures-battery-design.md](superpowers/sp
     `userDataFormat` (it says the stored slots are V2, which the persistors write after a wipe too) and the EEPROM's
     calibration values (a settings category of their own, see the EEPROM). The storage's kept keys are
     `KEPT_USER_SETTINGS`.
-- **`RCVR HARDWARE ERROR:` / `0008`** (IM C-3): the receiver's battery-backed RAM failed its check and was cleared; the
-  manual names the loss of the receiver's backup among the causes. It shows from the first navigation page of a power-on
-  with a wipe until the receiver tracks its first satellite in it (`GPS.tracksSatellite`: a real satellite in a channel in
-  an acquired state, as STA 1 shows it), so at a cold-and-dark start it shows during the blind search and at an
-  engine-running start, whose forced acquisition tracks satellites at once, it does not. That the code ends with the
-  first satellite also for this cause is the design's reading of the manual (2026-11-08), not its pairing. It is a
-  message of its own beside `0010` of the antenna; both can be listed.
+- **0008 in the receiver error word** (IM C-3, #471): the receiver's battery-backed RAM failed its check and was
+  cleared; the manual names the loss of the receiver's backup among the causes. A power-on with a wipe latches 0008,
+  which shows in the combined `RCVR HARDWARE ERROR:` code from the first navigation page until the receiver tracks its
+  first satellite (see "The receiver error word"), so at a cold-and-dark start it shows during the blind search and at
+  an engine-running start it does not. With an open antenna at the same power-on the code is `0018`. That power-on's
+  Self Test page shows `TEST FAIL`, also when a satellite is tracked before it is shown.
 - A failed battery stays failed until repaired, so the data is lost again at every power-on.
 - **FLR 2 is no service** (maintainer, 2026-11-08): it repairs the failure only. The battery works again, but the health
   stays where it is (a battery at 0 % may be drawn again by the trigger), the data already lost stays lost, and the
@@ -875,7 +1053,9 @@ before the next fix. The simulation keeps it (maintainer, 2026-11-08):
   - the jammer: its place `lat` and `lon`, its power `powerDb` and its reference altitude `refAglFt`;
   - the spoofer: the same, plus the false position `falseLat`, `falseLon` and `falseAltFt`, the time shift `shiftMs`
     and the clock offset `clockM`;
-  - the faulty satellite: its PRN `prn`, its bias `biasM` and its ramp `rampS` and `elapsedS`.
+  - the faulty satellite: its PRN `prn`, its bias `biasM` and its ramp `rampS` and `elapsedS`;
+  - the antenna: `short` (0 open, 1 short); `rcvrHardware`: its `code`; `rcvrMemory`, `rcvrInit` and `rcvrEeprom`:
+    `transient` (0 or 1); `antennaGain`: its loss `lossDb` (#471).
 - A jammer is saved at its generation, a spoofer once its airport search has resolved. The reference altitude is saved
   again when it has grown by 500 ft. Values that do not parse (a hand-edited profile) are drawn anew by the placement
   rules. #460's jamming ramp (`rampS`, `finalDb`, `elapsedS` of `gpsJamming`) was never released, so no stored ramp
@@ -893,7 +1073,9 @@ before the next fix. The simulation keeps it (maintainer, 2026-11-08):
 - A repair ends the effect at once: the port works from the next tick, the lamp follows its command, the receiver
   acquires again, the message condition ends. Data lost by a dead battery stays lost, and a clock in the wrong era stays after FLR 2.
 - The EEPROM is the exception, as the unit reads it at a power-on only: the screen recenters, the D-bar is right again
-  and the message goes at the next power-on (see the EEPROM).
+  and the message goes at the next power-on (see the EEPROM). So are the power-on codes of the receiver error word
+  (0002, 0004, 0008, 0080, 0400, 0800): they and their effects stay until the next power-on (0008 until a satellite is
+  tracked), see "The receiver error word".
 
 ## UI
 
@@ -948,9 +1130,9 @@ MSG BULB
   INACTIVE 
 429 OUTPUT 
 ALTITUDE   
+ANT GAIN   
 BATTERY    
 EEPROM     
-GPS ANTENNA
 ```
 
 - As FLR 2, for the failures that may fail and are not active, including the manual-only ones. A failure that may not
@@ -996,7 +1178,8 @@ gate and the port let it through.
   the bus fails).
 - Wiki (the maintainer updates it): a new page for the failures and the FLR pages, with the limit that they affect the
   KLN only (see "Other GPS units"); panel.xml
-  customization (`Output.RmiInstalled`); External Annunciators (dark and stuck lamps); RMI (the new key).
+  customization (`Output.RmiInstalled`); External Annunciators (dark and stuck lamps); RMI (the new key). For #471 the
+  failure page gets the new receiver failures and the combined `RCVR HARDWARE ERROR` code.
 
 ## Testing
 
@@ -1009,7 +1192,10 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
   placement, leaving, reference altitude and persistence (`failures/Transmitters.test.ts`); the fake receiver's search
   rule, claims, acquisition times and lock rule (`failures/FakeReceiver.test.ts`); the range errors, the reference
   state and the velocity error (`failures/RangeErrors.test.ts`); the residual test and its thresholds
-  (`GpsSolution.test.ts`); the recovery rules of the start model (`GpsSearch.test.ts`).
+  (`GpsSolution.test.ts`); the recovery rules of the start model (`GpsSearch.test.ts`). For #471: the receiver error
+  word from latched and live bits, the 0008 ending and `testFailCode` keeping it, the draws and their persistence,
+  values missing or unusable, and the transient rule (`failures/ReceiverErrors.test.ts`); the combined message's text
+  and re-alert by bits (`data/PersistentMessages.test.ts`); the acquisition factor (`GpsSearch.test.ts`).
 - Render: FLR 1 to 3 (fields, prompts, lists, SERVICED), SET 10's button, the messages and TEST FAIL, OTH 9/10 dashes,
   the screen shift; STA 1 with fake satellites, their flat SNR and their fake-sky elevations once captured, and in the
   mixed phase (`pages/Sta1Spoofing.test.ts`).
@@ -1019,7 +1205,12 @@ Each behavior gets a test at the cheapest stage that can observe it (CLAUDE.md, 
   horizon; flying into a spoofer, the mixed phase, capture with and without an altitude input and with many and few
   shared PRNs; flying out; a new transmitter after leaving; both together; power cycles, sessions, hot swapping and
   the repair; the airport search), the general time check and the recovery after a lost fix (`test/render/Gps.test.ts`),
-  the battery wipe at a power-on.
+  the battery wipe at a power-on. For #471 (`test/render/failures/Receiver*.test.ts`, `AntennaGain.test.ts`): one
+  message with `0018` from an open antenna and the battery's wipe, `0008` alone after the antenna's repair and its end
+  with the first satellite, the message across a power cycle and while `NO RCVR DATA`, and `TEST FAIL` for each kind of
+  code; `rcvrMemory` erasing the receiver and keeping the user data; `rcvrHardware`'s power-on and live codes; `rcvrInit`
+  blocking FAST, the SET 1 and SET 2 reinitialization and the altitude aiding; `rcvrEeprom` slowing the first fix;
+  `antennaGain` lowering the SNRs on STA 1.
 - With MTBF off and nothing failed, the whole existing suite stays green unchanged, except the tests that pin the
   planner across a power-off with `Output.WriteGPSSimVars` set and those the exceptions of #465 touch (the anti-goals).
 - Sim, before release: the failed ports with a hot swap to another GPS unit (the zeroing itself was tested on

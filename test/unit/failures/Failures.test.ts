@@ -140,7 +140,8 @@ describe('Failures', () => {
         const {failures} = build();
         failures.fail('arinc429Out');
 
-        expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude', 'eeprom', 'superflag', 'gpsAntenna', 'gpsReceiver']);
+        expect(failures.randomCandidates().map(d => d.key)).toEqual(['obsResolver', 'altitude', 'eeprom', 'superflag', 'gpsAntenna', 'gpsReceiver',
+            'rcvrMemory', 'rcvrHardware', 'rcvrInit', 'rcvrEeprom', 'antennaGain']);
     });
 
     it('the MTBF is kept within 0 to 999 hours', () => {

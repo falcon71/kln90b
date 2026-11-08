@@ -25,7 +25,8 @@ export class SelfTestLeftPage extends SixLineHalfPage {
 
     /**
      * #416, #458: whether the self-test of this power-on has failed or a failure that acts on the unit shows as TEST FAIL
-     * (the EEPROM as the power-on read it, #459); it does not change while the page is shown
+     * (the EEPROM as the power-on read it, #459), or the receiver error word has a code (IM C-3, #471); it does not
+     * change while the page is shown
      */
     private readonly isTestFailed: boolean;
 
@@ -35,7 +36,8 @@ export class SelfTestLeftPage extends SixLineHalfPage {
         super(props);
 
         this.props.memory.navPage.isSelfTestActive = true;
-        this.isTestFailed = this.props.memory.selfTestFailure !== null || this.props.failureDetector.anyTestFail();
+        this.isTestFailed = this.props.memory.selfTestFailure !== null || this.props.failureDetector.anyTestFail()
+            || this.props.sensors.in.gps.failures.receiverErrors.testFailCode !== 0;
     }
 
 

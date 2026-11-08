@@ -22,6 +22,7 @@ import {GPS} from "../Gps";
 import {FailureDetector} from "../failures/FailureDetector";
 import {FAILURE_CATALOG, FailedInputPort, FailureKey} from "../failures/FailureCatalog";
 import {DataInterface} from "../settings/KLN90BPlaneSettings";
+import {formatReceiverCode, ReceiverErrors} from "../failures/ReceiverErrors";
 
 /**
  * How long the course must be off before a course message that waits shows: the KA 90 Installation Manual pp. 3-43 and
@@ -42,7 +43,7 @@ export function buildPersistentMessages(props: PageProps): Message[] {
     return [
         new AltitudeFailMessage(props.planeSettings, props.failureDetector),
         new BatteryLowMessage(props.battery, props.memory),
-        new ReceiverMemoryLostMessage(props.memory, props.sensors.in.gps),
+        new ReceiverHardwareMessage(props.memory, props.sensors.in.gps.failures.receiverErrors),
         ...FAILURE_CATALOG.filter(d => d.message !== null).map(d => new FailureMessage(d.key, [...d.message!], props.failureDetector)),
         new ArmGPSApproachMessage(props.memory.navPage),
         new DatabaseOutOfDateMessage(props.database),
@@ -256,31 +257,37 @@ class BatteryLowMessage implements Message {
 }
 
 /**
- * IM C-3: RCVR HARDWARE ERROR 0008, the receiver's battery-backed memory failed its check and was cleared; the loss of its
- * battery backup is one of the causes listed. The manual's remark that the code stays until satellites are received is
- * tied to another cause of the same code; that it also holds for the battery backup is the design's reading (2026-11-08),
- * not the manual's pairing. Here: from a power-on that wiped the
- * memory (#461) until the receiver tracks its first satellite in it (GPS.tracksSatellite), posted from the first main page
- * on like the unit's other hardware messages. A satellite tracked ends it for this power-on, also one tracked before the
- * main page (an engine-running start's forced acquisition)
+ * RCVR HARDWARE ERROR: with the receiver error word as four hex digits (IM C-3, C-4; KLN 900 Pilot's Guide B-6; #471). It
+ * shows while the host reads a code other than 0 (ReceiverErrors.reportedCode, 0 while NO RCVR DATA), from the first main
+ * page of the power-on on like the unit's other hardware messages. A bit the code did not have at the last check makes the
+ * message unread again, so the MSG prompt flashes; a bit that ends only changes the text (the maintainer, 2026-11-08).
+ * Checked at 1 Hz, it allocates only when the code changes
  */
-class ReceiverMemoryLostMessage implements Message {
+class ReceiverHardwareMessage implements Message {
 
-    public readonly message: string[] = ["RCVR HARDWARE ERROR:", "0008"];
+    public readonly message: string[] = ["RCVR HARDWARE ERROR:", "0000"];
     public seen: boolean = false;
+    /** The code of the last check; 0 while the message was not valid */
+    private lastCode = 0;
 
-    constructor(private readonly memory: VolatileMemory, private readonly gps: GPS) {
+    constructor(private readonly memory: VolatileMemory, private readonly errors: ReceiverErrors) {
     }
 
     public isConditionValid(): boolean {
-        if (!this.memory.receiverMemoryLost) {
-            return false;
+        const code = this.memory.failureDetection.mainPageShown ? this.errors.reportedCode : 0;
+        if (code !== this.lastCode) {
+            if ((code & ~this.lastCode) !== 0) {
+                this.seen = false;
+            }
+            this.message[1] = formatReceiverCode(code);
+            this.lastCode = code;
         }
-        if (this.gps.tracksSatellite) {
-            this.memory.receiverMemoryLost = false;
-            return false;
-        }
-        return this.memory.failureDetection.mainPageShown;
+        return code !== 0;
+    }
+
+    /** The code remembered for the re-alert starts at 0 at every power-on, so the message comes back unread */
+    public onPowerOff(): void {
+        this.lastCode = 0;
     }
 }
 

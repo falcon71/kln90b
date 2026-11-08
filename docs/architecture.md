@@ -373,7 +373,7 @@ prediction context of the main computer.
   satellite and is ticked in `GPS.tick` after `GpsFailures.tick` and before the search and the SDK's update. The SNR is
   the sum of the antenna's gain toward the satellite (the SNR curve evaluated at the elevation above the antenna's plane,
   which tilts with the aircraft), an offset by the satellite's block, a slow fade, the receiver's estimate jitter, minus
-  the rise of the noise floor from the jammer and the spoofer (#465, below). The antenna's attitude comes from the platform (`createAntennaAttitude`): `SimVarAntennaAttitude`
+  the rise of the noise floor from the jammer and the spoofer (#465, below) and `antennaGain`'s loss (#471). The antenna's attitude comes from the platform (`createAntennaAttitude`): `SimVarAntennaAttitude`
   in the sim (heading, pitch, bank and `SIM ON GROUND`, with the MSFS signs flipped there), a level antenna in the tests
   unless a boot opts in (`antennaAttitude`).
     - **One lock rule for every cause**: a tracked satellite is lost below SNR 30, a lost one comes back at 35 or more
@@ -407,6 +407,13 @@ prediction context of the main computer.
   owns the receiver failures and the faulty satellite's drawn PRN, bias and ramp, and holds no state `VolatileMemory`
   would reset: the persistent part is the failure's stored values (the ramp progress is saved at most every 10 s), the
   rest restarts at every power-on. Jamming and spoofing are not here: they come from the transmitters (below).
+    - **The receiver error word** (`kln90b/failures/ReceiverErrors.ts`, #471), owned by `GpsFailures`: the
+      `RCVR HARDWARE ERROR` bits. `GPS.powerChanged` latches the power-on bits first at a power-on, before the search
+      and FAST decide their start (the battery's `userMemoryLost` has run by then); the live bits and `antennaGain`'s
+      loss are cached at every `failureChanged`, so the ticks read no setting text. `GPS` reads `hostBlocked` (0400),
+      `acquisitionFactor` (0800, passed to `GpsSearch` until the first fix) and `antennaLossDb` (added in
+      `currentNoiseRiseDb` and the fake receiver's SNR). `ReceiverHardwareMessage` shows `reportedCode`, and
+      `SelfTestLeftPage` reads `testFailCode`.
     - **Inhibit ownership.** `GpsSearch` keeps its own choice (the allowed PRNs) and is given one callback,
       `GpsFailures.receiverFailed`, asked once per application because it reads the settings. The SDK inhibit is set
       when the search does not allow the satellite or the receiver has failed; `GPS.tick` applies it once per tick.
@@ -420,7 +427,7 @@ prediction context of the main computer.
       It always updates the inner strategy and moves its outputs by the solution's shift from `RangeErrors` (#465,
       below): the faulty satellite's bias and a spoofer's mixed solution. Without range errors the inner outputs pass
       through unchanged.
-    - **Readers.** `receiverFailed` (antenna or receiver) makes `Sta1Page` show `FAILR` with no rows, silences the
+    - **Readers.** `receiverFailed` (a dead bit of the receiver error word, or `gpsReceiver`) makes `Sta1Page` show `FAILR` with no rows, silences the
       #453 signal and RAIM messages and gives the fake receiver no spoofer level; `GPS.rangeErrorDetected(halNm)`
       (below) feeds `RaimPositionErrorMessage`, `NavCalculator`'s integrity output and `ModeController`'s approach gate.
 - **Transmitters, the fake receiver and the mixed solution** (#465, design in

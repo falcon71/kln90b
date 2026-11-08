@@ -108,8 +108,12 @@ export class GpsSearch {
      * channel and searches it (#467, Gps.ts wrapReachability)
      * @param allBlocked The failures forbid tracking any satellite (a receiver failure). Asked once per application, not
      * per satellite: it reads the settings (the tick cost rule, CLAUDE.md)
+     * @param acquisitionFactor #471, rcvrEeprom (IM C-4, 0800): the receiver lost its oscillator calibration and searches a
+     * wider frequency range. Every acquisition time set for the start of a power-on is multiplied by it; end() and the sky
+     * search that keeps the belief are not, as a receiver with a fix has solved its clock drift. 1 without the failure
      */
-    constructor(private readonly computer: KLNGPSSatComputer, private readonly allBlocked: () => boolean) {
+    constructor(private readonly computer: KLNGPSSatComputer, private readonly allBlocked: () => boolean,
+                private readonly acquisitionFactor: () => number = () => 1) {
         this.prediction = computer.createPredictionContext();
         this.prediction.awaitInit().then(() => this.predictionReady = true);
     }
@@ -266,14 +270,15 @@ export class GpsSearch {
         const storedNearby = this.storedPosition.distance(presentPoint) < SDK_LAST_KNOWN_POSITION_LIMIT;
         this.computer.syncLastKnownPosition(storedNearby ? this.storedPosition : presentPoint);
 
-        const warm = WARM_ACQUISITION_MIN + Math.random() * (WARM_ACQUISITION_MAX - WARM_ACQUISITION_MIN);
-        this.computer.setAcquisitionTime(warm, WARM_ACQUISITION_RANGE);
+        const factor = this.acquisitionFactor(); //#471: rcvrEeprom, before the first fix of the power-on
+        const warm = (WARM_ACQUISITION_MIN + Math.random() * (WARM_ACQUISITION_MAX - WARM_ACQUISITION_MIN)) * factor;
+        this.computer.setAcquisitionTime(warm, WARM_ACQUISITION_RANGE * factor);
         //Beyond 100 NM the SDK's last known position is the present one, so its 2 NM rule would make every satellite with
         //a current ephemeris hot. The unit searches from the stored position, which is far away: no hot start this time
         if (storedNearby) {
-            this.computer.setAcquisitionTimeWithEphemeris(HOT_ACQUISITION, HOT_ACQUISITION_RANGE);
+            this.computer.setAcquisitionTimeWithEphemeris(HOT_ACQUISITION * factor, HOT_ACQUISITION_RANGE * factor);
         } else {
-            this.computer.setAcquisitionTimeWithEphemeris(warm, WARM_ACQUISITION_RANGE);
+            this.computer.setAcquisitionTimeWithEphemeris(warm, WARM_ACQUISITION_RANGE * factor);
         }
 
         this.mode = SearchMode.Acquisition;
@@ -287,10 +292,11 @@ export class GpsSearch {
         this.releasing.fill(0);
         this.inhibitAllExcept(null);
         this.computer.eraseLastKnownPosition();
+        const factor = this.acquisitionFactor(); //#471: rcvrEeprom, before the first fix of the power-on
         if (mode === SearchMode.AlmanacSearch) {
-            this.computer.setAcquisitionTime(ALMANAC_SEARCH_ACQUISITION, ALMANAC_SEARCH_ACQUISITION_RANGE);
+            this.computer.setAcquisitionTime(ALMANAC_SEARCH_ACQUISITION * factor, ALMANAC_SEARCH_ACQUISITION_RANGE * factor);
         } else {
-            this.computer.setAcquisitionTime(BLIND_ACQUISITION, BLIND_ACQUISITION_RANGE);
+            this.computer.setAcquisitionTime(BLIND_ACQUISITION * factor, BLIND_ACQUISITION_RANGE * factor);
         }
         this.almanacTimeAtStart = this.computer.getLastAlmanacTime();
         this.mode = mode;

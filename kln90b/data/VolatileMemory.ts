@@ -383,12 +383,6 @@ export class VolatileMemory {
      */
     public selfTestFailure: Error | null = null;
 
-    /**
-     * #461: this power-on wiped the user memory, and the receiver has not tracked a satellite since (RCVR HARDWARE ERROR
-     * 0008, IM C-3). Set at every power-on from its event; ReceiverMemoryLostMessage clears it once a satellite is tracked
-     */
-    public receiverMemoryLost: boolean = false;
-
     /** #416: the number of the current power-on. A step of the reset of an earlier one changes nothing (spec 4.3) */
     private powerOnCount = 0;
 
@@ -462,7 +456,6 @@ export class VolatileMemory {
         this.failureDetection.detected.clear();
         this.failureDetection.noticed.clear();
         this.readAtPowerOn();
-        this.receiverMemoryLost = evt.memoryLost === true;
         this.transmittersStarted = false;
         this.navPage.startPageWaypoint = this.navPage.activeWaypoint.lastactiveWaypoint; //#422: before a leg can be activated
         //#202: a power cycle forgets the last match of the ident entry

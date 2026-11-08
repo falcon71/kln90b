@@ -70,9 +70,9 @@ beforeEach(() => {
     // Every normal of the jitter is 0, every acquisition time its mean less half its range
     receiver = new FakeReceiver(fakeSky.context, believedSky.context, () => 0);
     input = {
-        simTimeMs: T0, spoofer: {...SPOOFER}, spooferRatio: 1e6, jammerRatio: 0,
+        simTimeMs: T0, spoofer: {...SPOOFER}, spooferRatio: 1e6, jammerRatio: 0, antennaLossDb: 0,
         beliefLat: TRUE_POSITION.lat, beliefLon: TRUE_POSITION.lon, beliefTimeMs: T0, searchAll: false, almanacSearch: false,
-        sdkChannels: channels, realSnr: prn => realSnr.get(prn) ?? 0, realLost: prn => realLost.has(prn),
+        acquisitionFactor: 1, sdkChannels: channels, realSnr: prn => realSnr.get(prn) ?? 0, realLost: prn => realLost.has(prn),
     };
 });
 
@@ -415,6 +415,43 @@ describe('acquisition (#465)', () => {
         receiver.reset();
         input.beliefTimeMs = input.simTimeMs + SHIFT_MS;
         input.searchAll = true;
+        tick();
+        expect(secondsUntil(1, GPSSatelliteState.InUse)).toBe(6);
+    });
+
+    // #471, rcvrEeprom (IM C-4, 0800): the same receiver searches the fake signals as the real ones, so the factor GPS
+    // passes until the first fix of the power-on scales every fake acquisition time, mean and range alike. The times
+    // of the test above, each times 3
+    it('the 0800 factor scales the acquisition time in every branch (#471)', () => {
+        input.acquisitionFactor = 3;
+        receiver.tick(input);
+        expect(secondsUntil(1, GPSSatelliteState.Acquired, 400)).toBe(111); // Idle: 37 s times 3
+
+        receiver.clear();
+        input.searchAll = true;
+        tick();
+        expect(secondsUntil(1, GPSSatelliteState.Acquired, 400)).toBe(180); // Blind: 60 s times 3
+
+        receiver.clear();
+        input.almanacSearch = true;
+        tick();
+        expect(secondsUntil(1, GPSSatelliteState.Acquired, 1200)).toBe(990); // Almanac search: 330 s times 3
+        input.almanacSearch = false;
+
+        // Hot: captured with the fake ephemeris collected, then the power is cycled at the false position and time
+        receiver.clear();
+        input.searchAll = false;
+        believeFalse();
+        believedStars = FAKE_SKY;
+        tick();
+        secondsUntil(1, GPSSatelliteState.InUse, 400);
+        receiver.reset();
+        tick();
+        expect(secondsUntil(1, GPSSatelliteState.InUse)).toBe(18); // 6 s times 3
+
+        // After the first fix GPS passes 1: the normal times again
+        receiver.reset();
+        input.acquisitionFactor = 1;
         tick();
         expect(secondsUntil(1, GPSSatelliteState.InUse)).toBe(6);
     });

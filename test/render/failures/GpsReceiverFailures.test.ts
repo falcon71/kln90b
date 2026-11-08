@@ -38,6 +38,8 @@ const HOME = {lastLatitude: 47, lastLongitude: 8};
 
 /** A failure stored by an earlier session; '{}' is the text of a failure without values (Failures.fail) */
 const failed = (key: FailureKey) => ({[`failure_${key}`]: '{}'});
+/** #471: the antenna draws open or short at its failure (random() < 0.5 is the short); this steers it to open, 0010 */
+const openAntenna = (unit: HeadlessUnit) => unit.props.sensors.in.gps.failures.receiverErrors.random = () => 0.9;
 
 const byNumber = (a: number, b: number) => a - b;
 const computer = (unit: HeadlessUnit) => unit.props.sensors.in.gps.gpsSatComputer;
@@ -68,6 +70,7 @@ describe('the receiver failures in the receiver (#460)', () => {
             expect(messages(unit)).toEqual([]);
             expect(all.length).toBe(32);
 
+            openAntenna(unit);
             unit.props.failures.fail(c.key);
             await untilCalcTick(unit);
 
@@ -102,6 +105,7 @@ describe('the receiver failures in the receiver (#460)', () => {
         const unit = await bootUnit({storage: HOME});
         await settle(unit);
 
+        openAntenna(unit);
         unit.props.failures.fail('gpsAntenna');
         await vi.advanceTimersByTimeAsync(2000);
 
@@ -119,6 +123,7 @@ describe('the receiver failures in the receiver (#460)', () => {
         vi.spyOn(gps, 'solution', 'get').mockReturnValue(geometry);
         vi.spyOn(gps, 'isValid').mockReturnValue(true);
 
+        openAntenna(unit);
         unit.props.failures.fail('gpsAntenna');
         await vi.advanceTimersByTimeAsync(15_000);
         expect(messages(unit)).toEqual([ANTENNA]);
@@ -291,7 +296,7 @@ describe('the receiver failures in the receiver (#460)', () => {
         await unit.panel.cursorTo('L', 'SPOOFING');
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(rows()).toEqual(['  INACTIVE', 'GPS RCVR', 'JAMMING', 'OBS INPUT', 'SATELLITE', 'SPOOFING']);
+        expect(rows()).toEqual(['  INACTIVE', 'RCVR HW', 'RCVR INIT', 'RCVR MEMORY', 'SATELLITE', 'SPOOFING']);
         await unit.panel.cursorTo('L', 'GPS ANTENNA');
         await vi.advanceTimersByTimeAsync(1000);
         expect(rows()[1]).toBe('GPS ANTENNA');

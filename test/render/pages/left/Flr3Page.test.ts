@@ -13,7 +13,7 @@ describe('FLR 3 (#458)', () => {
         await openFlr3(unit);
 
         expect(Screen.read().status().left).toBe('FLR 3');
-        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'ALTITUDE', 'BATTERY', 'EEPROM', 'GPS ANTENNA']);
+        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'ALTITUDE', 'ANT GAIN', 'BATTERY', 'EEPROM']);
         expect(unit.errors).toEqual([]);
     });
 
@@ -32,7 +32,7 @@ describe('FLR 3 (#458)', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(unit.props.failures.isActive('altitude')).toBe(true);
         expect(unit.props.failures.mtbfHours).toBe(0); // Also with the random failures off
-        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'BATTERY', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR']);
+        expect(rows()).toEqual(['  INACTIVE', '429 OUTPUT', 'ANT GAIN', 'BATTERY', 'EEPROM', 'GPS ANTENNA']);
 
         await unit.panel.cursor('L'); // Off, so that the inner knob turns the pages
         await unit.panel.inner('L', -1);
@@ -65,12 +65,12 @@ describe('FLR 3 (#458)', () => {
         unit.props.failures.fail('arinc429Out');
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'BATTERY', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR']);
+        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'ANT GAIN', 'BATTERY', 'EEPROM', 'GPS ANTENNA']);
         // The cursor keeps its position and stands on the entry that moved up into it
-        expect(unit.panel.focused('L').text.trim()).toBe('BATTERY');
+        expect(unit.panel.focused('L').text.trim()).toBe('ANT GAIN');
         await unit.panel.ent();
         await vi.advanceTimersByTimeAsync(1000);
-        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'FAIL      ?', 'EEPROM', 'GPS ANTENNA', 'GPS RCVR']);
+        expect(rows()).toEqual(['  INACTIVE', 'ALTITUDE', 'FAIL      ?', 'BATTERY', 'EEPROM', 'GPS ANTENNA']);
         expect(unit.errors).toEqual([]);
     });
 
@@ -95,13 +95,13 @@ describe('FLR 3 (#458)', () => {
             }),
         });
         await openFlr3(unit);
-        expect(rows().slice(1)).toEqual(['429 AIRDATA', '429 OUTPUT', 'BATTERY', 'EEPROM', 'GPS ANTENNA']);
+        expect(rows().slice(1)).toEqual(['429 AIRDATA', '429 OUTPUT', 'ANT GAIN', 'BATTERY', 'EEPROM']);
 
         await unit.panel.cursor('L');
         await unit.panel.cursorTo('L', 'RS-232 OUT');
         await vi.advanceTimersByTimeAsync(1000);
 
-        expect(rows().slice(1)).toEqual(['OBS INPUT', 'RMI OUTPUT', 'RS-232 DATA', 'RS-232 IN', 'RS-232 OUT']);
+        expect(rows().slice(1)).toEqual(['RCVR MEMORY', 'RMI OUTPUT', 'RS-232 DATA', 'RS-232 IN', 'RS-232 OUT']);
         expect(unit.errors).toEqual([]);
     });
 });

@@ -7,7 +7,8 @@ import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from "../
 export type FailureKey = 'arinc429Out' | 'rs232Out' | 'rmiOutput' | 'obsResolver' | 'rs232In' | 'rs232Data' | 'airdata429' | 'altitude' | 'eeprom'
     | 'msgBulb' | 'wptBulb' | 'armBulb' | 'actvBulb' | 'msgWiring' | 'wptWiring' | 'armWiring' | 'actvWiring'
     | 'msgDriver' | 'wptDriver' | 'armDriver' | 'actvDriver' | 'superflag'
-    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'gpsSpoofing' | 'faultySatellite' | 'battery';
+    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'gpsSpoofing' | 'faultySatellite' | 'battery'
+    | 'rcvrMemory' | 'rcvrHardware' | 'rcvrInit' | 'rcvrEeprom' | 'antennaGain';
 
 /** Interconnect property names of the output ports */
 export type FailedOutputPort = 'arinc429Tx' | 'rs232Out' | 'obiBus' | 'superflag';
@@ -157,9 +158,10 @@ export const FAILURE_CATALOG: readonly FailureDefinition[] = [
         isEligible: () => true,
     },
     {
-        //#460: the antenna or its cable; the unit finds no satellite and reports a receiver hardware error
-        key: 'gpsAntenna', flrName: 'GPS ANTENNA', random: true, testFail: true,
-        outputs: [], inputs: [], message: ['RCVR HARDWARE ERROR:', '0010'], detection: 'internal',
+        //#460: the antenna or its cable; the unit finds no satellite. Its code (0010, 0110) is in the receiver error word,
+        //whose message and TEST FAIL are ReceiverHardwareMessage and SelfTestLeftPage (#471)
+        key: 'gpsAntenna', flrName: 'GPS ANTENNA', random: true, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
         isEligible: () => true,
     },
     {
@@ -190,6 +192,36 @@ export const FAILURE_CATALOG: readonly FailureDefinition[] = [
         //#461: the internal battery that keeps the almanac, the user data and the clock (CMM 22, B-2). The pilot fails it
         //at will; the random trigger picks it only once the aging has emptied it
         key: 'battery', flrName: 'BATTERY', random: true, randomWhenEmpty: true, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#471: receiver memory fault (IM C-3, C-4). Its effect and message follow in ReceiverErrors
+        key: 'rcvrMemory', flrName: 'RCVR MEMORY', random: true, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#471: receiver hardware fault (IM C-3, C-4)
+        key: 'rcvrHardware', flrName: 'RCVR HW', random: true, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#471: receiver initialization fault (IM C-3, C-4)
+        key: 'rcvrInit', flrName: 'RCVR INIT', random: true, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#471: receiver EEPROM fault (IM C-3, C-4)
+        key: 'rcvrEeprom', flrName: 'RCVR EEPROM', random: true, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#471: antenna gain out of range (IM C-7; KLN 900 Pilot's Guide B-6)
+        key: 'antennaGain', flrName: 'ANT GAIN', random: true, testFail: false,
         outputs: [], inputs: [], message: null, detection: null,
         isEligible: () => true,
     },

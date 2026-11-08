@@ -611,7 +611,9 @@ export class ModeController implements CalcTickable {
         this.navState.aprIntegrityCheckTime = now;
 
         const hal = halForMode(NavMode.APR_LEG);
-        const altitudeAided = this.sensors.in.airdata.pressureAltitude !== null;
+        //5-29: the altitude input as a measurement, as in the live solution. #471: not while rcvrInit (IM C-4, 0400) keeps it
+        //from the receiver, or the gate would pass on a forecast the receiver cannot meet at the FAF and the MAP
+        const altitudeAided = this.sensors.in.airdata.pressureAltitude !== null && !gps.failures.receiverErrors.hostBlocked;
         const gs = gps.groundspeed;
         const msPerNm = gs < 1 ? 0 : HOURS_TO_SECONDS * 1000 / gs;
         const fafEta = now + fafDist * msPerNm;

@@ -202,9 +202,11 @@ describe('the GPS receiver entries (#460)', () => {
         const antenna = def('gpsAntenna');
         expect(antenna.flrName).toBe('GPS ANTENNA');
         expect(antenna.random).toBe(true);
-        expect(antenna.testFail).toBe(true);
-        expect(antenna.message).toEqual(['RCVR HARDWARE ERROR:', '0010']);
-        expect(antenna.detection).toBe('internal');
+        // #471: its code is in the receiver error word, whose message and TEST FAIL are ReceiverHardwareMessage and the
+        // Self Test page, so FailureDetector neither posts nor fails it
+        expect(antenna.testFail).toBe(false);
+        expect(antenna.message).toBeNull();
+        expect(antenna.detection).toBeNull();
         const rcvr = def('gpsReceiver');
         expect(rcvr.flrName).toBe('GPS RCVR');
         expect(rcvr.random).toBe(true);
@@ -238,6 +240,26 @@ describe('the GPS receiver entries (#460)', () => {
         expect(keys).not.toContain('gpsSpoofing');
         expect(keys).not.toContain('faultySatellite');
     });
+});
+
+describe('the receiver failures of #471', () => {
+    const NAMES: Record<string, string> = {
+        rcvrMemory: 'RCVR MEMORY', rcvrHardware: 'RCVR HW', rcvrInit: 'RCVR INIT', rcvrEeprom: 'RCVR EEPROM', antennaGain: 'ANT GAIN',
+    };
+    for (const key of Object.keys(NAMES)) {
+        it(`${key}: the FLR name, random, no TEST FAIL, no message of its own, no ports, always eligible`, () => {
+            const d = def(key as FailureKey);
+            expect(d.flrName).toBe(NAMES[key]);
+            expect(d.random).toBe(true);
+            expect(d.testFail).toBe(false);
+            expect(d.message).toBeNull();
+            expect(d.detection).toBeNull();
+            expect(d.outputs).toEqual([]);
+            expect(d.inputs).toEqual([]);
+            expect(d.readAtPowerOn).toBeUndefined();
+            expect(d.isEligible(plane())).toBe(true);
+        });
+    }
 });
 
 describe('the battery entry (#461)', () => {
