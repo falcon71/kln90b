@@ -54,15 +54,15 @@ async function switchToFast(unit: HeadlessUnit): Promise<void> {
 }
 
 // #468: a switch to FAST while the unit has no fix initializes the memory from the truth and restarts the search, as a
-// power-on with FAST does. No forced acquisition, which would make a satellite with a lost signal Unreachable
+// power-on with FAST does. No forced acquisition: FAST runs the normal search of REAL
 describe('SET 10 switched to FAST (#468)', () => {
     it('switching to FAST during a search gives a hot-start fix, with no Unreachable satellite (#468)', async () => {
         const unit = await bootUnit({coldGps: true, antennaAttitude: true, storage: {fastGpsAcquisition: false, lastLatitude: 47, lastLongitude: 30}});
         const gps = unit.props.sensors.in.gps;
         gps.signals.fadeScale = 0;
         gps.signals.jitterScale = 0;
-        // A bank of 60 degrees to the right (MSFS: negative) loses the low satellites on the high-wing side (#467). A
-        // forced acquisition would make them Unreachable; the search keeps them searched
+        // A bank of 60 degrees to the right (MSFS: negative) loses the low satellites on the high-wing side (#467); the
+        // search keeps them searched
         unit.env.sim.set('PLANE BANK DEGREES', 'degrees', -60);
         unit.env.sim.set('SIM ON GROUND', 'bool', false);
         await untilCalcTick(unit);

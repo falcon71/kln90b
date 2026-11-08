@@ -457,14 +457,17 @@ describe('jamming by distance (#465)', () => {
     }, 60_000);
 
     // The forced acquisition of an engine-running start runs before the first calculation tick: the stored jammer 5 NM away
-    // loses the satellites in it, so nothing is acquired. #467: the forced path makes a lost satellite Unreachable, so the
-    // tracked states are what counts
+    // loses the satellites in it, so nothing is acquired. #469: a lost satellite keeps the channel the forced acquisition
+    // gave it and is searched there, as after any other loss; none is Unreachable, and STA 1 shows every channel searched
     it("an engine-running start inside a stored jammer's effect acquires nothing", async () => {
         const site = jammer(HOME, 200, 5, 150);
         const atForced: number[][] = [];
+        const atForcedUnreachable: number[][] = [];
         const original = GPS.prototype.acceptForcedSolution;
         vi.spyOn(GPS.prototype, 'acceptForcedSolution').mockImplementation(function (this: GPS) {
-            atForced.push(this.gpsSatComputer.getSatellites().filter(s => TRACKED.has(s.state.get())).map(s => s.prn));
+            const sats = this.gpsSatComputer.getSatellites();
+            atForced.push(sats.filter(s => TRACKED.has(s.state.get())).map(s => s.prn));
+            atForcedUnreachable.push(sats.filter(s => s.state.get() === GPSSatelliteState.Unreachable).map(s => s.prn));
             original.call(this);
         });
         const unit = await bootUnit({storage: {...STORED_HOME, ...jammerAt(site)}});
@@ -472,9 +475,14 @@ describe('jamming by distance (#465)', () => {
         const gps = unit.props.sensors.in.gps;
 
         expect(atForced).toEqual([[]]); // Exactly one forced acquisition, and it acquired nothing
+        expect(atForcedUnreachable).toEqual([[]]); // A lost satellite is searched, never Unreachable (#469)
         expect(gps.hadFixSincePowerOn).toBe(false);
 
         await afterCalcTick(unit);
+        expect(inChannels(unit).length).toBeGreaterThanOrEqual(4); // Precondition: the forced acquisition gave the channels
+        const rows = await satelliteRows(unit);
+        expect(rows.map(prnOf)).toEqual(inChannels(unit));
+        expect(rows).toEqual(rows.map(r => searchedRow(unit, prnOf(r))));
         await vi.advanceTimersByTimeAsync(10_000);
         await afterCalcTick(unit);
 
@@ -486,10 +494,10 @@ describe('jamming by distance (#465)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
-    // #469: the forced acquisition marks every satellite it cannot reach Unreachable, and the SDK keeps those out of the
-    // channel assignment until their unreachable time expires, so the fix returns about 242 s after the jammer is repaired.
-    // A satellite lost in flight comes back after IDLE_ACQUISITION plus TRAN (the sibling above holds the setup)
-    it.fails('an engine-running start inside a total signal loss reacquires like a satellite lost in flight (#469)', async () => {
+    // #469: the satellites the forced acquisition could not acquire stay searched in their channels, so the fix returns as
+    // after a satellite lost in flight: IDLE_ACQUISITION plus TRAN (the sibling above holds the setup). When the forced path
+    // marked them Unreachable, the SDK kept them out of the channel assignment and the fix came back after about 242 s
+    it('an engine-running start inside a total signal loss reacquires like a satellite lost in flight', async () => {
         const site = jammer(HOME, 200, 5, 150);
         const unit = await bootUnit({storage: {...STORED_HOME, ...jammerAt(site)}});
         const gps = unit.props.sensors.in.gps;

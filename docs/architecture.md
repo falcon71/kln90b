@@ -371,7 +371,10 @@ prediction context of the main computer.
       its channel, searched; a searched one is not acquired and becomes `Unreachable` after the acquisition timeout. The
       channel assignment keeps the geometric value, so channels still follow the almanac's prediction. The wrapper reads
       a private SDK field; a test holds it. A forced acquisition (the engine-running start) refreshes the
-      signals at its first reachability query, because the SDK computes the satellite positions inside that update.
+      signals at its first reachability query, because the SDK computes the satellite positions inside that update. A
+      lost satellite always takes the SDK's unforced update, also in a forced one (#469): the forced branch would make
+      it `Unreachable` and free its channel, while the unforced one, with the forced update's delta time of 0, leaves it
+      `None` in its channel, searched.
     - **The block** of each PRN comes from `block` in `gps_ephemeris.json`, read from the SDK satellite's private
       ephemeris entry; the offset per block is in `GpsSignal.ts`. A satellite without a known block gets 0.
     - **The ephemeris is generated.** `gps_ephemeris.json` is no committed file: the build generates it from the RINEX
