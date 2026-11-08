@@ -31,7 +31,7 @@ import {
 } from '@microsoft/msfs-sdk';
 
 import {KLN90BPlatform} from "./KLN90BPlatform";
-import {PowerSupply, PowerEvent} from "./PowerSupply";
+import {PowerSupply, PowerEvent, UserMemoryLostEvent} from "./PowerSupply";
 import {KLN90BSettingSaveManager} from "./settings/KLN90BUserSettingsSaverManager";
 import {PageProps} from "./pages/Page";
 import {PageManager} from "./pages/PageManager";
@@ -40,6 +40,7 @@ import {KLN90BPlaneSettingsParser, KLN90PlaneSettings} from "./settings/KLN90BPl
 import {Sensors} from "./Sensors";
 import {Interconnect} from "./Interconnect";
 import {Failures} from "./failures/Failures";
+import {Battery} from "./failures/Battery";
 import {FailureDetector} from "./failures/FailureDetector";
 import {FailureTrigger} from "./failures/FailureTrigger";
 import {FailureOutputs} from "./failures/FailureOutputs";
@@ -81,6 +82,7 @@ import {AirspaceAlert} from "./data/navdata/AirspaceAlert";
 import {AudioGenerator} from "./services/AudioGenerator";
 import {HtAboveAirportAlert} from "./services/HtAboveAirportAlert";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
+import {wipeStorage} from "./settings/UserMemory";
 import {AltAlert} from "./services/AltAlert";
 import {UserFlightplanPersistor} from "./settings/UserFlightplanPersistor";
 import {Hardware} from "./Hardware";
@@ -158,6 +160,8 @@ export class KLN90BCore {
     private efbLoader: KlnEfbLoader | undefined;
     /** The facility calls and the data file the boot waits on, so that the Turn-On page can name the one that hangs (#416) */
     private readonly pendingCalls = new PendingCalls();
+    /** #461: how many times the user memory was lost, so that the boot's restore can tell that one happened while it ran */
+    private memoryLossCount = 0;
 
 
     /**
@@ -176,6 +180,12 @@ export class KLN90BCore {
         this.settingSaveManager.startAutoSave(saveKey);
         //After the load and with the auto save running, so that the drawn values are stored (#459)
         EepromCalibration.drawMissing(KLN90BEepromSettings.getManager(this.bus));
+        //#461: right after the load, so that the storage is wiped before every later handler of the event runs
+        this.bus.getSubscriber<UserMemoryLostEvent>().on("userMemoryLost").handle(() => {
+            wipeStorage(this.userSettings, this.bus);
+            this.memoryLossCount++;
+            this.postUserDataLost();
+        });
 
         this.hEventPublisher = new HEventPublisher(this.bus);
 
@@ -267,6 +277,9 @@ export class KLN90BCore {
         const planeSettingsParser = new KLN90BPlaneSettingsParser();
         this.planeSettings = planeSettingsParser.parsePlaneSettings(xmlConfig);
         const failures = new Failures(this.bus, KLN90BFailureSettings.getManager(this.bus), this.planeSettings);
+        //The battery ages once per session, from the sim date of the last one (#461)
+        const battery = new Battery(KLN90BFailureSettings.getManager(this.bus), failures);
+        battery.age(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
         //The read of the EEPROM at the power-on is kept in VolatileMemory and judged by the detector, both built later;
         //no D-bar write or display tick asks before (#459)
         const eepromReadFailed = () => this.failureDetector !== undefined && this.failureDetector.actsOnUnit('eeprom');
@@ -291,7 +304,7 @@ export class KLN90BCore {
             pageManager: this.pageManager,
             forceReadyToUse: forceReadyToUse,
             pendingCalls: this.pendingCalls,
-        }, brightnessManager);
+        }, brightnessManager, () => failures.isActive('battery'));
 
 
         //From now on, the welcome page may be shown. This gives us time to initialize everything here.
@@ -330,6 +343,8 @@ export class KLN90BCore {
         sensors.in.gps.transmitters.setAirportFinder(new NearestAirportFinder(facilityLoader)); //#465: the spoofer's false position snaps to an airport
         const scanlists = new Scanlists(facilityLoader, this.bus);
 
+        //#461: a power-on with the battery failed during the restore below wipes what the restore has already read
+        const lossesBefore = this.memoryLossCount;
         this.userWaypointPersistor = new UserWaypointPersistor(this.bus, facilityRepository, this.userSettings);
         try {
             this.userWaypointPersistor.restoreWaypoints();
@@ -353,8 +368,9 @@ export class KLN90BCore {
                 lastActiveWaypoint = await facilityLoader.getFacility(ICAO.getFacilityTypeFromValue(lastActiveValue), lastActiveValue);
             } catch (e) {
                 console.error(`Last active waypoint not found: ${lastActiveIcao}`, e);
-                //B-4, #421: a waypoint that is no longer in the database is reported, which the active one is as well
-                if (lastActiveValue !== null) {
+                //B-4, #421: a waypoint that is no longer in the database is reported, which the active one is as well. Not
+                //when the user memory was lost meanwhile, which is all that is reported then (#461)
+                if (lastActiveValue !== null && this.memoryLossCount === lossesBefore) {
                     this.messageHandler.addMessage(new OneTimeMessage([`WAYPOINT ${lastActiveValue.ident} DELETED`]));
                 }
             }
@@ -371,6 +387,16 @@ export class KLN90BCore {
             }
         } else {
             flightplans = Array(26).fill(null).map((_, idx) => new Flightplan(idx, [], this.bus));
+        }
+
+        if (this.memoryLossCount !== lossesBefore) {
+            //#461: the user memory was lost while the restore ran. The holders built later read the wiped storage; what the
+            //restore read before the wipe is dropped here, and so are the messages of the restore. Data the restore failed
+            //on is wiped too, so its USER DATA LOST below is the one posted here
+            restoreSuccessFull = true;
+            lastActiveWaypoint = null;
+            flightplans = Array(26).fill(null).map((_, idx) => new Flightplan(idx, [], this.bus));
+            this.postUserDataLost();
         }
 
         const userDataFormat = this.userSettings.getSetting("userDataFormat");
@@ -416,7 +442,7 @@ export class KLN90BCore {
                 airspaceAlert,
                 new HtAboveAirportAlert(memory.navPage, this.planeSettings, sensors, this.userSettings),
                 new AltAlert(memory, this.planeSettings, sensors, this.userSettings),
-                new Timers(sensors, this.userSettings, memory.dtPage),
+                new Timers(this.bus, sensors, this.userSettings, memory.dtPage),
                 vnav,
                 this.messageHandler,
                 new RollSteeringController(sensors, memory, this.planeSettings),
@@ -449,6 +475,7 @@ export class KLN90BCore {
                 userSettings: this.userSettings,
                 planeSettings: this.planeSettings!,
                 failures: failures,
+                battery: battery,
                 failureDetector: failureDetector,
                 eepromCalibration: eepromCalibration,
                 sensors: sensors,
@@ -481,6 +508,14 @@ export class KLN90BCore {
         }).catch(e => {
             this.bus.getPublisher<ErrorEvent>().pub("error", e);
         });
+    }
+
+    /**
+     * #461: the message list of a power-on that lost the user memory holds USER DATA LOST (B-4) and nothing posted before
+     */
+    private postUserDataLost(): void {
+        this.messageHandler.clear();
+        this.messageHandler.addMessage(new OneTimeMessage(["USER DATA LOST"]));
     }
 
     /**

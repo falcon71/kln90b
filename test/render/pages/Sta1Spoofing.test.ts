@@ -229,6 +229,28 @@ describe('STA 1 with a spoofer (#465)', () => {
         expect(unit.errors).toEqual([]);
     }, 60_000);
 
+    // #461, design "The wipe": a power-on that lost the battery-backed memory erases every ephemeris, also the one collected
+    // from a spoofer, which a normal power cycle keeps
+    it('a wipe power-on forgets the fake ephemeris a normal power cycle keeps', async () => {
+        const {unit} = await capturedUnit();
+        const gps = unit.props.sensors.in.gps;
+        await vi.advanceTimersByTimeAsync(90_000);
+        const collected = () => Array.from({length: 32}, (_, i) => i + 1).filter(prn => gps.fakeReceiver.hasCollected(prn));
+        expect(collected().length).toBeGreaterThanOrEqual(6); // Precondition
+
+        await unit.panel.powerOff();
+        await vi.advanceTimersByTimeAsync(60_000);
+        await unit.panel.powerOn();
+        expect(collected().length).toBeGreaterThanOrEqual(6); // Precondition: kept over a normal power cycle
+
+        await unit.panel.powerOff();
+        unit.props.failures.fail('battery');
+        await vi.advanceTimersByTimeAsync(60_000);
+        await unit.panel.powerOn();
+
+        expect(collected()).toEqual([]);
+    }, 90_000);
+
     // Design, "Shared PRNs": before a search of the whole sky the receiver finds only the fake satellites of PRNs up in both
     // its believed sky and the fake sky; with a shift of 12 hours almost none. A blind search finds every fake PRN
     it.each([

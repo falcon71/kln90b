@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {bootToSelfTest, bootUnit, HeadlessUnit, settle} from '../../harness/boot';
 import {AIRDATA, fuelComputer, HEADING_INPUT, panelXml, VFR_ONLY} from '../../harness/panelXml';
-import {messages} from '../../harness/readers';
+import {messageLines, messages} from '../../harness/readers';
 import {Screen} from '../../harness/render/screen';
 import {FailureKey} from '../../../kln90b/failures/FailureCatalog';
 
@@ -164,4 +164,40 @@ describe('detection over the start and the power cycle (#458)', () => {
         await vi.advanceTimersByTimeAsync(11_000);
         expect(failureMessages(unit)).toEqual(['NO RS-232 DATA']);
     }, 20_000);
+});
+
+describe('BATTERY LOW (#461)', () => {
+    const LOW = ['BATTERY LOW: SERVICE', 'REQUIRED TO PREVENT', 'LOSS OF USER DATA'];
+
+    // CMM 22 gives the low threshold, B-2 the message; the 1.5 % edge is our reading of it
+    it('BATTERY LOW at 1.5 %', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 1.5}});
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messageLines(unit)).toContainEqual(LOW);
+    });
+
+    it('no BATTERY LOW at 1.51 %', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 1.51}});
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messageLines(unit)).not.toContainEqual(LOW);
+    });
+
+    it('a failed battery at full charge shows it', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 100, failure_battery: '{}'}});
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messageLines(unit)).toContainEqual(LOW);
+    });
+
+    it('is not listed on the self-test page and goes after SERVICE?', async () => {
+        const unit = await bootToSelfTest({storage: {batteryHealth: 1}});
+        expect(messageLines(unit)).not.toContainEqual(LOW);
+
+        await unit.panel.approveSelfTest();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messageLines(unit)).toContainEqual(LOW); // Precondition
+
+        unit.props.battery.service();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(messageLines(unit)).not.toContainEqual(LOW);
+    });
 });

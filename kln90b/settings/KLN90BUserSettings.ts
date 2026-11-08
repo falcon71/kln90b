@@ -70,6 +70,7 @@ export type KLN90BUserSettingsTypes = {
     lastLongitude: number;
     lastAlmanacDownload: number;
     lastEphemeris: string;
+    clockOffset: number;
     nearestAptSurface: boolean;
     nearestAptMinRunwayLength: number;
     activeWaypoint: string;
@@ -195,6 +196,10 @@ export class KLN90BUserSettings extends DefaultUserSettingManager<KLN90BUserSett
             {
                 name: "lastEphemeris", //"prn:time,prn:time": the ephemeris in the receiver's memory, by satellite (#62)
                 defaultValue: "",
+            },
+            {
+                name: "clockOffset", //The battery-backed clock as its offset from the sim time in ms, so that a wrong era is kept across sessions (#461)
+                defaultValue: 0,
             },
             {
                 name: "nearestAptSurface",

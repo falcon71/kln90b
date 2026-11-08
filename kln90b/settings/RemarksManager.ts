@@ -2,6 +2,7 @@ import {DefaultUserSettingManager, EventBus} from '@microsoft/msfs-sdk';
 import {KLN90BUserSettings} from "./KLN90BUserSettings";
 import { KLN90BUserFlightplansTypes} from "./KLN90BUserFlightplans";
 import {KLN90BUserRemarkSettings, NUM_REMARKS} from "./KLN90BUserRemarkSettings";
+import {UserMemoryLostEvent} from "../PowerSupply";
 
 export interface RemarksChangedEvent {
     changed: string;
@@ -22,6 +23,8 @@ export class RemarksManager {
         this.manager = KLN90BUserRemarkSettings.getManager(bus);
         this.loadRemarks();
         console.log("Loaded remarks", this.remarks);
+        //#461: the remarks are part of the user memory a failed battery loses at the power-on; the slots are already empty
+        bus.getSubscriber<UserMemoryLostEvent>().on("userMemoryLost").handle(() => this.remarks = {});
     }
 
     public saveRemarks(ident: string, remarks: [string, string, string]) {

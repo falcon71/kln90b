@@ -7,7 +7,7 @@ import {DataInterface, KLN90PlaneSettings, ObsInterface, RmiInterface} from "../
 export type FailureKey = 'arinc429Out' | 'rs232Out' | 'rmiOutput' | 'obsResolver' | 'rs232In' | 'rs232Data' | 'airdata429' | 'altitude' | 'eeprom'
     | 'msgBulb' | 'wptBulb' | 'armBulb' | 'actvBulb' | 'msgWiring' | 'wptWiring' | 'armWiring' | 'actvWiring'
     | 'msgDriver' | 'wptDriver' | 'armDriver' | 'actvDriver' | 'superflag'
-    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'gpsSpoofing' | 'faultySatellite';
+    | 'gpsAntenna' | 'gpsReceiver' | 'gpsJamming' | 'gpsSpoofing' | 'faultySatellite' | 'battery';
 
 /** Interconnect property names of the output ports */
 export type FailedOutputPort = 'arinc429Tx' | 'rs232Out' | 'obiBus' | 'superflag';
@@ -30,6 +30,8 @@ export interface FailureDefinition {
     readonly flrName: string;
     /** The random trigger may pick it */
     readonly random: boolean;
+    /** The random trigger may pick it only while the battery is empty (batteryHealth 0, #461) */
+    readonly randomWhenEmpty?: boolean;
     /** The self-test (TEST FAIL) shows it */
     readonly testFail: boolean;
     readonly outputs: readonly FailedOutputPort[];
@@ -181,6 +183,13 @@ export const FAILURE_CATALOG: readonly FailureDefinition[] = [
     {
         //#460: one satellite broadcasts a growing range error; the pilot starts it, the random trigger does not
         key: 'faultySatellite', flrName: 'SATELLITE', random: false, testFail: false,
+        outputs: [], inputs: [], message: null, detection: null,
+        isEligible: () => true,
+    },
+    {
+        //#461: the internal battery that keeps the almanac, the user data and the clock (CMM 22, B-2). The pilot fails it
+        //at will; the random trigger picks it only once the aging has emptied it
+        key: 'battery', flrName: 'BATTERY', random: true, randomWhenEmpty: true, testFail: false,
         outputs: [], inputs: [], message: null, detection: null,
         isEligible: () => true,
     },

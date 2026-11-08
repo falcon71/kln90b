@@ -5,7 +5,7 @@ import {EVT_ENT} from '../../../../kln90b/HEvents';
 import {collectStatusMessages} from '../../../harness/statusLine';
 import {Flr2Page} from '../../../../kln90b/pages/left/Flr2Page';
 import {Flr3Page} from '../../../../kln90b/pages/left/Flr3Page';
-import {openFlr1, rows} from '../../../harness/render/flrPages';
+import {openFlr1, openFlr2, rows} from '../../../harness/render/flrPages';
 
 // #458: the FLR pages are fictional, as SET 10 is; the unit has no such pages. FLR 1 and the container FlrPage, which
 // turns FLR 1 to FLR 3 with the inner knob: docs/failures.md, "UI". FLR 2 and FLR 3 are in Flr2Page.test.ts and
@@ -138,6 +138,56 @@ describe('FLR 1 (#458)', () => {
         await vi.advanceTimersByTimeAsync(1000);
         expect(Screen.read().status().left).toBe(afterOuter);
         expect(unit.errors).toEqual([]);
+    });
+});
+
+describe('FLR 1 battery (#461)', () => {
+    // Characterization: the percent is the charge rounded up (the display rule of Battery.displayPercent)
+    it('shows the charge rounded up', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 42.01}});
+        await openFlr1(unit);
+        expect(rows()[1]).toBe('BATTERY  43');
+        expect(unit.errors).toEqual([]);
+    });
+
+    it('shows an empty battery as 0', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 0}});
+        await openFlr1(unit);
+        expect(rows()[1]).toBe('BATTERY   0');
+    });
+
+    it('SERVICE? gives a new battery and repairs the battery failure', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 3, failure_battery: '{}'}});
+        await openFlr1(unit);
+        expect(rows()[1]).toBe('BATTERY   3'); // Precondition
+        expect(unit.props.failures.isActive('battery')).toBe(true); // Precondition
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'SERVICE?');
+
+        await unit.panel.ent();
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+
+        expect(rows()[1]).toBe('BATTERY 100');
+        expect(unit.props.failures.isActive('battery')).toBe(false);
+        expect(unit.errors).toEqual([]);
+    });
+
+    // The service is on FLR 1 only: repairing the failure on FLR 2 does not charge the battery
+    it('repairing BATTERY on FLR 2 leaves the charge', async () => {
+        const unit = await bootUnit({storage: {batteryHealth: 3, failure_battery: '{}'}});
+        await openFlr2(unit);
+        await unit.panel.cursor('L');
+        await unit.panel.cursorTo('L', 'BATTERY');
+        await unit.panel.clr();
+        await vi.advanceTimersByTimeAsync(1000);
+        await unit.panel.ent();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(unit.props.failures.isActive('battery')).toBe(false);
+
+        await unit.panel.inner('L', -1);
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(rows()[1]).toBe('BATTERY   3');
     });
 });
 

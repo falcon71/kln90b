@@ -124,7 +124,7 @@ type Flr1PageTypes = {
 }
 
 /**
- * docs/failures.md, FLR 1: the MTBF of the random failures, the battery (fixed until #461) and the service button
+ * docs/failures.md, FLR 1: the MTBF of the random failures, the battery's charge and the service button
  */
 export class Flr1Page extends SixLineHalfPage {
 
@@ -132,6 +132,8 @@ export class Flr1Page extends SixLineHalfPage {
     public readonly children: UIElementChildren<Flr1PageTypes>;
 
     readonly name: string = "FLR 1";
+
+    private readonly batteryRef: NodeReference<HTMLSpanElement> = FSComponent.createRef<HTMLSpanElement>();
 
     constructor(props: PageProps) {
         super(props);
@@ -146,7 +148,7 @@ export class Flr1Page extends SixLineHalfPage {
     public render(): VNode {
         return (<pre>
             MTBF:&nbsp&nbsp{this.children.get("mtbf").render()}<br/>
-            BATTERY&nbsp100<br/>
+            BATTERY&nbsp<span ref={this.batteryRef}>{this.batteryText()}</span><br/>
             <br/>
             <br/>
             <br/>
@@ -154,8 +156,25 @@ export class Flr1Page extends SixLineHalfPage {
         </pre>);
     }
 
+    public tick(blink: boolean): void {
+        super.tick(blink);
+        //The text is written only when it changed (the DOM changes only in display ticks)
+        if (TickController.checkRef(this.batteryRef)) {
+            const text = this.batteryText();
+            if (this.batteryRef.instance.textContent !== text) {
+                this.batteryRef.instance.textContent = text;
+            }
+        }
+    }
+
+    private batteryText(): string {
+        return this.props.battery.displayPercent.toString().padStart(3);
+    }
+
     private serviced(): void {
+        this.props.battery.service(); //A new battery (#461); repairAll covers the battery failure
         this.props.failures.repairAll();
+        this.props.sensors.in.gps.serviceClock(); //The service sets the clock to the true time, which also corrects a wrong era (#461)
         this.props.bus.getPublisher<StatusLineMessageEvents>().pub("statusLineMessage", "SERVICED");
         this.cursorController.setCursorActive(false); //The service is done, nothing is left to enter (maintainer, 2026-11-04)
     }

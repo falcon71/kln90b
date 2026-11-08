@@ -17,9 +17,10 @@ import {TimeStamp} from "./data/Time";
 import {KLN90BUserSettings} from "./settings/KLN90BUserSettings";
 import {KLN90PlaneSettings} from "./settings/KLN90BPlaneSettings";
 import {MessageHandler, OneTimeMessage} from "./data/MessageHandler";
-import {PowerEvent, PowerEventData} from "./PowerSupply";
+import {PowerEvent, PowerEventData, UserMemoryLostEvent} from "./PowerSupply";
 import {TICK_TIME_CALC} from "./TickController";
 import {
+    ACQUIRED_STATES,
     CLOCK_TOLERANCE,
     GPS_ERA_DURATION,
     GpsSearch,
@@ -62,6 +63,11 @@ const TIME_UPDATE_LIMIT = 10 * 60 * 1000; //B-4: SYSTEM TIME UPDATED TO GPS TIME
 const FAR_BELIEF_NM = 100;
 const METERS_PER_FOOT = 0.3048;
 const PRN_SLOTS = 256;
+/**
+ * #461: the clock after a wipe of the battery-backed memory, 1 JAN 1988 00:00:00 UTC. The year the unit's date editors
+ * default to (DateEditor); what the real unit's clock shows after the loss of its memory is a guess
+ */
+export const WIPED_CLOCK_MS = Date.UTC(1988, 0, 1);
 
 /**
  * Take-home mode flies without satellites (Installation manual 1-6, 2-4: it acts as if the GPS had a fix), so its
@@ -338,6 +344,12 @@ export class GPS {
     private readonly takeHomeMode: boolean;
     /** FAST has initialized the memory from the truth: the ephemeris restore of the satellites' late load must keep it current (#468) */
     private ephemerisFromTruthPending = false;
+    /** #461: a wipe erased the receiver's memory: the ephemeris restore of the satellites' late load must erase instead */
+    private ephemerisErasePending = false;
+    /** #461: the wipe left no stored position, so the first fix has nothing to compare with (B-3). Until that fix or a power-off */
+    private noStoredPosition = false;
+    /** #461: this power-on wiped the memory. FAST restores nothing from the truth until the next power event */
+    private memoryLostThisPowerOn = false;
     private gpsStartTime: number = 0;
     private solutionAccepted = false; //5-29: the unit accepts the receiver's solution one calculation tick after it appears (TRAN)
     private inTransition = false;
@@ -487,11 +499,18 @@ export class GPS {
         this.raimPrediction = this.gpsSatComputer.createPredictionContext(); //STA 5 (6-20): one context for the life of the unit; pages are rebuilt on every knob step
         this.gpsSatComputer.onForcedAcquisition = () => this.acceptForcedSolution();
         bus.getSubscriber<PowerEvent>().on("powerEvent").handle(this.powerChanged.bind(this));
+        //Published before the powerEvent of the same power-on, and after the storage wipe (KLN90BCore subscribes first)
+        bus.getSubscriber<UserMemoryLostEvent>().on("userMemoryLost").handle(this.forgetMemory.bind(this));
 
         this.gpsSatComputer.init();
         const savedEphemeris = parseEphemeris(userSettings.getSetting("lastEphemeris").get());
         this.gpsSatComputer.awaitInit().then(() => {
-            this.gpsSatComputer.restoreEphemeris(savedEphemeris);
+            if (this.ephemerisErasePending) {
+                //#461: a wipe ran before the satellites were loaded: the ephemeris parsed above was lost with the memory
+                this.gpsSatComputer.eraseCachedEphemeris();
+            } else {
+                this.gpsSatComputer.restoreEphemeris(savedEphemeris);
+            }
             if (this.ephemerisFromTruthPending) {
                 //A FAST power-on ran before the satellites were loaded: its ephemeris would be lost to the restore (#468)
                 this.gpsSatComputer.setEphemerisCurrent(this.currentSimUnixTime());
@@ -510,7 +529,10 @@ export class GPS {
 
         //We assume that the internal clock kept the time fairly accurate since it has last been running
         const timeRandom = Math.random() * 5 - 2.5;
-        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) + timeRandom);
+        //#461: the clock is kept across sessions as its offset from the sim time, so a wrong era stays until it is corrected
+        const storedOffset = userSettings.getSetting("clockOffset").get();
+        const offset = Number.isFinite(storedOffset) ? storedOffset : 0;
+        const unixTime = this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) + timeRandom) + offset;
         this.timeZulu = this.unixToTimestamp(unixTime);
         this.gpsSatComputer.internalTime = unixTime;
     }
@@ -908,6 +930,7 @@ export class GPS {
      * its search again from the corrected values (#357). With a fix the satellites supply both, and nothing changes
      */
     public reinitializeSearch(): void {
+        this.saveClock(); //The caller has just set the clock (#461)
         if (this.isValid() || this.takeHomeMode) {
             return;
         }
@@ -921,7 +944,8 @@ export class GPS {
      * which acquires each satellite in its own time. With a fix nothing changes, and take-home mode has no satellites
      */
     public startFast(): void {
-        if (this.isValid() || this.takeHomeMode) {
+        //#461: after a wipe in this power-on FAST does nothing either; its hot start stands for a current memory
+        if (this.isValid() || this.takeHomeMode || this.memoryLostThisPowerOn) {
             return;
         }
         this.initializeFromTruth();
@@ -943,8 +967,13 @@ export class GPS {
             SimVar.GetSimVarValue('PLANE LATITUDE', SimVarValueType.Degree),
             SimVar.GetSimVarValue('PLANE LONGITUDE', SimVarValueType.Degree),
         );
-        this.timeZulu.setTimestamp(now);
-        this.gpsSatComputer.internalTime = now;
+        //#461: the true time in the era of the unit's clock, so that the receiver (which works modulo the era) sees an exact
+        //clock, the start stays hot and the unit keeps its era. Almanac and ephemeris keep the sim time base
+        const clock = this.calculateGPSTime(this.timeZulu.getTimestamp(), now);
+        this.timeZulu = clock;
+        this.gpsSatComputer.internalTime = clock.getTimestamp();
+        this.saveClock();
+        this.ephemerisErasePending = false; //The truth replaces a wiped memory
         this.gpsSatComputer.downloadAlamanac(now); //Explicitly: the SDK's default is its context time, stale before its first update
         this.gpsSatComputer.syncLastKnownPosition(this.coords);
         this.gpsSatComputer.setEphemerisCurrent(now); //Nothing yet if the satellites are still loading: see the constructor
@@ -955,7 +984,60 @@ export class GPS {
         return this.absoluteTimeToUNIXTime(SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds));
     }
 
+    /**
+     * #461, design "The wipe": the battery-backed memory was lost at this power-on. The clock starts on WIPED_CLOCK_MS, the
+     * almanac and every ephemeris are erased, and there is no stored position (the settings' default 0/0). The off time
+     * adds nothing to the clock (lastPowerOffTime is now), and the clock is saved over the wiped storage. Runs before the
+     * powerEvent, whose search then starts from this memory: an almanac search (ORS 01 6-30)
+     */
+    private forgetMemory(): void {
+        this.timeZulu = this.unixToTimestamp(WIPED_CLOCK_MS);
+        this.gpsSatComputer.internalTime = WIPED_CLOCK_MS;
+        this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+        this.gpsSatComputer.eraseAlamanac();
+        this.gpsSatComputer.eraseCachedEphemeris(); //Nothing yet if the satellites are still loading: see the constructor
+        this.fakeReceiver.forgetEphemeris(); //Also the fake ephemeris collected from a spoofer
+        this.ephemerisErasePending = true;
+        this.ephemerisFromTruthPending = false; //A truth written earlier is lost with the memory
+        this.coords.set(0, 0);
+        this.gpsSatComputer.syncLastKnownPosition(this.coords);
+        this.noStoredPosition = true;
+        this.saveClock();
+    }
+
+    /**
+     * #461: the receiver tracks a satellite: some real satellite in the SDK's channels is in an acquired state, as STA 1
+     * shows it. RCVR HARDWARE ERROR 0008 ends with it: IM C-3 ties the code's end at the first satellites to another of its
+     * causes, and applying it to the loss of the battery backup is the design's reading (2026-11-08). Allocates nothing
+     */
+    public get tracksSatellite(): boolean {
+        const channels = this.gpsSatComputer.getChannels();
+        for (let i = 0; i < channels.length; i++) {
+            const sat = channels[i];
+            if (sat !== null && ACQUIRED_STATES.has(sat.state.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** #461: stores the clock as its offset from the sim time, the battery-backed memory of the unit's clock */
+    public saveClock(): void {
+        this.userSettings.getSetting("clockOffset").set(this.timeZulu.getTimestamp() - this.currentSimUnixTime());
+    }
+
+    /**
+     * #461, SERVICE? on FLR 1: the clock is set to the true time. Without a fix the receiver's clock and search follow, as
+     * after a SET 2 entry; with a fix the satellites supply the time anyway
+     */
+    public serviceClock(): void {
+        const now = this.currentSimUnixTime();
+        this.timeZulu = this.unixToTimestamp(now);
+        this.reinitializeSearch(); //Saves the clock, and restarts a search without a fix from it
+    }
+
     public savePosition(): void {
+        this.saveClock();
         this.userSettings.getSetting("lastLatitude").set(this.coords.lat);
         this.userSettings.getSetting("lastLongitude").set(this.coords.lon);
         this.userSettings.getSetting("lastAlmanacDownload").set(this.gpsSatComputer.getLastAlmanacTime() ?? 0);
@@ -994,6 +1076,7 @@ export class GPS {
     private timeUpdated(time: TimeStamp): void {
         this.messageHandler.addMessage(new OneTimeMessage(["SYSTEM TIME UPDATED", "TO GPS TIME"]));
         this.bus.getPublisher<GPSEvents>().pub("timeUpdatedEvent", time);
+        this.saveClock();
     }
 
     private gpsAcquired() {
@@ -1013,10 +1096,12 @@ export class GPS {
         const pos = this.acquiredPosition.set(this.measurement.lat, this.measurement.lon);
 
         //B-3: only the first NAV after power-on is compared with the position at power-off. A fix regained in flight
-        //would compare with the position where the fix was lost (#454). Before coords takes the new position
-        if (firstFix && UnitType.GA_RADIAN.convertTo(this.coords.distance(pos), UnitType.NMILE) > 2) {
+        //would compare with the position where the fix was lost (#454). Before coords takes the new position. #461: after
+        //a wipe there is no stored position to compare with
+        if (firstFix && !this.noStoredPosition && UnitType.GA_RADIAN.convertTo(this.coords.distance(pos), UnitType.NMILE) > 2) {
             this.messageHandler.addMessage(new OneTimeMessage(["POSITION DIFFERS FROM", "LAST POSITION BY >2NM"]));
         }
+        this.noStoredPosition = false;
 
         if (Math.abs(calculatedTime.getTimestamp() - this.timeZulu.getTimestamp()) > TIME_UPDATE_LIMIT) {
             this.timeUpdated(calculatedTime);
@@ -1024,6 +1109,7 @@ export class GPS {
 
         this.timeZulu = calculatedTime;
         this.gpsSatComputer.internalTime = actualUnixTime;
+        this.saveClock();
         this.coords.set(pos);
     }
 
@@ -1051,6 +1137,7 @@ export class GPS {
         this.fakeReceiver.reset(); //#465: every fake satellite lost and its channel freed; the fake ephemeris kept
         this.rangeErrors.reset(); //#465: the rows' whole milliseconds and their ranges' rates are forgotten
         this.signalsRefreshPending = false; //A forced acquisition asked before the satellites were loaded may never run
+        this.memoryLostThisPowerOn = evt.isPowered && evt.memoryLost === true; //#461
         if (evt.isPowered) {
             //Ticks are not running, when we are powered off. The battery clock counts the off time itself:
             //PowerSupply's timeSincePowerChange is shaped for the CRT warm-up and is about 0 on a forced start (#328).
@@ -1058,7 +1145,8 @@ export class GPS {
             //real-world counterpart
             this.timeZulu.setTimestamp(this.timeZulu.getTimestamp() + (SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds) - this.lastPowerOffTime) * 1000);
             this.gpsSatComputer.internalTime = this.timeZulu.getTimestamp(); //The receiver reads it on the first update, before tick refreshes it (#211)
-            if (this.userSettings.getSetting("fastGpsAcquisition").get()) {
+            //#461: FAST does nothing at a power-on that wiped the memory: a wiped receiver has no memory to be hot from
+            if (this.userSettings.getSetting("fastGpsAcquisition").get() && !this.memoryLostThisPowerOn) {
                 this.initializeFromTruth(); //#468: before the search, which decides its start from this memory
             }
             this.search.start(this.coords); //The receiver starts from the position stored at power-off (#62)
@@ -1067,9 +1155,13 @@ export class GPS {
             this.measurement.restart(); //Design 6.7: nothing of the receiver's errors and filter survives a power cycle
         } else {
             this.lastPowerOffTime = SimVar.GetSimVarValue('E:ABSOLUTE TIME', SimVarValueType.Seconds);
+            this.saveClock(); //#461: the battery keeps the clock over the power-off
+            //Sensors.reset -> gps.reset -> savePosition -> saveClock also runs at a power-on or off, and stores the right
+            //clock only because GPS subscribes to powerEvent before Sensors does: powerChanged has carried the clock over the off time first
             this.solutionAccepted = false;
             this.inTransition = false;
             this._hadFixSincePowerOn = false;
+            this.noStoredPosition = false; //#461: the position of this power-off is stored
             this.search.end();
             this.measurement.restart();
         }

@@ -61,7 +61,7 @@ export const ALMANAC_SEARCH_ACQUISITION_RANGE = 120 * 1000;
 export const SDK_REACHABLE_STRENGTH = 0.05;
 const PRN_SLOTS = 256;
 
-const ACQUIRED_STATES = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
+export const ACQUIRED_STATES = new Set([GPSSatelliteState.Acquired, GPSSatelliteState.DataCollected, GPSSatelliteState.InUse, GPSSatelliteState.InUseDiffApplied]);
 
 const elevationDeg = (sat: GPSPredictionSatellite): number => 90 - UnitType.RADIAN.convertTo(sat.position.get()[0], UnitType.DEGREE);
 

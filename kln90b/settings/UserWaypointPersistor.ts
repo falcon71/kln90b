@@ -23,6 +23,8 @@ import {padFixed, padInt, withSign} from "../data/NumberFormat";
 import {UserWaypointLoaderV2} from "./UserWaypointLoaderV2";
 import {KLN90BUserSettings} from "./KLN90BUserSettings";
 import {UserWaypointLoaderV1} from "./UserWaypointLoaderV1";
+import {UserMemoryLostEvent} from "../PowerSupply";
+import {USER_WAYPOINT} from "../data/navdata/IcaoBuilder";
 
 export interface UserWaypointLoader {
     restoreWaypoints(): void;
@@ -43,6 +45,29 @@ export class UserWaypointPersistor {
         this.manager = KLN90BUserWaypointsSettings.getManager(bus);
         this.v1Loader = new UserWaypointLoaderV1(bus, repo);
         this.v2Loader = new UserWaypointLoaderV2(bus, repo);
+        bus.getSubscriber<UserMemoryLostEvent>().on("userMemoryLost").handle(this.removeUserWaypoints.bind(this));
+    }
+
+    /**
+     * #461: the user waypoints are part of the user memory a failed battery loses at the power-on. The slots are already
+     * empty (UserMemory.wipeStorage), so the removals write nothing. The temporary waypoints are left to
+     * TemporaryWaypointDeleter, which deletes those that no flight plan holds at the same power-on
+     */
+    private removeUserWaypoints(): void {
+        const userWaypoints: Facility[] = [];
+        this.repo.forEach(w => {
+            if (w.icaoStruct.region === USER_WAYPOINT) {
+                userWaypoints.push(w);
+            }
+        });
+        this.ignoreSync = true;
+        try {
+            for (const wpt of userWaypoints) {
+                this.repo.remove(wpt);
+            }
+        } finally {
+            this.ignoreSync = false;
+        }
     }
 
     public restoreWaypoints() {

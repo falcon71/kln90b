@@ -96,7 +96,7 @@ topic and rendered by `controls/ErrorPage` as a full-screen error page with a Gi
 and contains:
 `ref, bus, userSettings, planeSettings, sensors, pageManager, messageHandler, hardware, memory (VolatileMemory), facilityLoader,
 facilityRepository, nearestLists, nearestUtils, remarksManager, scanLists, msa, vnav, modeController, database, magvar, sidstar,
-pendingCalls`. The failure simulation adds `failures`, `failureDetector` and `eepromCalibration` (after `planeSettings`).
+pendingCalls`. The failure simulation adds `failures`, `battery`, `failureDetector` and `eepromCalibration` (after `planeSettings`).
 `PowerSupply` and `WelcomePage` start with a reduced `WelcomePageProps` and swap in the full props when `propsReady`
 arrives.
 
@@ -111,8 +111,15 @@ arrives.
   ordinary power-off, so the `powerEvent` and its off time follow the actual power change, not the loss. The first
   reading, a loss while the knob is off and the knob itself act at once; turning the knob off during a ride-through
   ends it. `GPS OVERRIDDEN` stays claimed through it, because the running unit's `NavCalculator` claims it at 1 Hz.
-- On a power-on edge, `PowerSupply` increments the `powercycles` setting, calls
-  `pageManager.setCurrentPage(WelcomePage, props)` and publishes **`powerEvent {isPowered, timeSincePowerChange}`**.
+- On a power-on edge, `PowerSupply` first asks whether the battery has failed (`batteryFailed`, the `battery` failure,
+  #461). If so it publishes the bus event **`userMemoryLost`** (not cached), synchronously, so that every holder of user
+  memory has reset itself before anything else of the power-on runs. It then increments the `powercycles` setting, calls
+  `pageManager.setCurrentPage(WelcomePage, props)` and publishes
+  **`powerEvent {isPowered, timeSincePowerChange, memoryLost}`**, where `memoryLost` says that the event preceded it.
+  Only a real power-on does this: the ride-through and the hot-swap resume publish neither. The subscribers of
+  `userMemoryLost` are `KLN90BCore` (right after the settings load: `wipeStorage` in `settings/UserMemory.ts`, the loss
+  counter that `asyncInit` compares across its awaits, and `USER DATA LOST`), `UserWaypointPersistor`, `VolatileMemory`
+  (the flight plans, `ActiveWaypoint.forgetAll`), `RemarksManager`, `Timers` and `GPS` (`forgetMemory`).
 - On a power-off edge, it shows the `NullPage` and publishes the same event.
 - `lastPowerChangeTime` starts one hour in the past, so the unit is assumed to have been off for one hour.
 - Subscribers to `powerEvent`:
@@ -123,7 +130,8 @@ arrives.
       (`E:ABSOLUTE TIME` at construction or the last power-off, `lastPowerOffTime`), not by `timeSincePowerChange`: that
       value is shaped for the CRT warm-up and is about 0 on a forced start (#328). The clock follows the sim's world
       time, as the satellites do, so a sim pause before the power-on does not put it off. At power-on it then starts
-      the start model (`search.start`, Core 3); at power-off it ends it.
+      the start model (`search.start`, Core 3); at power-off it ends it. A power-on with `memoryLost` skips FAST's
+      `initializeFromTruth` (#461): the wiped receiver does the almanac search.
     - `VolatileMemory.reset()`, which runs on power-on only (see Core 7).
     - `TemporaryWaypointDeleter`.
 - Welcome and self-test flow (lives in pages, summarised here for wiring): the display loop runs from the start of the
@@ -606,8 +614,11 @@ prediction context of the main computer.
   `SYSTEM TIME UPDATED TO GPS TIME` and publishes **`timeUpdatedEvent`** (SET 2 publishes it too; nothing subscribes
   since #175). The AIRAC-expired message is the persistent `DatabaseOutOfDateMessage` alone (Core 9).
 - Internal clock `timeZulu` (`data/Time.ts TimeStamp`):
-    - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s. No hour is subtracted, and the hour
-      `PowerSupply` assumes for the CRT warm-up is not used.
+    - At construction it is set from `E:ABSOLUTE TIME` plus a random ±2.5 s plus the user setting `clockOffset` (#461),
+      the clock's offset from the sim time that `GPS.saveClock` stores whenever the clock is set other than by running
+      and at a power-off, so that a wrong era is kept across sessions. No hour is subtracted, and the hour
+      `PowerSupply` assumes for the CRT warm-up is not used. A wipe sets the clock to `WIPED_CLOCK_MS` (1 JAN 1988),
+      `SERVICE?` to the true time (`GPS.serviceClock`), and FAST keeps the unit's era.
     - While the unit is off it runs on in sim time: at power-on the `E:ABSOLUTE TIME` elapsed since construction or the
       last power-off is added (#328). A sim pause has no real-world counterpart, so wall-clock time would put the clock
       off by the length of the pause.
@@ -1661,8 +1672,8 @@ Everything goes through SDK **UserSettings saved by `UserSettingSaveManager`** (
   the tree as a type only and `Set10Page` does not import the file, so neither closes an import cycle. `FlrPage` is a
   custom page tree controller like the ACT page: the inner knob moves between FLR 1 to 3, and the outer knob is not
   handled, so the pushed page is popped and the event dispatched again (the KLN 89 trainer behavior above).
-  FLR 1 holds the `MtbfEditor` (three digits and `H`, 0 or CLR is OFF), the battery (a fixed figure until the battery
-  part) and the `SERVICE?` button, which asks `CONFIRM?` and then repairs everything (`failures.repairAll()`) and shows
+  FLR 1 holds the `MtbfEditor` (three digits and `H`, 0 or CLR is OFF), the battery's charge in percent (`Battery.displayPercent`)
+  and the `SERVICE?` button, which asks `CONFIRM?` and then installs a new battery, repairs everything (`failures.repairAll()`), sets the clock (`GPS.serviceClock`) and shows
   `SERVICED` on the status line. FLR 2 and FLR 3 share `FailureListPage`: a static heading and a `List` of
   `ConfirmListItem`s (`controls/ListItem.tsx`: an entry that shows a flashing prompt of its own in its place, asked by
   CLR on FLR 2 and by ENT on FLR 3, confirmed by ENT, withdrawn by CLR). The lists come from `failures.activeList()` and

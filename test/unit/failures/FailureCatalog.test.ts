@@ -240,6 +240,23 @@ describe('the GPS receiver entries (#460)', () => {
     });
 });
 
+describe('the battery entry (#461)', () => {
+    it('is the only entry the random trigger picks only while the battery is empty', () => {
+        expect(FAILURE_CATALOG.filter(d => d.randomWhenEmpty).map(d => d.key)).toEqual(['battery']);
+    });
+
+    it('has no ports, no message and is always eligible', () => {
+        const b = def('battery');
+        expect(b.flrName).toBe('BATTERY');
+        expect(b.outputs).toEqual([]);
+        expect(b.inputs).toEqual([]);
+        expect(b.message).toBeNull();
+        expect(b.detection).toBeNull();
+        expect(b.testFail).toBe(false);
+        expect(b.isEligible(plane())).toBe(true);
+    });
+});
+
 describe('the spoofing entry (#465)', () => {
     it('gpsSpoofing is in the catalog: SPOOFING, manual, no TEST FAIL', () => {
         const spoof = def('gpsSpoofing');
